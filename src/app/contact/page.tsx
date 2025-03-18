@@ -43,7 +43,7 @@ export default function Contact() {
         subject: "",
         message: "",
       })
-    } catch (err) {
+    } catch (error) {
       setError("Hubo un error al enviar el mensaje. Por favor, inténtalo de nuevo.")
     } finally {
       setLoading(false)

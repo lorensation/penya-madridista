@@ -4,6 +4,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import Header from "@/components/header"
 import { ThemeProvider } from "@/components/theme-provider"
+import Link from "next/link"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -35,24 +36,24 @@ export default function RootLayout({
                   <h3 className="text-xl font-bold mb-4">Enlaces</h3>
                   <ul className="space-y-2">
                     <li>
-                      <a href="/" className="hover:text-accent">
+                      <Link href="/" className="hover:text-accent">
                         Inicio
-                      </a>
+                      </Link>
                     </li>
                     <li>
-                      <a href="/blog" className="hover:text-accent">
+                      <Link href="/blog" className="hover:text-accent">
                         Blog
-                      </a>
+                      </Link>
                     </li>
                     <li>
-                      <a href="/membership" className="hover:text-accent">
+                      <Link href="/membership" className="hover:text-accent">
                         Hazte Socio
-                      </a>
+                      </Link>
                     </li>
                     <li>
-                      <a href="/contact" className="hover:text-accent">
+                      <Link href="/contact" className="hover:text-accent">
                         Contacto
-                      </a>
+                      </Link>
                     </li>
                   </ul>
                 </div>

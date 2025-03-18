@@ -45,7 +45,8 @@ const membershipPlans = [
 export default function Membership() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  // Remove the unused loading variable
+  // const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -53,7 +54,8 @@ export default function Membership() {
     const checkUser = async () => {
       const { data } = await supabase.auth.getUser()
       setUser(data.user)
-      setLoading(false)
+      // Remove the loading state update
+      // setLoading(false);
     }
 
     checkUser()

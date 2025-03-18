@@ -76,7 +76,8 @@ export default function ContentPage() {
           return
         }
 
-        setUser(userData.user)
+        // Remove the unused user variable
+        // setUser(userData.user);
 
         // Fetch user profile
         const { data: profileData, error: profileError } = await supabase

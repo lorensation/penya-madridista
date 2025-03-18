@@ -54,7 +54,8 @@ export default function SettingsPage() {
 
         if (profileError) throw profileError
 
-        setProfile(profileData)
+        // Remove the unused profile variable
+        // setProfile(profileData);
 
         // Initialize form data
         setFormData({
