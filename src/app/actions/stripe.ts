@@ -1,11 +1,12 @@
 "use server"
 
 import { createCheckoutSession, createCustomer, cancelSubscription as cancelStripeSubscription } from "@/lib/stripe"
-import { supabase } from "@/lib/supabase"
+import { createServerSupabaseClient } from "@/lib/supabase-server"
 import { revalidatePath } from "next/cache"
 
 export async function createStripeCheckout(formData: FormData) {
   try {
+    const supabase = createServerSupabaseClient()
     const priceId = formData.get("priceId") as string
     const userId = formData.get("userId") as string
     const email = formData.get("email") as string
@@ -64,6 +65,7 @@ export async function createStripeCheckout(formData: FormData) {
 
 export async function cancelSubscription(formData: FormData) {
   try {
+    const supabase = createServerSupabaseClient()
     const subscriptionId = formData.get("subscriptionId") as string
     const userId = formData.get("userId") as string
 

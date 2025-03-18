@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { createUserProfile } from "@/app/actions/auth"
 
 export default function Register() {
   const router = useRouter()
@@ -42,24 +43,12 @@ export default function Register() {
         throw new Error("No user data returned from signup")
       }
 
-      // 2. Create the profile in miembros table
-      const { error: profileError } = await supabase.from("miembros").insert({
-        auth_id: authData.user.id,
-        email: email,
-        name: name,
-        apellido1: "", // This is required, but we don't have it in the form yet
-        dni_pasaporte: "", // This is required, but we don't have it in the form yet
-        telefono: 0, // This is required, but we don't have it in the form yet
-        fecha_nacimiento: new Date().toISOString(), // This is required, but we don't have it in the form yet
-        es_socio_realmadrid: false,
-        socio_carnet_madridista: false,
-        nacionalidad: "", // This is required, but we don't have it in the form yet
-      })
+      // 2. Create the profile using server action
+      const result = await createUserProfile(authData.user.id, email, name)
 
-      if (profileError) {
-        // If profile creation fails, we should delete the auth user
-        await supabase.auth.admin.deleteUser(authData.user.id)
-        throw profileError
+      if (result.error) {
+        console.error("Profile creation error:", result.error)
+        // We'll continue and let the user complete their profile later
       }
 
       router.push("/register-success")
