@@ -39,9 +39,7 @@ export function RegisterForm() {
         throw signUpError
       }
 
-      // Create user profile using server action
-      // This will be handled by a server action in a separate file
-
+      // We'll create the profile after email verification
       router.push("/auth/verify")
     } catch (error: any) {
       setError(error.message || "Failed to register")
@@ -75,4 +73,5 @@ export function RegisterForm() {
     </form>
   )
 }
+
 
