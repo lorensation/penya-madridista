@@ -25,7 +25,8 @@ export default function Register() {
     setError(null)
 
     try {
-      const { error } = await supabase.auth.signUp({
+      // 1. Sign up the user
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -35,10 +36,35 @@ export default function Register() {
         },
       })
 
-      if (error) throw error
+      if (signUpError) throw signUpError
+
+      if (!authData.user) {
+        throw new Error("No user data returned from signup")
+      }
+
+      // 2. Create the profile in miembros table
+      const { error: profileError } = await supabase.from("miembros").insert({
+        auth_id: authData.user.id,
+        email: email,
+        name: name,
+        apellido1: "", // This is required, but we don't have it in the form yet
+        dni_pasaporte: "", // This is required, but we don't have it in the form yet
+        telefono: 0, // This is required, but we don't have it in the form yet
+        fecha_nacimiento: new Date().toISOString(), // This is required, but we don't have it in the form yet
+        es_socio_realmadrid: false,
+        socio_carnet_madridista: false,
+        nacionalidad: "", // This is required, but we don't have it in the form yet
+      })
+
+      if (profileError) {
+        // If profile creation fails, we should delete the auth user
+        await supabase.auth.admin.deleteUser(authData.user.id)
+        throw profileError
+      }
 
       router.push("/register-success")
     } catch (error: any) {
+      console.error("Registration error:", error)
       setError(error.message || "Error al registrarse")
     } finally {
       setLoading(false)
