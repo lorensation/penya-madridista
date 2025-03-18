@@ -4,14 +4,19 @@ import { Button } from "@/components/ui/button"
 import { supabase } from "@/lib/supabase"
 
 async function getBlogPosts() {
-  const { data, error } = await supabase.from("posts").select("*").order("created_at", { ascending: false })
+  try {
+    const { data, error } = await supabase.from("posts").select("*").order("created_at", { ascending: false })
 
-  if (error) {
+    if (error) {
+      console.error("Error fetching blog posts:", error)
+      return []
+    }
+
+    return data || []
+  } catch (error) {
     console.error("Error fetching blog posts:", error)
     return []
   }
-
-  return data || []
 }
 
 export default async function Blog() {

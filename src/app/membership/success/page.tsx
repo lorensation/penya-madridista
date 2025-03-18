@@ -5,8 +5,9 @@ import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { supabase } from "@/lib/supabase"
+import { Suspense } from "react"
 
-export default function SuccessPage() {
+function SuccessContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -45,13 +46,13 @@ export default function SuccessPage() {
 
         if (checkoutData) {
           await supabase
-            .from("profiles")
+            .from("miembros")
             .update({
               subscription_status: "active",
               subscription_plan: checkoutData.plan_type,
               subscription_updated_at: new Date().toISOString(),
             })
-            .eq("id", userData.user.id)
+            .eq("auth_id", userData.user.id)
         }
 
         setLoading(false)
@@ -137,6 +138,23 @@ export default function SuccessPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-gray-600">Cargando...</p>
+          </div>
+        </div>
+      }
+    >
+      <SuccessContent />
+    </Suspense>
   )
 }
 

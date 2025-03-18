@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CreditCard, CheckCircle, AlertTriangle, Calendar } from "lucide-react"
-import { cancelSubscription } from "../../actions/stripe"
+import { cancelSubscription } from "@/app/actions/stripe"
 
 export default function MembershipPage() {
   const router = useRouter()
@@ -33,7 +33,7 @@ export default function MembershipPage() {
 
         // Fetch user profile
         const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
+          .from("miembros")
           .select("*")
           .eq("id", userData.user.id)
           .single()

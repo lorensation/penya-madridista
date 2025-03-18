@@ -30,9 +30,9 @@ export default function Dashboard() {
 
         // Fetch user profile
         const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
+          .from("miembros")
           .select("*")
-          .eq("id", userData.user.id)
+          .eq("auth_id", userData.user.id)
           .single()
 
         if (profileError) throw profileError
@@ -79,7 +79,7 @@ export default function Dashboard() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-primary">Bienvenido a tu Panel de Socio</h1>
-          <p className="text-gray-600">Hola, {user?.user_metadata?.name || user?.email}</p>
+          <p className="text-gray-600">Hola, {profile?.name || user?.email}</p>
         </div>
       </div>
 

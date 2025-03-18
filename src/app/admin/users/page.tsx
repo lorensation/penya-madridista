@@ -37,7 +37,7 @@ export default function AdminUsersPage() {
       if (authError) throw authError
 
       // Get profiles from profiles table
-      const { data: profiles, error: profilesError } = await supabase.from("profiles").select("*")
+      const { data: profiles, error: profilesError } = await supabase.from("miembros").select("*")
 
       if (profilesError) throw profilesError
 
@@ -72,7 +72,7 @@ export default function AdminUsersPage() {
 
   const handleUpdateUserRole = async (userId: string, role: string) => {
     try {
-      const { error } = await supabase.from("profiles").update({ role }).eq("id", userId)
+      const { error } = await supabase.from("miembros").update({ role }).eq("id", userId)
 
       if (error) throw error
 

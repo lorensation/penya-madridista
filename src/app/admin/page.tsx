@@ -23,40 +23,69 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Fetch total users
-        const { count: usersCount, error: usersError } = await supabase
-          .from("profiles")
-          .select("*", { count: "exact", head: true })
+        let usersCount = 0
+        let subscriptionsCount = 0
+        let postsCount = 0
+        let eventsCount = 0
 
-        if (usersError) throw usersError
+        // Fetch total users
+        try {
+          const { count: _usersCount, error: usersError } = await supabase
+            .from("miembros")
+            .select("*", { count: "exact", head: true })
+
+          if (!usersError) {
+            usersCount = _usersCount || 0
+          }
+        } catch (error) {
+          console.error("Error fetching users count:", error)
+        }
 
         // Fetch active subscriptions
-        const { count: subscriptionsCount, error: subscriptionsError } = await supabase
-          .from("profiles")
-          .select("*", { count: "exact", head: true })
-          .eq("subscription_status", "active")
+        try {
+          const { count: _subscriptionsCount, error: subscriptionsError } = await supabase
+            .from("miembros")
+            .select("*", { count: "exact", head: true })
+            .eq("subscription_status", "active")
 
-        if (subscriptionsError) throw subscriptionsError
+          if (!subscriptionsError) {
+            subscriptionsCount = _subscriptionsCount || 0
+          }
+        } catch (error) {
+          console.error("Error fetching subscriptions count:", error)
+        }
 
         // Fetch total posts
-        const { count: postsCount, error: postsError } = await supabase
-          .from("posts")
-          .select("*", { count: "exact", head: true })
+        try {
+          const { count: _postsCount, error: postsError } = await supabase
+            .from("posts")
+            .select("*", { count: "exact", head: true })
 
-        if (postsError) throw postsError
+          if (!postsError) {
+            postsCount = _postsCount || 0
+          }
+        } catch (error) {
+          console.error("Error fetching posts count:", error)
+        }
 
         // Fetch total events
-        const { count: eventsCount, error: eventsError } = await supabase
-          .from("events")
-          .select("*", { count: "exact", head: true })
+        try {
+          const { count: _eventsCount, error: eventsError } = await supabase
+            .from("events")
+            .select("*", { count: "exact", head: true })
 
-        if (eventsError) throw eventsError
+          if (!eventsError) {
+            eventsCount = _eventsCount || 0
+          }
+        } catch (error) {
+          console.error("Error fetching events count:", error)
+        }
 
         setStats({
-          totalUsers: usersCount || 0,
-          activeSubscriptions: subscriptionsCount || 0,
-          totalPosts: postsCount || 0,
-          totalEvents: eventsCount || 0,
+          totalUsers: usersCount,
+          activeSubscriptions: subscriptionsCount,
+          totalPosts: postsCount,
+          totalEvents: eventsCount,
         })
 
         setLoading(false)

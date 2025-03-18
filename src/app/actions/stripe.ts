@@ -19,7 +19,11 @@ export async function createStripeCheckout(formData: FormData) {
     }
 
     // Check if user already has a Stripe customer ID
-    const { data: profileData } = await supabase.from("profiles").select("stripe_customer_id").eq("id", userId).single()
+    const { data: profileData } = await supabase
+      .from("miembros")
+      .select("stripe_customer_id")
+      .eq("auth_id", userId)
+      .single()
 
     let customerId = profileData?.stripe_customer_id
 
@@ -29,7 +33,7 @@ export async function createStripeCheckout(formData: FormData) {
       customerId = customer.id
 
       // Update the user profile with the Stripe customer ID
-      await supabase.from("profiles").update({ stripe_customer_id: customerId }).eq("id", userId)
+      await supabase.from("miembros").update({ stripe_customer_id: customerId }).eq("auth_id", userId)
     }
 
     // Create a checkout session
@@ -74,12 +78,12 @@ export async function cancelSubscription(formData: FormData) {
 
     // Update the user profile
     await supabase
-      .from("profiles")
+      .from("miembros")
       .update({
         subscription_status: "cancelled",
         subscription_updated_at: new Date().toISOString(),
       })
-      .eq("id", userId)
+      .eq("auth_id", userId)
 
     revalidatePath("/dashboard/membership")
     revalidatePath("/dashboard")

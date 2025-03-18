@@ -20,6 +20,10 @@ export default function RegisterSuccess() {
             Hemos enviado un correo electrónico de confirmación a tu dirección de correo. Por favor, verifica tu bandeja
             de entrada y sigue las instrucciones para activar tu cuenta.
           </p>
+          <p className="mt-4 text-center text-sm text-gray-600">
+            Una vez que hayas verificado tu correo, necesitarás completar tu perfil con información adicional para
+            finalizar tu registro como socio de la Peña Lorenzo Sanz.
+          </p>
           <div className="mt-6">
             <Link href="/login">
               <Button className="w-full bg-primary hover:bg-secondary">Ir a Iniciar Sesión</Button>

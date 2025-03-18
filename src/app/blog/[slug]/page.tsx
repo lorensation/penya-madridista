@@ -5,30 +5,40 @@ import { supabase } from "@/lib/supabase"
 import { notFound } from "next/navigation"
 
 async function getBlogPost(slug: string) {
-  const { data, error } = await supabase.from("posts").select("*").eq("slug", slug).single()
+  try {
+    const { data, error } = await supabase.from("posts").select("*").eq("slug", slug).single()
 
-  if (error || !data) {
+    if (error || !data) {
+      console.error("Error fetching blog post:", error)
+      return null
+    }
+
+    return data
+  } catch (error) {
     console.error("Error fetching blog post:", error)
     return null
   }
-
-  return data
 }
 
 async function getRelatedPosts(currentPostId: string, category: string) {
-  const { data, error } = await supabase
-    .from("posts")
-    .select("*")
-    .eq("category", category)
-    .neq("id", currentPostId)
-    .limit(2)
+  try {
+    const { data, error } = await supabase
+      .from("posts")
+      .select("*")
+      .eq("category", category)
+      .neq("id", currentPostId)
+      .limit(2)
 
-  if (error) {
+    if (error) {
+      console.error("Error fetching related posts:", error)
+      return []
+    }
+
+    return data || []
+  } catch (error) {
     console.error("Error fetching related posts:", error)
     return []
   }
-
-  return data || []
 }
 
 export default async function BlogPost({ params }: { params: { slug: string } }) {

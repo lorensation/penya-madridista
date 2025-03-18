@@ -47,7 +47,7 @@ export default function SettingsPage() {
 
         // Fetch user profile
         const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
+          .from("miembros")
           .select("*")
           .eq("id", userData.user.id)
           .single()
@@ -113,7 +113,7 @@ export default function SettingsPage() {
 
       // Update profile
       const { error: profileError } = await supabase
-        .from("profiles")
+        .from("miembros")
         .update({
           phone: formData.phone,
           address: formData.address,
@@ -143,7 +143,7 @@ export default function SettingsPage() {
     try {
       // Update preferences
       const { error: preferencesError } = await supabase
-        .from("profiles")
+        .from("miembros")
         .update({
           email_notifications: formData.emailNotifications,
           marketing_emails: formData.marketingEmails,
