@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { RegisterForm } from "@/components/auth/register-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { EnvChecker } from "@/components/env-checker"
 
 export default function RegisterPage() {
   return (
@@ -11,6 +12,7 @@ export default function RegisterPage() {
           <CardDescription className="text-center">Enter your information to create an account</CardDescription>
         </CardHeader>
         <CardContent>
+          <EnvChecker />
           <RegisterForm />
           <div className="mt-4 text-center text-sm">
             Already have an account?{" "}
