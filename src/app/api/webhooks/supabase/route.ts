@@ -39,25 +39,35 @@ export async function POST(request: Request) {
       // User was created in Auth
       const user = payload.record
 
-      // Check if profile already exists
-      const { data: existingProfile, error: profileError } = await supabase
-        .from("miembros")
-        .select("id")
-        .eq("auth_id", user.id)
-        .single()
-
-      if (profileError && !existingProfile) {
-        // Create profile if it doesn't exist
-        const { error: insertError } = await supabase.from("miembros").insert({
-          auth_id: user.id,
-          email: user.email,
-          name: user.user_metadata?.name || user.email.split("@")[0],
-          role: "user",
-          created_at: new Date().toISOString(),
+      // Use the SQL function to create a profile
+      try {
+        await supabase.rpc("create_user_profile", {
+          user_id: user.id,
+          user_email: user.email || "",
+          user_name: user.user_metadata?.name || null,
         })
+      } catch (fnError) {
+        console.error("Error calling create_user_profile function in webhook:", fnError)
 
-        if (insertError) {
-          console.error("Error creating profile in webhook:", insertError)
+        // Fallback to direct API call
+        try {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/profile/create`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              userId: user.id,
+              email: user.email,
+              name: user.user_metadata?.name,
+            }),
+          })
+
+          if (!response.ok) {
+            throw new Error(`API call failed: ${response.status}`)
+          }
+        } catch (apiError) {
+          console.error("API fallback error:", apiError)
         }
       }
     }
@@ -68,4 +78,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 400 })
   }
 }
+
 

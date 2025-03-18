@@ -11,26 +11,15 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error && data?.user) {
-      // Check if user profile exists
-      const { data: profile, error: profileError } = await supabase
-        .from("miembros")
-        .select("id")
-        .eq("auth_id", data.user.id)
-        .single()
-
-      // If profile doesn't exist, create it
-      if (profileError && !profile) {
-        try {
-          await supabase.from("miembros").insert({
-            auth_id: data.user.id,
-            email: data.user.email || "",
-            name: data.user.user_metadata?.name || data.user.email?.split("@")[0] || "",
-            role: "user",
-            created_at: new Date().toISOString(),
-          })
-        } catch (insertError) {
-          console.error("Error creating profile in callback:", insertError)
-        }
+      // Use the SQL function to create a profile
+      try {
+        await supabase.rpc("create_user_profile", {
+          user_id: data.user.id,
+          user_email: data.user.email || "",
+          user_name: data.user.user_metadata?.name || null,
+        })
+      } catch (fnError) {
+        console.error("Error calling create_user_profile function:", fnError)
       }
     }
   }
