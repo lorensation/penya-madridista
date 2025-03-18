@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CreditCard, CheckCircle, AlertTriangle, Calendar } from "lucide-react"
-import { cancelSubscription } from "@/app/actions/stripe"
+import { cancelSubscription } from "../../actions/stripe"
 
 export default function MembershipPage() {
   const router = useRouter()

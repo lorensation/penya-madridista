@@ -5,7 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { subscribeNewsletter } from "@/app/actions/newsletter"
+import { subscribeNewsletter } from "../app/actions/newsletter"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function NewsletterForm() {
