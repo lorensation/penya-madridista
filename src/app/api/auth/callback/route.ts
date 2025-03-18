@@ -1,6 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase-server"
 import { NextResponse } from "next/server"
-import { createUserProfile } from "@/app/actions/auth"
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -13,15 +12,25 @@ export async function GET(request: Request) {
 
     if (!error && data?.user) {
       // Check if user profile exists
-      const { data: profile } = await supabase.from("miembros").select("id").eq("auth_id", data.user.id).single()
+      const { data: profile, error: profileError } = await supabase
+        .from("miembros")
+        .select("id")
+        .eq("auth_id", data.user.id)
+        .single()
 
       // If profile doesn't exist, create it
-      if (!profile) {
-        await createUserProfile(
-          data.user.id,
-          data.user.email || "",
-          data.user.user_metadata?.name || data.user.email?.split("@")[0] || "",
-        )
+      if (profileError && !profile) {
+        try {
+          await supabase.from("miembros").insert({
+            auth_id: data.user.id,
+            email: data.user.email || "",
+            name: data.user.user_metadata?.name || data.user.email?.split("@")[0] || "",
+            role: "user",
+            created_at: new Date().toISOString(),
+          })
+        } catch (insertError) {
+          console.error("Error creating profile in callback:", insertError)
+        }
       }
     }
   }

@@ -39,7 +39,25 @@ export function RegisterForm() {
         throw signUpError
       }
 
-      // We'll create the profile after email verification
+      // Create profile directly after signup
+      if (data?.user) {
+        try {
+          const { error: profileError } = await supabaseBrowser.from("miembros").insert({
+            auth_id: data.user.id,
+            email: email,
+            name: name || email.split("@")[0],
+            role: "user",
+            created_at: new Date().toISOString(),
+          })
+
+          if (profileError) {
+            console.error("Error creating profile:", profileError)
+          }
+        } catch (profileErr) {
+          console.error("Error in profile creation:", profileErr)
+        }
+      }
+
       router.push("/auth/verify")
     } catch (error: any) {
       setError(error.message || "Failed to register")
@@ -73,5 +91,4 @@ export function RegisterForm() {
     </form>
   )
 }
-
 
