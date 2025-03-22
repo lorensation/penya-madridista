@@ -1,13 +1,12 @@
 import Image from "next/image"
 import Link from "next/link"
-import { createServerSupabaseClient } from "@/lib/supabase-server"
+import { supabase } from "@/lib/supabase"
 import { notFound } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 
 async function getBlogPost(slug: string) {
   try {
-    const supabase = createServerSupabaseClient()
     const { data, error } = await supabase.from("posts").select("*").eq("slug", slug).single()
 
     if (error || !data) {
@@ -24,7 +23,6 @@ async function getBlogPost(slug: string) {
 
 async function getRelatedPosts(currentPostId: string, category: string) {
   try {
-    const supabase = createServerSupabaseClient()
     const { data, error } = await supabase
       .from("posts")
       .select("*")
@@ -46,14 +44,14 @@ async function getRelatedPosts(currentPostId: string, category: string) {
 
 export async function generateMetadata({ params }: { params: { slug: string } }) {
   const post = await getBlogPost(params.slug)
-  
+
   if (!post) {
     return {
-      title: 'Post not found',
-      description: 'The requested blog post could not be found'
+      title: "Post not found",
+      description: "The requested blog post could not be found",
     }
   }
-  
+
   return {
     title: post.title,
     description: post.excerpt,
@@ -85,12 +83,10 @@ export default async function BlogPost({ params }: { params: { slug: string } })
               className="object-cover"
             />
           </div>
-          
+
           <div className="p-8">
             <div className="flex items-center text-sm text-gray-500 mb-4">
-              <span className="bg-primary/10 text-primary px-3 py-1 rounded-full">
-                {post.category}
-              </span>
+              <span className="bg-primary/10 text-primary px-3 py-1 rounded-full">{post.category}</span>
               <span className="mx-2">•</span>
               <span>
                 {new Date(post.created_at).toLocaleDateString("es-ES", {
@@ -100,9 +96,9 @@ export default async function BlogPost({ params }: { params: { slug: string } })
                 })}
               </span>
             </div>
-            
+
             <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">{post.title}</h1>
-            
+
             <div className="flex items-center mb-8">
               <div className="w-10 h-10 rounded-full bg-gray-200 mr-3 overflow-hidden relative">
                 {post.author_image ? (
@@ -113,16 +109,14 @@ export default async function BlogPost({ params }: { params: { slug: string } })
                     className="object-cover"
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    {post.author.charAt(0)}
-                  </div>
+                  <div className="flex items-center justify-center h-full text-gray-500">{post.author.charAt(0)}</div>
                 )}
               </div>
               <span className="text-gray-700">Por {post.author}</span>
             </div>
-            
+
             <div className="prose prose-lg max-w-none" dangerouslySetInnerHTML={{ __html: post.content }} />
-            
+
             <div className="mt-8 pt-8 border-t border-gray-200">
               <div className="flex items-center justify-between">
                 <Link href="/blog">
@@ -130,17 +124,37 @@ export default async function BlogPost({ params }: { params: { slug: string } })
                     ← Volver al Blog
                   </Button>
                 </Link>
-                
+
                 <div className="flex space-x-4">
                   <Button variant="ghost" size="icon" className="text-gray-500 hover:text-primary">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
                     </svg>
                     <span className="sr-only">Compartir en Facebook</span>
                   </Button>
-                  
+
                   <Button variant="ghost" size="icon" className="text-gray-500 hover:text-primary">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path>
                     </svg>
                     <span className="sr-only">Compartir en Twitter</span>
@@ -150,11 +164,11 @@ export default async function BlogPost({ params }: { params: { slug: string } })
             </div>
           </div>
         </article>
-        
+
         {relatedPosts.length > 0 && (
           <div className="mt-16">
             <h2 className="text-2xl font-bold text-primary mb-8 text-center">Artículos Relacionados</h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {relatedPosts.map((relatedPost) => (
                 <Card key={relatedPost.id} className="overflow-hidden">
@@ -166,7 +180,7 @@ export default async function BlogPost({ params }: { params: { slug: string } })
                       className="object-cover"
                     />
                   </div>
-                  
+
                   <CardContent className="p-6">
                     <div className="flex items-center text-sm text-gray-500 mb-2">
                       <span>{relatedPost.category}</span>
@@ -179,10 +193,10 @@ export default async function BlogPost({ params }: { params: { slug: string } })
                         })}
                       </span>
                     </div>
-                    
+
                     <h3 className="text-lg font-bold text-primary mb-2 line-clamp-2">{relatedPost.title}</h3>
                     <p className="text-gray-600 mb-4 line-clamp-3">{relatedPost.excerpt}</p>
-                    
+
                     <Link href={`/blog/${relatedPost.slug}`}>
                       <Button
                         variant="outline"
@@ -201,3 +215,4 @@ export default async function BlogPost({ params }: { params: { slug: string } })
     </div>
   )
 }
+

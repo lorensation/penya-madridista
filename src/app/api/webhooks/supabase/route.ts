@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server"
+import { supabase } from "@/lib/supabase"
 import { createHmac } from "crypto"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
@@ -32,7 +32,6 @@ export async function POST(request: Request) {
   try {
     const payload = JSON.parse(body)
     const event = payload.type
-    const supabase = createServerSupabaseClient()
 
     // Handle different webhook events
     if (event === "user.created") {
@@ -78,5 +77,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 400 })
   }
 }
+
 
 

@@ -1,11 +1,10 @@
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { createServerSupabaseClient } from "@/lib/supabase-server"
+import { supabase } from "@/lib/supabase"
 
 async function getBlogPosts() {
   try {
-    const supabase = createServerSupabaseClient()
     const { data, error } = await supabase.from("posts").select("*").order("created_at", { ascending: false })
 
     if (error) {

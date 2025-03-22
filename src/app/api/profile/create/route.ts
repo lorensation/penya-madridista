@@ -1,9 +1,8 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server"
+import { supabase } from "@/lib/supabase"
 import { NextResponse } from "next/server"
 
 export async function POST(request: Request) {
   try {
-    const supabase = createServerSupabaseClient()
     const { userId, email, name } = await request.json()
 
     if (!userId || !email) {
@@ -46,4 +45,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to create profile" }, { status: 500 })
   }
 }
+
 
