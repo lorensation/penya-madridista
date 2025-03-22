@@ -1,109 +1,117 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server"
-import { handleStripeWebhookEvent } from "@/lib/stripe"
-import { headers } from "next/headers"
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
+import Stripe from "stripe"
+import { getServiceSupabase } from "@/lib/supabase"
 
-export async function POST(request: Request) {
-  const headersList = await headers()
-  const signature = headersList.get("stripe-signature")
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2025-02-24.acacia",
+})
 
-  if (!signature) {
-    return NextResponse.json({ error: "Missing stripe-signature header" }, { status: 400 })
-  }
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
+
+export async function POST(request: NextRequest) {
+  const payload = await request.text()
+  const signature = request.headers.get("stripe-signature") as string
+
+  let event: Stripe.Event
 
   try {
-    const payload = await request.text()
-    const event = await handleStripeWebhookEvent(signature, Buffer.from(payload))
-    const supabase = createServerSupabaseClient()
+    event = stripe.webhooks.constructEvent(payload, signature, webhookSecret)
+  } catch (err: any) {
+    console.error(`Webhook signature verification failed: ${err.message}`)
+    return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
+  }
 
-    // Handle different webhook events
+  const supabase = getServiceSupabase()
+
+  try {
     switch (event.type) {
       case "checkout.session.completed": {
-        const session = event.data.object as any
+        const session = event.data.object as Stripe.Checkout.Session
 
-        // Update the checkout session status
-        await supabase.from("checkout_sessions").update({ status: "completed" }).eq("session_id", session.id)
+        if (session.subscription) {
+          const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
+          const userId = subscription.metadata.userId
 
-        // Get user information from the checkout session
-        const { data: checkoutData } = await supabase
-          .from("checkout_sessions")
-          .select("user_id, plan_type")
-          .eq("session_id", session.id)
-          .single()
+          if (!userId) {
+            throw new Error("No userId found in subscription metadata")
+          }
 
-        if (checkoutData) {
-          // Update the user's subscription status
-          await supabase
-            .from("miembros")
-            .update({
-              subscription_id: session.subscription,
-              subscription_status: "active",
-              subscription_plan: checkoutData.plan_type,
-              subscription_updated_at: new Date().toISOString(),
-            })
-            .eq("auth_id", checkoutData.user_id)
+          // Insert subscription data into the database
+          const { error: subscriptionError } = await supabase
+          .from("subscriptions")
+          .insert({
+            id: subscription.id,
+            user_id: userId,
+            status: subscription.status,
+            price_id: subscription.items.data[0].price.id,
+            quantity: subscription.items.data[0].quantity,
+            cancel_at_period_end: subscription.cancel_at_period_end,
+            created_at: new Date(subscription.created * 1000).toISOString(),
+            current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+            ended_at: subscription.ended_at ? new Date(subscription.ended_at * 1000).toISOString() : null,
+            cancel_at: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
+            canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
+            trial_start: subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null,
+            trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
+          })
+
+          if (subscriptionError) {
+            throw new Error(`Error inserting subscription: ${subscriptionError.message}`)
+          }
         }
         break
       }
-
       case "customer.subscription.updated": {
-        const subscription = event.data.object as any
+        const subscription = event.data.object as Stripe.Subscription
+        const userId = subscription.metadata.userId
 
-        // Find the user with this subscription
-        const { data: userData } = await supabase
-          .from("miembros")
-          .select("auth_id")
-          .eq("subscription_id", subscription.id)
-          .single()
+        if (!userId) {
+          throw new Error("No userId found in subscription metadata")
+        }
 
-        if (userData) {
-          // Update the subscription status
-          await supabase
-            .from("miembros")
-            .update({
-              subscription_status: subscription.status,
-              subscription_updated_at: new Date().toISOString(),
-            })
-            .eq("auth_id", userData.auth_id)
+        // Update subscription data in the database
+        const { error: subscriptionError } = await supabase
+          .from("subscriptions")
+          .update({
+            status: subscription.status,
+            cancel_at_period_end: subscription.cancel_at_period_end,
+            current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+            ended_at: subscription.ended_at ? new Date(subscription.ended_at * 1000).toISOString() : null,
+            cancel_at: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
+            canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
+          })
+          .eq("id", subscription.id)
+
+        if (subscriptionError) {
+          throw new Error(`Error updating subscription: ${subscriptionError.message}`)
         }
         break
       }
-
       case "customer.subscription.deleted": {
-        const subscription = event.data.object as any
+        const subscription = event.data.object as Stripe.Subscription
 
-        // Find the user with this subscription
-        const { data: userData } = await supabase
-          .from("miembros")
-          .select("auth_id")
-          .eq("subscription_id", subscription.id)
-          .single()
+        // Update subscription data in the database
+        const { error: subscriptionError } = await supabase
+          .from("subscriptions")
+          .update({
+            status: subscription.status,
+            ended_at: new Date(subscription.ended_at! * 1000).toISOString(),
+          })
+          .eq("id", subscription.id)
 
-        if (userData) {
-          // Update the subscription status
-          await supabase
-            .from("miembros")
-            .update({
-              subscription_status: "cancelled",
-              subscription_updated_at: new Date().toISOString(),
-            })
-            .eq("auth_id", userData.auth_id)
+        if (subscriptionError) {
+          throw new Error(`Error updating subscription: ${subscriptionError.message}`)
         }
         break
       }
     }
 
     return NextResponse.json({ received: true })
-  } catch (error) {
-    console.error("Webhook error:", error)
-    return NextResponse.json({ error: "Webhook handler failed" }, { status: 400 })
+  } catch (error: any) {
+    console.error(`Webhook error: ${error.message}`)
+    return NextResponse.json({ error: error.message || "Webhook handler failed" }, { status: 500 })
   }
-}
-
-// This is needed to disable the default body parsing
-export const config = {
-  api: {
-    bodyParser: false,
-  },
 }
 

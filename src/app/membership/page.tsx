@@ -5,18 +5,17 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { CheckCircle } from "lucide-react"
-import { createStripeCheckout } from "../actions/stripe"
 import { supabase } from "@/lib/supabase"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
-// Define membership plans
+// Define membership plans with direct checkout links
 const membershipPlans = [
   {
     id: "annual",
     name: "Membresía Anual",
-    price: "€50",
+    price: "€100",
     period: "/año",
-    priceId: process.env.NEXT_PUBLIC_STRIPE_ANNUAL_PRICE_ID || "price_annual",
+    checkoutUrl: "https://buy.stripe.com/dR69C47a4e0TccU4gg",
     features: [
       "Acceso a eventos exclusivos organizados por la peña",
       "Descuentos en viajes organizados para ver partidos",
@@ -28,14 +27,13 @@ const membershipPlans = [
   {
     id: "family",
     name: "Membresía Familiar",
-    price: "€80",
+    price: "€150",
     period: "/año",
-    priceId: process.env.NEXT_PUBLIC_STRIPE_FAMILY_PRICE_ID || "price_family",
+    checkoutUrl: "https://buy.stripe.com/5kAbKc7a42ib6SA001",
     features: [
       "Todos los beneficios de la membresía individual",
-      "Válido para hasta 4 miembros de la familia",
+      "Válido para un adulto y un menor miembros de la familia",
       "Descuentos adicionales en eventos familiares",
-      "Prioridad en la reserva de entradas para partidos",
       "Carnets oficiales para todos los miembros incluidos",
     ],
     popular: true,
@@ -45,59 +43,39 @@ const membershipPlans = [
 export default function Membership() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
-  // Remove the unused loading variable
-  // const [loading, setLoading] = useState(true);
-  const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
 
   useEffect(() => {
     const checkUser = async () => {
       const { data } = await supabase.auth.getUser()
       setUser(data.user)
-      // Remove the loading state update
-      // setLoading(false);
     }
 
     checkUser()
   }, [])
 
-  const handleSubscribe = async (planId: string) => {
+  const handleSelectPlan = (planId: string) => {
+    setSelectedPlan(planId)
+  }
+
+  const handleSubscribe = () => {
+    if (!selectedPlan) return
+
     if (!user) {
       router.push("/login?redirect=/membership")
       return
     }
 
-    setCheckoutLoading(true)
-    setError(null)
-
-    try {
-      const plan = membershipPlans.find((p) => p.id === planId)
-      if (!plan) {
-        throw new Error("Plan not found")
-      }
-
-      const formData = new FormData()
-      formData.append("priceId", plan.priceId)
-      formData.append("userId", user.id)
-      formData.append("email", user.email)
-      formData.append("name", user.user_metadata?.name || user.email)
-      formData.append("planType", planId)
-
-      const result = await createStripeCheckout(formData)
-
-      if (result.error) {
-        throw new Error(result.error)
-      }
-
-      if (result.url) {
-        window.location.href = result.url
-      }
-    } catch (error: any) {
-      console.error("Error subscribing:", error)
-      setError(error.message || "Failed to process subscription")
-    } finally {
-      setCheckoutLoading(false)
+    // Get the selected plan
+    const plan = membershipPlans.find((p) => p.id === selectedPlan)
+    if (!plan) {
+      setError("Plan not found")
+      return
     }
+
+    // Redirect to the direct Stripe checkout URL
+    window.location.href = plan.checkoutUrl
   }
 
   return (
@@ -121,7 +99,10 @@ export default function Membership() {
             {membershipPlans.map((plan) => (
               <div
                 key={plan.id}
-                className={`bg-white rounded-lg shadow-md overflow-hidden ${plan.popular ? "border-2 border-secondary" : ""}`}
+                className={`bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transition-all ${
+                  plan.popular ? "border-2 border-secondary" : ""
+                } ${selectedPlan === plan.id ? "ring-2 ring-primary" : ""}`}
+                onClick={() => handleSelectPlan(plan.id)}
               >
                 <div className={`${plan.popular ? "bg-secondary" : "bg-primary"} p-6 text-white text-center relative`}>
                   {plan.popular && (
@@ -146,20 +127,27 @@ export default function Membership() {
                   </ul>
                   <div className="mt-8">
                     <Button
-                      className={`w-full ${plan.popular ? "bg-secondary hover:bg-primary" : "bg-primary hover:bg-secondary"}`}
-                      onClick={() => handleSubscribe(plan.id)}
-                      disabled={checkoutLoading}
+                      className={`w-full ${
+                        selectedPlan === plan.id
+                          ? "bg-primary"
+                          : plan.popular
+                            ? "bg-secondary hover:bg-primary"
+                            : "bg-primary hover:bg-secondary"
+                      }`}
+                      onClick={() => handleSelectPlan(plan.id)}
                     >
-                      {checkoutLoading
-                        ? "Procesando..."
-                        : user
-                          ? "Seleccionar Plan"
-                          : "Iniciar Sesión para Suscribirse"}
+                      {selectedPlan === plan.id ? "Plan seleccionado" : "Seleccionar Plan"}
                     </Button>
                   </div>
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="mt-8 text-center">
+            <Button size="lg" onClick={handleSubscribe} disabled={!selectedPlan} className="px-8 py-6 text-lg">
+              {user ? "Continuar con el pago" : "Iniciar Sesión para Suscribirse"}
+            </Button>
           </div>
 
           <div className="mt-12 bg-white rounded-lg shadow-md p-8 text-center">

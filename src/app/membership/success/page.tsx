@@ -45,14 +45,28 @@ function SuccessContent() {
           .single()
 
         if (checkoutData) {
-          await supabase
+          // Check if the user already has a member profile
+          const { data: memberData } = await supabase
             .from("miembros")
-            .update({
-              subscription_status: "active",
-              subscription_plan: checkoutData.plan_type,
-              subscription_updated_at: new Date().toISOString(),
-            })
+            .select("id, auth_id")
             .eq("auth_id", userData.user.id)
+            .single()
+
+          if (memberData) {
+            // Update existing member record
+            await supabase
+              .from("miembros")
+              .update({
+                subscription_status: "active",
+                subscription_plan: checkoutData.plan_type,
+                subscription_updated_at: new Date().toISOString(),
+              })
+              .eq("auth_id", userData.user.id)
+          } else {
+            // If no member profile exists, redirect to the registration form
+            router.push(`/complete-profile?session_id=${sessionId}`)
+            return
+          }
         }
 
         setLoading(false)
