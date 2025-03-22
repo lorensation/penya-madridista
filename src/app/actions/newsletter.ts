@@ -1,12 +1,11 @@
 "use server"
 
 import { subscribeToNewsletter } from "@/lib/mailgun"
-import { createServerSupabaseClient } from "@/lib/supabase-server"
+import { supabase } from "@/lib/supabase"
 import { revalidatePath } from "next/cache"
 
 export async function subscribeNewsletter(formData: FormData) {
   try {
-    const supabase = createServerSupabaseClient()
     const email = formData.get("email") as string
     const name = (formData.get("name") as string) || undefined
 

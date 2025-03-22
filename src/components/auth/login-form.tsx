@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { supabaseBrowser } from "@/lib/supabase-browser"
+import { signIn } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -23,10 +23,7 @@ export function LoginForm() {
     setError(null)
 
     try {
-      const { error } = await supabaseBrowser.auth.signInWithPassword({
-        email,
-        password,
-      })
+      const { error } = await signIn(email, password) // Using the unified function
 
       if (error) {
         throw error

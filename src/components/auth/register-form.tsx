@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { supabaseBrowser } from "@/lib/supabase-browser"
+import { signUp } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -50,18 +50,8 @@ export function RegisterForm() {
     }
 
     try {
-      // Sign up with Supabase Auth
-      const { data, error: signUpError } = await supabaseBrowser.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-          },
-          // Use a simpler approach for the redirect URL
-          emailRedirectTo: window.location.origin + "/api/auth/callback",
-        },
-      })
+      // Sign up with Supabase Auth using the unified function
+      const { error: signUpError } = await signUp(email, password, name)
 
       if (signUpError) {
         throw signUpError

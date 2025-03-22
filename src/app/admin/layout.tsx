@@ -1,12 +1,10 @@
 import type React from "react"
-import { createServerSupabaseClient } from "@/lib/supabase-server"
+import { supabase } from "@/lib/supabase" // Updated import
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
 async function getAdminUser() {
-  const supabase = createServerSupabaseClient()
-
   // Get the current user
   const {
     data: { session },
