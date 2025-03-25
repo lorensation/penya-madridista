@@ -36,10 +36,26 @@ export async function POST(request: NextRequest) {
             throw new Error("No userId found in subscription metadata")
           }
 
+          // Get user details from Supabase
+          const { data: userData, error: userError } = await supabase
+            .from("webusers")
+            .select("email, name")
+            .eq("id", userId)
+            .single()
+
+          if (userError || !userData) {
+            throw new Error(`User not found: ${userError?.message}`)
+          }
+
+          // Update webusers to mark as member
+          const { error: updateError } = await supabase.from("webusers").update({ is_member: true }).eq("id", userId)
+
+          if (updateError) {
+            throw new Error(`Error updating user: ${updateError.message}`)
+          }
+
           // Insert subscription data into the database
-          const { error: subscriptionError } = await supabase
-          .from("subscriptions")
-          .insert({
+          const { error: subscriptionError } = await supabase.from("subscriptions").insert({
             id: subscription.id,
             user_id: userId,
             status: subscription.status,
@@ -59,6 +75,33 @@ export async function POST(request: NextRequest) {
           if (subscriptionError) {
             throw new Error(`Error inserting subscription: ${subscriptionError.message}`)
           }
+
+          // Check if user already exists in miembros table
+          const { data: existingMember, error: memberCheckError } = await supabase
+            .from("miembros")
+            .select("id")
+            .eq("user_id", userId)
+            .single()
+
+          // Only create a minimal miembros entry if it doesn't exist
+          // The user will complete their profile later
+          if (!existingMember && !memberCheckError) {
+            const { error: memberError } = await supabase.from("miembros").insert({
+              user_id: userId,
+              email: userData.email,
+              name: userData.name,
+              subscription_status: subscription.status,
+              subscription_plan: subscription.items.data[0].price.id,
+              subscription_id: subscription.id,
+              subscription_updated_at: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+
+            if (memberError) {
+              throw new Error(`Error creating member: ${memberError.message}`)
+            }
+          }
         }
         break
       }
@@ -68,6 +111,19 @@ export async function POST(request: NextRequest) {
 
         if (!userId) {
           throw new Error("No userId found in subscription metadata")
+        }
+
+        // Update webusers membership status based on subscription status
+        const { error: userError } = await supabase
+          .from("webusers")
+          .update({
+            is_member: subscription.status === "active",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", userId)
+
+        if (userError) {
+          throw new Error(`Error updating user: ${userError.message}`)
         }
 
         // Update subscription data in the database
@@ -86,6 +142,20 @@ export async function POST(request: NextRequest) {
 
         if (subscriptionError) {
           throw new Error(`Error updating subscription: ${subscriptionError.message}`)
+        }
+
+        // Update miembros subscription status
+        const { error: memberError } = await supabase
+          .from("miembros")
+          .update({
+            subscription_status: subscription.status,
+            subscription_updated_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", userId)
+
+        if (memberError) {
+          throw new Error(`Error updating member: ${memberError.message}`)
         }
         break
       }

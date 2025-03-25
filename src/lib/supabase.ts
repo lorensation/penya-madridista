@@ -5,7 +5,7 @@ import type { Database } from "@/types/supabase"
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// For server-side operations that need more privileges 
+// For server-side operations that need more privileges
 const supabaseServiceKey = process.env.SUPABASE_WEBHOOK_SECRET
 
 // Create a single client instance that can be used everywhere
@@ -65,8 +65,7 @@ export async function resetPassword(email: string) {
 
 // User profile functions
 export async function getUserProfile(userId: string) {
-  const { data, error } = await supabase.from("webusers").select("*").eq("id", userId).single()
-
+  const { data, error } = await supabase.from("webusers").select("*, is_member").eq("id", userId).single()
   return { data, error }
 }
 
@@ -77,8 +76,22 @@ export async function updateUserProfile(userId: string, updates: any) {
 }
 
 // Member functions
-export async function createMember(memberData: any) {
-  const { data, error } = await supabase.from("miembros").insert(memberData).select()
+export async function createMember(userId: string, memberData: any) {
+  // First update the webusers table to mark as member
+  const { error: userError } = await supabase.from("webusers").update({ is_member: true }).eq("id", userId)
+
+  if (userError) {
+    return { data: null, error: userError }
+  }
+
+  // Then create the member record
+  const { data, error } = await supabase
+    .from("miembros")
+    .insert({
+      user_id: userId,
+      ...memberData,
+    })
+    .select()
 
   return { data, error }
 }
@@ -93,5 +106,16 @@ export async function updateMember(userId: string, updates: any) {
   const { data, error } = await supabase.from("miembros").update(updates).eq("user_id", userId).select()
 
   return { data, error }
+}
+
+// Add a function to check if a user is a member
+export async function checkMembershipStatus(userId: string) {
+  const { data, error } = await supabase.from("webusers").select("is_member").eq("id", userId).single()
+
+  if (error) {
+    return { isMember: false, error }
+  }
+
+  return { isMember: data?.is_member || false, error: null }
 }
 

@@ -35,18 +35,30 @@ export async function POST(request: Request) {
         message: "Verification email sent",
       })
     } else if (data.user && data.session) {
-      // This means auto-confirm is enabled, create profile now
+      // This means auto-confirm is enabled, but we only create webusers entry
+      // The miembros entry will be created after payment
       try {
-        const { error: profileError } = await supabase.from("miembros").insert({
-          auth_id: data.user.id,
-          email: email,
-          name: name || email.split("@")[0],
-          role: "user",
-          created_at: new Date().toISOString(),
-        })
+        // Check if webusers entry exists (it should be created by the trigger)
+        const { data: existingUser, error: checkError } = await supabase
+          .from("webusers")
+          .select("id")
+          .eq("id", data.user.id)
+          .single()
 
-        if (profileError) {
-          console.error("Profile creation error:", profileError)
+        if (checkError || !existingUser) {
+          // If not created by trigger, create it manually
+          const { error: profileError } = await supabase.from("webusers").insert({
+            id: data.user.id,
+            email: email,
+            name: name || email.split("@")[0],
+            is_member: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+
+          if (profileError) {
+            console.error("Profile creation error:", profileError)
+          }
         }
       } catch (profileErr) {
         console.error("Profile creation exception:", profileErr)

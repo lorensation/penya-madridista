@@ -8,6 +8,7 @@ export interface Database {
           id: string
           email: string
           name: string
+          is_member: boolean
           created_at: string
           updated_at: string
         }
@@ -15,6 +16,7 @@ export interface Database {
           id: string
           email: string
           name: string
+          is_member?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -22,6 +24,7 @@ export interface Database {
           id?: string
           email?: string
           name?: string
+          is_member?: boolean
           created_at?: string
           updated_at?: string
         }
