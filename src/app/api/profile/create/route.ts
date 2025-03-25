@@ -9,41 +9,43 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    // Try using the RPC function first
+    // Create webuser entry
     try {
-      await supabase.rpc("create_user_profile", {
-        user_id: userId,
-        user_email: email,
-        user_name: name || null,
+      const { error: webusersError } = await supabase.from("webusers").insert({
+        email: email,
+        name: name || email.split("@")[0],
+        is_miembro: false,
+        is_member: false,
+        created_at: new Date().toISOString(),
       })
-      return NextResponse.json({ success: true })
-    } catch (rpcError) {
-      console.error("RPC error:", rpcError)
 
-      // Fallback to direct insert
-      try {
-        const { error } = await supabase.from("miembros").insert({
-          auth_id: userId,
-          email: email,
-          name: name || email.split("@")[0],
-          role: "user",
-          created_at: new Date().toISOString(),
-        })
-
-        if (error) {
-          throw error
-        }
-
-        return NextResponse.json({ success: true })
-      } catch (insertError) {
-        console.error("Insert error:", insertError)
-        throw insertError
+      if (webusersError) {
+        console.error("Webusers insert error:", webusersError)
+        return NextResponse.json({ error: "Failed to create webuser" }, { status: 500 })
       }
+
+      // Get the newly created webuser to get its ID
+      const { data: newUser, error: fetchError } = await supabase
+        .from("webusers")
+        .select("id")
+        .eq("email", email)
+        .single()
+
+      if (fetchError || !newUser) {
+        console.error("Error fetching new user:", fetchError)
+        return NextResponse.json({ error: "Failed to fetch new user" }, { status: 500 })
+      }
+
+      return NextResponse.json({
+        success: true,
+        userId: newUser.id,
+      })
+    } catch (error) {
+      console.error("Profile creation error:", error)
+      return NextResponse.json({ error: "Failed to create profile" }, { status: 500 })
     }
   } catch (error) {
     console.error("Profile creation error:", error)
     return NextResponse.json({ error: "Failed to create profile" }, { status: 500 })
   }
 }
-
-

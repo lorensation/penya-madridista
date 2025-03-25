@@ -65,30 +65,66 @@ export async function resetPassword(email: string) {
 
 // User profile functions
 export async function getUserProfile(userId: string) {
-  const { data, error } = await supabase.from("webusers").select("*, is_member").eq("id", userId).single()
+  // Get the auth user
+  const { data: authUser } = await supabase.auth.getUser()
+
+  if (!authUser?.user) {
+    return { data: null, error: new Error("User not found") }
+  }
+
+  // Get user from the users table
+  const { data, error } = await supabase.from("users").select("*").eq("id", authUser.user.id).single()
+
   return { data, error }
 }
 
 export async function updateUserProfile(userId: string, updates: any) {
-  const { data, error } = await supabase.from("webusers").update(updates).eq("id", userId).select()
+  // Get the auth user
+  const { data: authUser } = await supabase.auth.getUser()
 
-  return { data, error }
+  if (!authUser?.user) {
+    return { data: null, error: new Error("User not found") }
+  }
+
+  // Update user in the users table
+  const { data, error } = await supabase.from("users").update(updates).eq("id", authUser.user.id).select()
+
+  return { data: data?.[0] || null, error }
 }
 
 // Member functions
-export async function createMember(userId: string, memberData: any) {
-  // First update the webusers table to mark as member
-  const { error: userError } = await supabase.from("webusers").update({ is_member: true }).eq("id", userId)
+export async function createMember(memberData: any) {
+  // Get the auth user
+  const { data: authUser } = await supabase.auth.getUser()
+
+  if (!authUser?.user) {
+    return { data: null, error: new Error("Auth user not found") }
+  }
+
+  // First update the users table to mark as member
+  const { error: userError } = await supabase.from("users").update({ is_member: true }).eq("id", authUser.user.id)
 
   if (userError) {
     return { data: null, error: userError }
+  }
+
+  // Get the user record to get the numeric ID if needed
+  const { data: userData, error: userFetchError } = await supabase
+    .from("users")
+    .select("id")
+    .eq("id", authUser.user.id)
+    .single()
+
+  if (userFetchError) {
+    return { data: null, error: userFetchError }
   }
 
   // Then create the member record
   const { data, error } = await supabase
     .from("miembros")
     .insert({
-      user_id: userId,
+      user_uuid: authUser.user.id,
+      auth_id: authUser.user.id, // Keep for backward compatibility
       ...memberData,
     })
     .select()
@@ -96,21 +132,45 @@ export async function createMember(userId: string, memberData: any) {
   return { data, error }
 }
 
-export async function getMember(userId: string) {
-  const { data, error } = await supabase.from("miembros").select("*").eq("user_id", userId).single()
+export async function getMember() {
+  // Get the auth user
+  const { data: authUser } = await supabase.auth.getUser()
+
+  if (!authUser?.user) {
+    return { data: null, error: new Error("User not found") }
+  }
+
+  // Get member by user_uuid
+  const { data, error } = await supabase.from("miembros").select("*").eq("user_uuid", authUser.user.id).single()
 
   return { data, error }
 }
 
-export async function updateMember(userId: string, updates: any) {
-  const { data, error } = await supabase.from("miembros").update(updates).eq("user_id", userId).select()
+export async function updateMember(updates: any) {
+  // Get the auth user
+  const { data: authUser } = await supabase.auth.getUser()
 
-  return { data, error }
+  if (!authUser?.user) {
+    return { data: null, error: new Error("User not found") }
+  }
+
+  // Update member by user_uuid
+  const { data, error } = await supabase.from("miembros").update(updates).eq("user_uuid", authUser.user.id).select()
+
+  return { data: data?.[0] || null, error }
 }
 
 // Add a function to check if a user is a member
-export async function checkMembershipStatus(userId: string) {
-  const { data, error } = await supabase.from("webusers").select("is_member").eq("id", userId).single()
+export async function checkMembershipStatus() {
+  // Get the auth user
+  const { data: authUser } = await supabase.auth.getUser()
+
+  if (!authUser?.user) {
+    return { isMember: false, error: new Error("User not found") }
+  }
+
+  // Check membership status in users table
+  const { data, error } = await supabase.from("users").select("is_member").eq("id", authUser.user.id).single()
 
   if (error) {
     return { isMember: false, error }
@@ -118,4 +178,5 @@ export async function checkMembershipStatus(userId: string) {
 
   return { isMember: data?.is_member || false, error: null }
 }
+
 

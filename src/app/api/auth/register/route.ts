@@ -35,33 +35,28 @@ export async function POST(request: Request) {
         message: "Verification email sent",
       })
     } else if (data.user && data.session) {
-      // This means auto-confirm is enabled, but we only create webusers entry
-      // The miembros entry will be created after payment
-      try {
-        // Check if webusers entry exists (it should be created by the trigger)
-        const { data: existingUser, error: checkError } = await supabase
-          .from("webusers")
-          .select("id")
-          .eq("id", data.user.id)
-          .single()
+      // This means auto-confirm is enabled
+      // The trigger should automatically create a user record
+      // But we can verify it exists
+      const { data: existingUser, error: checkError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("id", data.user.id)
+        .single()
 
-        if (checkError || !existingUser) {
-          // If not created by trigger, create it manually
-          const { error: profileError } = await supabase.from("webusers").insert({
-            id: data.user.id,
-            email: email,
-            name: name || email.split("@")[0],
-            is_member: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
+      if (checkError) {
+        // If the trigger didn't work, create the user manually
+        const { error: createError } = await supabase.from("users").insert({
+          id: data.user.id,
+          email: email,
+          name: name || email.split("@")[0],
+          is_member: false,
+          created_at: new Date().toISOString(),
+        })
 
-          if (profileError) {
-            console.error("Profile creation error:", profileError)
-          }
+        if (createError) {
+          console.error("User creation error:", createError)
         }
-      } catch (profileErr) {
-        console.error("Profile creation exception:", profileErr)
       }
 
       return NextResponse.json({
