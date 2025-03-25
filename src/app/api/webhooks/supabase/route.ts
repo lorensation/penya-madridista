@@ -38,27 +38,34 @@ export async function POST(request: Request) {
       // User was created in Auth
       const user = payload.record
 
-      // The trigger should automatically create a user record
-      // But we can verify it exists
-      const { data: existingUser, error: checkError } = await supabase
-        .from("users")
-        .select("id")
-        .eq("id", user.id)
-        .single()
-
-      if (checkError) {
-        // If the trigger didn't work, create the user manually
-        const { error: createError } = await supabase.from("users").insert({
+      try {
+        // Use a separate supabase client for this operation to avoid transaction issues
+        const { error: insertError } = await supabase.from("users").insert({
           id: user.id,
           email: user.email || "",
-          name: user.user_metadata?.name || user.email?.split("@")[0] || "User",
           is_member: false,
-          created_at: new Date().toISOString(),
         })
 
-        if (createError) {
-          console.error("User creation error:", createError)
+        if (insertError) {
+          console.error("User creation error in webhook:", insertError)
+
+          // Try a raw SQL approach as a fallback
+          try {
+            const { error: rpcError } = await supabase.rpc("create_user_safely", {
+              user_uuid: user.id,
+              user_email: user.email || "",
+              user_name: user.user_metadata?.name || null,
+            })
+
+            if (rpcError) {
+              console.error("RPC error in webhook:", rpcError)
+            }
+          } catch (rpcErr) {
+            console.error("RPC exception in webhook:", rpcErr)
+          }
         }
+      } catch (err) {
+        console.error("Error in webhook user creation:", err)
       }
     }
 

@@ -36,27 +36,34 @@ export async function POST(request: Request) {
       })
     } else if (data.user && data.session) {
       // This means auto-confirm is enabled
-      // The trigger should automatically create a user record
-      // But we can verify it exists
-      const { data: existingUser, error: checkError } = await supabase
-        .from("users")
-        .select("id")
-        .eq("id", data.user.id)
-        .single()
-
-      if (checkError) {
-        // If the trigger didn't work, create the user manually
-        const { error: createError } = await supabase.from("users").insert({
+      try {
+        // Use a separate supabase client for this operation to avoid transaction issues
+        const { error: insertError } = await supabase.from("users").insert({
           id: data.user.id,
           email: email,
-          name: name || email.split("@")[0],
           is_member: false,
-          created_at: new Date().toISOString(),
         })
 
-        if (createError) {
-          console.error("User creation error:", createError)
+        if (insertError) {
+          console.error("User creation error:", insertError)
+
+          // Try a raw SQL approach as a fallback
+          try {
+            const { error: rpcError } = await supabase.rpc("create_user_safely", {
+              user_uuid: data.user.id,
+              user_email: email,
+              user_name: name || null,
+            })
+
+            if (rpcError) {
+              console.error("RPC error:", rpcError)
+            }
+          } catch (rpcErr) {
+            console.error("RPC exception:", rpcErr)
+          }
         }
+      } catch (err) {
+        console.error("Error handling user creation:", err)
       }
 
       return NextResponse.json({
@@ -74,4 +81,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Registration failed" }, { status: 500 })
   }
 }
-
