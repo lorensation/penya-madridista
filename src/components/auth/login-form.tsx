@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AuthError } from "@supabase/supabase-js"
 
 export function LoginForm() {
   const [email, setEmail] = useState("")
@@ -31,8 +32,14 @@ export function LoginForm() {
 
       router.push("/dashboard")
       router.refresh()
-    } catch (error: any) {
-      setError(error.message || "Failed to sign in")
+    } catch (error: unknown) {
+      if (error instanceof AuthError) {
+        setError(error.message)
+      } else if (error instanceof Error) {
+        setError(error.message)
+      } else {
+        setError("Failed to sign in")
+      }
     } finally {
       setLoading(false)
     }
@@ -59,4 +66,3 @@ export function LoginForm() {
     </form>
   )
 }
-

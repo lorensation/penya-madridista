@@ -70,9 +70,13 @@ function SuccessContent() {
         }
 
         setLoading(false)
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error updating subscription status:", error)
-        setError(error.message || "Failed to process subscription")
+        setError(
+          error instanceof Error 
+            ? error.message 
+            : "Failed to process subscription"
+        )
         setLoading(false)
       }
     }
@@ -171,4 +175,3 @@ export default function SuccessPage() {
     </Suspense>
   )
 }
-

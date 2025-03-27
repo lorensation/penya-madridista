@@ -29,8 +29,12 @@ export default function ForgotPassword() {
       if (error) throw error
 
       setSuccess(true)
-    } catch (error: any) {
-      setError(error.message || "Error al enviar el correo de recuperación")
+    } catch (error: unknown) {
+      setError(
+        error instanceof Error 
+          ? error.message 
+          : "Error al enviar el correo de recuperación"
+      )
     } finally {
       setLoading(false)
     }
@@ -110,4 +114,3 @@ export default function ForgotPassword() {
     </div>
   )
 }
-

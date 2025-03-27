@@ -3,14 +3,35 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Calendar, MapPin, Clock, Users, AlertTriangle } from "lucide-react"
 
+// Define types for our data
+interface Event {
+  id: number
+  title: string
+  description: string
+  date: string
+  time: string
+  location: string
+  capacity: number
+  available: number
+  image: string
+}
+
+interface Profile {
+  id: string
+  subscription_status?: string
+  // Replace any with a more specific type
+  [key: string]: string | number | boolean | null | undefined
+}
+
 // Mock events data
-const events = [
+const events: Event[] = [
   {
     id: 1,
     title: "Cena Anual de Socios",
@@ -51,10 +72,9 @@ const events = [
 
 export default function EventsPage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null) // Renamed to use it later
 
   useEffect(() => {
     const checkUser = async () => {
@@ -65,9 +85,6 @@ export default function EventsPage() {
           router.push("/login")
           return
         }
-
-        // Remove the unused user variable
-        // setUser(userData.user);
 
         // Fetch user profile
         const { data: profileData, error: profileError } = await supabase
@@ -80,9 +97,9 @@ export default function EventsPage() {
 
         setProfile(profileData)
         setLoading(false)
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error fetching user data:", error)
-        setError(error.message || "Failed to load user data")
+        setError(error instanceof Error ? error.message : "Failed to load user data")
         setLoading(false)
       }
     }
@@ -97,6 +114,20 @@ export default function EventsPage() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-gray-600">Cargando...</p>
         </div>
+      </div>
+    )
+  }
+
+  // Display error message if there was an error
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Alert className="mb-8 bg-red-50 border-red-200">
+          <AlertTriangle className="h-4 w-4 text-red-800" />
+          <AlertDescription className="text-red-800">
+            {error}
+          </AlertDescription>
+        </Alert>
       </div>
     )
   }
@@ -127,7 +158,12 @@ export default function EventsPage() {
         {events.map((event) => (
           <Card key={event.id} className="overflow-hidden">
             <div className="relative h-48">
-              <img src={event.image || "/placeholder.svg"} alt={event.title} className="w-full h-full object-cover" />
+              <Image 
+                src={event.image || "/placeholder.svg"} 
+                alt={event.title} 
+                fill
+                className="object-cover"
+              />
             </div>
             <CardHeader className="pb-2">
               <CardTitle>{event.title}</CardTitle>
@@ -170,4 +206,3 @@ export default function EventsPage() {
     </div>
   )
 }
-

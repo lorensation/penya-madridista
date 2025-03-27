@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Home, FileText, Users, Calendar, Settings, LogOut, Menu, X, CreditCard } from "lucide-react"
+import { User } from "@supabase/supabase-js"
 
 const navigation = [
   { name: "Dashboard", href: "/admin", icon: Home },
@@ -20,7 +21,7 @@ const navigation = [
 export default function AdminSidebar() {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
 
   useEffect(() => {
     const checkUser = async () => {
@@ -125,4 +126,3 @@ export default function AdminSidebar() {
     </>
   )
 }
-

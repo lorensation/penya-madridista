@@ -1,8 +1,10 @@
+
 "use client"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -77,7 +79,7 @@ const exclusiveContent: ContentItem[] = [
 interface Profile {
   id: string
   subscription_status: string
-  [key: string]: any
+  [key: string]: string | null | boolean | number // Replace any with specific types
 }
 
 export default function ContentPage() {
@@ -109,9 +111,10 @@ export default function ContentPage() {
         if (profileError) throw profileError
 
         setProfile(profileData as Profile)
-      } catch (error: any) {
-        console.error("Error fetching user data:", error)
-        setError(error.message || "Failed to load user data")
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : "Failed to load user data";
+        console.error("Error fetching user data:", err)
+        setError(errorMsg)
       } finally {
         setLoading(false)
       }
@@ -131,6 +134,23 @@ export default function ContentPage() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-gray-600">Cargando...</p>
         </div>
+      </div>
+    )
+  }
+
+  // Display error message if there was an error loading the profile
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Alert className="mb-8 bg-red-50 border-red-200">
+          <AlertTriangle className="h-4 w-4 text-red-800" />
+          <AlertDescription className="text-red-800">
+            {error}
+          </AlertDescription>
+        </Alert>
+        <Button onClick={() => router.push("/dashboard")}>
+          Volver al Dashboard
+        </Button>
       </div>
     )
   }
@@ -187,10 +207,11 @@ export default function ContentPage() {
         {exclusiveContent.map((content) => (
           <Card key={content.id} className="overflow-hidden">
             <div className="relative h-48">
-              <img
+              <Image
                 src={content.thumbnail || "/placeholder.svg"}
                 alt={content.title}
-                className="w-full h-full object-cover"
+                fill
+                className="object-cover"
               />
               {content.type === "video" && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/30">

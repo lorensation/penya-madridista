@@ -13,16 +13,45 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Switch } from "@/components/ui/switch"
 
+// Define interfaces for our data types
+interface User {
+  id: string
+  email: string
+  user_metadata?: {
+    name?: string
+  }
+}
+
+/*interface ProfileData {
+  id: string
+  phone?: string
+  address?: string
+  city?: string
+  postal_code?: string
+  email_notifications?: boolean
+  marketing_emails?: boolean
+}*/
+
+interface FormData {
+  name: string
+  email: string
+  phone: string
+  address: string
+  city: string
+  postalCode: string
+  emailNotifications: boolean
+  marketingEmails: boolean
+}
+
 export default function SettingsPage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     name: "",
     email: "",
     phone: "",
@@ -43,7 +72,7 @@ export default function SettingsPage() {
           return
         }
 
-        setUser(userData.user)
+        setUser(userData.user as User)
 
         // Fetch user profile
         const { data: profileData, error: profileError } = await supabase
@@ -53,9 +82,6 @@ export default function SettingsPage() {
           .single()
 
         if (profileError) throw profileError
-
-        // Remove the unused profile variable
-        // setProfile(profileData);
 
         // Initialize form data
         setFormData({
@@ -70,9 +96,9 @@ export default function SettingsPage() {
         })
 
         setLoading(false)
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error fetching user data:", error)
-        setError(error.message || "Failed to load user data")
+        setError(error instanceof Error ? error.message : "Failed to load user data")
         setLoading(false)
       }
     }
@@ -102,6 +128,10 @@ export default function SettingsPage() {
     setSuccess(null)
 
     try {
+      if (!user) {
+        throw new Error("User not found")
+      }
+
       // Update user metadata
       const { error: updateError } = await supabase.auth.updateUser({
         data: {
@@ -126,9 +156,9 @@ export default function SettingsPage() {
       if (profileError) throw profileError
 
       setSuccess("Perfil actualizado correctamente")
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating profile:", error)
-      setError(error.message || "Failed to update profile")
+      setError(error instanceof Error ? error.message : "Failed to update profile")
     } finally {
       setSaving(false)
     }
@@ -141,6 +171,10 @@ export default function SettingsPage() {
     setSuccess(null)
 
     try {
+      if (!user) {
+        throw new Error("User not found")
+      }
+
       // Update preferences
       const { error: preferencesError } = await supabase
         .from("miembros")
@@ -154,9 +188,9 @@ export default function SettingsPage() {
       if (preferencesError) throw preferencesError
 
       setSuccess("Preferencias actualizadas correctamente")
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating preferences:", error)
-      setError(error.message || "Failed to update preferences")
+      setError(error instanceof Error ? error.message : "Failed to update preferences")
     } finally {
       setSaving(false)
     }
@@ -305,6 +339,10 @@ export default function SettingsPage() {
                     className="mt-2"
                     onClick={async () => {
                       try {
+                        if (!user?.email) {
+                          throw new Error("Email not found")
+                        }
+                        
                         const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
                           redirectTo: `${window.location.origin}/reset-password`,
                         })
@@ -312,8 +350,8 @@ export default function SettingsPage() {
                         if (error) throw error
 
                         setSuccess("Se ha enviado un correo electrónico con instrucciones para cambiar tu contraseña")
-                      } catch (error: any) {
-                        setError(error.message || "Failed to send password reset email")
+                      } catch (error: unknown) {
+                        setError(error instanceof Error ? error.message : "Failed to send password reset email")
                       }
                     }}
                   >
@@ -334,8 +372,8 @@ export default function SettingsPage() {
                         if (error) throw error
 
                         setSuccess("Se han cerrado todas las demás sesiones activas")
-                      } catch (error: any) {
-                        setError(error.message || "Failed to sign out other sessions")
+                      } catch (error: unknown) {
+                        setError(error instanceof Error ? error.message : "Failed to sign out other sessions")
                       }
                     }}
                   >
@@ -350,4 +388,3 @@ export default function SettingsPage() {
     </div>
   )
 }
-

@@ -10,10 +10,25 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CreditCard, CheckCircle, AlertTriangle, Calendar } from "lucide-react"
 import { cancelSubscription } from "@/app/actions/stripe"
 
+// Define interfaces for our data types
+/*interface User {
+  id: string
+  email?: string
+}*/
+
+interface Profile {
+  id: string
+  subscription_status?: string
+  subscription_plan?: 'annual' | 'family' | null
+  subscription_updated_at?: string
+  subscription_id?: string
+  last_four?: string
+}
+
 export default function MembershipPage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
+  // Removed unused 'user' state variable
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -29,7 +44,8 @@ export default function MembershipPage() {
           return
         }
 
-        setUser(userData.user)
+        // We don't need to set the user state since it's not used elsewhere
+        // Just use the user data directly for fetching the profile
 
         // Fetch user profile
         const { data: profileData, error: profileError } = await supabase
@@ -42,9 +58,9 @@ export default function MembershipPage() {
 
         setProfile(profileData)
         setLoading(false)
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error fetching user data:", error)
-        setError(error.message || "Failed to load user data")
+        setError(error instanceof Error ? error.message : "Failed to load user data")
         setLoading(false)
       }
     }
@@ -67,14 +83,11 @@ export default function MembershipPage() {
         throw new Error("No hay una suscripción activa para cancelar")
       }
 
-      const formData = new FormData()
-      formData.append("subscriptionId", profile.subscription_id)
-      formData.append("userId", user.id)
+      // Call the cancelSubscription function without arguments as per its definition
+      const result = await cancelSubscription()
 
-      const result = await cancelSubscription(formData)
-
-      if (result.error) {
-        throw new Error(result.error)
+      if (!result.success) {
+        throw new Error(result.error || "Error al cancelar la suscripción")
       }
 
       // Update local state
@@ -84,9 +97,9 @@ export default function MembershipPage() {
       })
 
       setCancelSuccess(true)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error cancelling subscription:", error)
-      setError(error.message || "Failed to cancel subscription")
+      setError(error instanceof Error ? error.message : "Failed to cancel subscription")
     } finally {
       setCancelLoading(false)
     }
@@ -170,7 +183,7 @@ export default function MembershipPage() {
                     <div>
                       <p className="text-sm text-gray-500">Próxima Facturación</p>
                       <p className="font-medium">
-                        {subscriptionUpdatedAt
+                        {subscriptionUpdatedAt && profile?.subscription_updated_at
                           ? new Date(
                               new Date(profile.subscription_updated_at).setFullYear(
                                 new Date(profile.subscription_updated_at).getFullYear() + 1,
@@ -294,4 +307,3 @@ export default function MembershipPage() {
     </div>
   )
 }
-

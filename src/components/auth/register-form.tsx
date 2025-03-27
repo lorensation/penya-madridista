@@ -55,7 +55,7 @@ export function RegisterForm() {
       const supabase = createClient()
       
       // Register the user
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email: values.email,
         password: values.password,
         options: {
@@ -116,7 +116,7 @@ export function RegisterForm() {
                 <Input type="email" placeholder="john.doe@example.com" {...field} />
               </FormControl>
               <FormDescription>
-                We'll send a confirmation email to this address.
+                We&apos;ll send a confirmation email to this address.
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -145,5 +145,3 @@ export function RegisterForm() {
     </Form>
   )
 }
-
-export default RegisterForm;

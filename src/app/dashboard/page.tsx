@@ -9,10 +9,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CreditCard, Calendar, FileText, Settings, AlertTriangle } from "lucide-react"
 
+// Define interfaces for our data types
+interface User {
+  id: string
+  email?: string
+}
+
+interface Profile {
+  id: string
+  name?: string
+  auth_id?: string
+  subscription_status?: string
+  subscription_plan?: 'annual' | 'family' | null
+}
+
 export default function Dashboard() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -39,9 +53,9 @@ export default function Dashboard() {
 
         setProfile(profileData)
         setLoading(false)
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error fetching user data:", error)
-        setError(error.message || "Failed to load user data")
+        setError(error instanceof Error ? error.message : "Failed to load user data")
         setLoading(false)
       }
     }
@@ -208,11 +222,11 @@ export default function Dashboard() {
               <div className="space-y-4">
                 <div className="border-b pb-4">
                   <p className="font-medium">Nuevo artículo publicado</p>
-                  <p className="text-sm text-gray-500">"Los 5 Mejores Momentos de la Era Lorenzo Sanz" - Hace 2 días</p>
+                  <p className="text-sm text-gray-500">&ldquo;Los 5 Mejores Momentos de la Era Lorenzo Sanz&rdquo; - Hace 2 días</p>
                 </div>
                 <div className="border-b pb-4">
                   <p className="font-medium">Próximo evento anunciado</p>
-                  <p className="text-sm text-gray-500">"Cena Anual de Socios" - 15 de diciembre, 2023</p>
+                  <p className="text-sm text-gray-500">&ldquo;Cena Anual de Socios&rdquo; - 15 de diciembre, 2023</p>
                 </div>
                 <div>
                   <p className="font-medium">Actualización de membresía</p>

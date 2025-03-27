@@ -33,6 +33,7 @@ export default function NewsletterForm() {
         setError(result.error || "Error al suscribirse. Inténtalo de nuevo.")
       }
     } catch (error) {
+      console.error("Newsletter subscription error:", error)
       setError("Error al suscribirse. Inténtalo de nuevo.")
     } finally {
       setLoading(false)
@@ -73,4 +74,3 @@ export default function NewsletterForm() {
     </div>
   )
 }
-

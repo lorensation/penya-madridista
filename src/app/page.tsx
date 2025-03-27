@@ -1,3 +1,5 @@
+"use client"
+
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -155,8 +157,8 @@ export default function Home() {
                 </div>
               </div>
               <p className="text-gray-600">
-                "Ser parte de la Peña Lorenzo Sanz ha sido una experiencia increíble. Los eventos exclusivos y la
-                camaradería entre los socios hacen que valga la pena cada euro de la membresía."
+                &ldquo;Ser parte de la Peña Lorenzo Sanz ha sido una experiencia increíble. Los eventos exclusivos y la
+                camaradería entre los socios hacen que valga la pena cada euro de la membresía.&rdquo;
               </p>
             </div>
 
@@ -169,8 +171,8 @@ export default function Home() {
                 </div>
               </div>
               <p className="text-gray-600">
-                "Los descuentos en entradas y la posibilidad de conocer a exjugadores del Madrid han hecho que mi
-                experiencia como madridista sea aún más especial. Totalmente recomendado."
+                &ldquo;Los descuentos en entradas y la posibilidad de conocer a exjugadores del Madrid han hecho que mi
+                experiencia como madridista sea aún más especial. Totalmente recomendado.&rdquo;
               </p>
             </div>
 
@@ -183,8 +185,8 @@ export default function Home() {
                 </div>
               </div>
               <p className="text-gray-600">
-                "La peña organiza los mejores viajes para ver al Madrid. He podido asistir a partidos de Champions que
-                nunca habría podido organizar por mi cuenta. Una familia madridista de verdad."
+                &ldquo;La peña organiza los mejores viajes para ver al Madrid. He podido asistir a partidos de Champions que
+                nunca habría podido organizar por mi cuenta. Una familia madridista de verdad.&rdquo;
               </p>
             </div>
           </div>
@@ -206,4 +208,3 @@ export default function Home() {
     </div>
   )
 }
-

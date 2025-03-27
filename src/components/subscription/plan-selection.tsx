@@ -24,7 +24,7 @@ const plans: Plan[] = [
   {
     id: "annual",
     name: "Socio Anual",
-    price: 50,
+    price: 100,
     description: "Membresía anual a la Peña Madridista",
     features: [
       "Acceso a eventos exclusivos",
@@ -37,13 +37,13 @@ const plans: Plan[] = [
   {
     id: "family",
     name: "Socio Familiar",
-    price: 80,
+    price: 150,
     description: "Membresía familiar a la Peña Madridista",
     features: [
       "Todos los beneficios del plan anual",
-      "Hasta 4 miembros de la familia",
+      "Inscribe a un miembro menor junto con un adulto",
       "Descuentos adicionales en eventos",
-      "Actividades familiares exclusivas",
+      "Actividades para los más jóvenes",
     ],
     priceId: process.env.NEXT_PUBLIC_STRIPE_FAMILY_PRICE_ID!,
   },
@@ -98,8 +98,9 @@ export default function PlanSelection() {
       if (error) {
         throw error
       }
-    } catch (err: any) {
-      setError(err.message || "Ocurrió un error al procesar el pago")
+    } catch (err: Error | unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Ocurrió un error al procesar el pago"
+      setError(errorMessage)
       console.error(err)
     } finally {
       setLoading(false)
@@ -161,4 +162,3 @@ export default function PlanSelection() {
     </div>
   )
 }
-
