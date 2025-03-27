@@ -42,6 +42,7 @@ export async function POST(request: Request) {
           id: data.user.id,
           email: email,
           is_member: false,
+          // Remove the role field from here
         })
 
         if (insertError) {
@@ -53,6 +54,7 @@ export async function POST(request: Request) {
               user_uuid: data.user.id,
               user_email: email,
               user_name: name || null,
+              // Don't pass role here either
             })
 
             if (rpcError) {
@@ -81,3 +83,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Registration failed" }, { status: 500 })
   }
 }
+

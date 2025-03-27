@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
 
+// Replace the current client creation with a singleton pattern
+
 // Environment variables are accessible in both client and server components
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -9,7 +11,15 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const supabaseServiceKey = process.env.SUPABASE_WEBHOOK_SECRET
 
 // Create a single client instance that can be used everywhere
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
+// Use a singleton pattern to prevent multiple instances
+let supabaseInstance: ReturnType<typeof createClient<Database>> | null = null
+
+export const supabase = (() => {
+  if (supabaseInstance) return supabaseInstance
+
+  supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey)
+  return supabaseInstance
+})()
 
 // For server-side operations that need admin privileges
 export const getServiceSupabase = () => {

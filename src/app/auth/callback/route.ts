@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
             auth_id: data.user.id,
             email: data.user.email,
             name: data.user.user_metadata?.name || data.user.email.split("@")[0] || "",
-            role: "user",
+            role: "user", // It's OK to set role here since this is the miembros table
             created_at: new Date().toISOString(),
           })
 

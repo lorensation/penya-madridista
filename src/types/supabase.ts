@@ -165,7 +165,6 @@ export interface Database {
           status?: string | null
         }
       }
-      // Other tables remain the same
       subscriptions: {
         Row: {
           id: string

@@ -44,6 +44,7 @@ export async function POST(request: Request) {
           id: user.id,
           email: user.email || "",
           is_member: false,
+          // Remove role field from here
         })
 
         if (insertError) {
@@ -55,6 +56,7 @@ export async function POST(request: Request) {
               user_uuid: user.id,
               user_email: user.email || "",
               user_name: user.user_metadata?.name || null,
+              // Don't pass role here either
             })
 
             if (rpcError) {
