@@ -1,128 +1,149 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { signUp } from "@/app/actions/auth"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import * as z from "zod"
+
 import { Button } from "@/components/ui/button"
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useToast } from "@/components/ui/use-toast"
+import { createBrowserSupabaseClient as createClient } from "@/lib/supabase-client"
 
-interface AuthResult {
-  success?: boolean
-  error?: string
-  message?: string
-}
+const formSchema = z.object({
+  name: z.string().min(2, {
+    message: "Name must be at least 2 characters.",
+  }),
+  email: z.string().email({
+    message: "Please enter a valid email address.",
+  }),
+  password: z.string().min(8, {
+    message: "Password must be at least 8 characters.",
+  }),
+})
 
-export default function RegisterForm() {
+type FormValues = z.infer<typeof formSchema>
+
+export function RegisterForm() {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<AuthResult | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const { toast } = useToast()
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setLoading(true)
-    setResult(null)
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+    },
+  })
+
+  async function onSubmit(values: FormValues) {
+    setIsLoading(true)
 
     try {
-      const formData = new FormData(e.currentTarget)
-      const password = formData.get("password") as string
-      const confirmPassword = formData.get("confirmPassword") as string
+      const supabase = createClient()
+      
+      // Register the user
+      const { data, error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          data: {
+            name: values.name,
+          },
+        },
+      })
 
-      // Check if passwords match
-      if (password !== confirmPassword) {
-        setResult({
-          success: false,
-          error: "Las contraseñas no coinciden",
-        })
-        setLoading(false)
-        return
+      if (error) {
+        throw error
       }
 
-      const response = await signUp(formData)
+      toast({
+        title: "Registration successful!",
+        description: "Please check your email to confirm your account.",
+      })
 
-      if (response.error) {
-        setResult({
-          success: false,
-          error: response.error,
-        })
-      } else {
-        setResult({
-          success: true,
-          message: "Registro exitoso. Por favor verifica tu correo electrónico.",
-        })
-        // Redirect to verification page
-        router.push("/auth/verify")
-      }
+      router.push("/login")
     } catch (error) {
-      setResult({
-        success: false,
-        error: error instanceof Error ? error.message : "Error en el registro",
+      console.error("Registration error:", error)
+      toast({
+        variant: "destructive",
+        title: "Registration failed",
+        description: error instanceof Error ? error.message : "Something went wrong. Please try again.",
       })
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      <div className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
-        <h2 className="text-2xl font-bold text-center text-gray-700 mb-6">Crear Cuenta</h2>
-
-        {result && (
-          <Alert
-            variant={result.success ? "default" : "destructive"}
-            className={result.success ? "bg-green-50 border-green-200 text-green-800 mb-4" : "mb-4"}
-          >
-            <AlertDescription>{result.success ? result.message : result.error}</AlertDescription>
-          </Alert>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="name">Nombre completo</Label>
-            <Input id="name" name="name" required className="mt-1" />
-          </div>
-          <div>
-            <Label htmlFor="email">Correo electrónico</Label>
-            <Input id="email" name="email" type="email" required className="mt-1" />
-          </div>
-          <div>
-            <Label htmlFor="password">Contraseña</Label>
-            <Input id="password" name="password" type="password" required className="mt-1" />
-          </div>
-          <div>
-            <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
-            <Input id="confirmPassword" name="confirmPassword" type="password" required className="mt-1" />
-          </div>
-          <div className="text-sm text-gray-600 mt-2">
-            Al registrarte, aceptas nuestros{" "}
-            <Link href="/terms" className="text-primary hover:underline">
-              Términos de Servicio
-            </Link>{" "}
-            y{" "}
-            <Link href="/privacy" className="text-primary hover:underline">
-              Política de Privacidad
-            </Link>
-            .
-          </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Procesando..." : "Registrarse"}
-          </Button>
-        </form>
-      </div>
-      <div className="text-center">
-        <p className="text-gray-600">
-          ¿Ya tienes una cuenta?{" "}
-          <Link href="/login" className="text-primary hover:underline">
-            Iniciar sesión
-          </Link>
-        </p>
-      </div>
-    </div>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Name</FormLabel>
+              <FormControl>
+                <Input placeholder="John Doe" {...field} />
+              </FormControl>
+              <FormDescription>
+                This is your public display name.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input type="email" placeholder="john.doe@example.com" {...field} />
+              </FormControl>
+              <FormDescription>
+                We'll send a confirmation email to this address.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="password"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Password</FormLabel>
+              <FormControl>
+                <Input type="password" {...field} />
+              </FormControl>
+              <FormDescription>
+                Use at least 8 characters with a mix of letters, numbers & symbols.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" className="w-full" disabled={isLoading}>
+          {isLoading ? "Registering..." : "Register"}
+        </Button>
+      </form>
+    </Form>
   )
 }
 
+export default RegisterForm;

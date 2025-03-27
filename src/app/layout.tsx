@@ -6,6 +6,7 @@ import Header from "@/components/header"
 import { ThemeProvider } from "@/components/theme-provider"
 import Link from "next/link"
 import { AuthProvider } from "@/context/AuthContext"
+import { Toaster } from "@/components/ui/use-toast"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -98,6 +99,7 @@ export default function RootLayout({
                 </div>
               </div>
             </footer>
+            <Toaster />
           </AuthProvider>
         </ThemeProvider>
       </body>

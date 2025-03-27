@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import type { Database } from "@/types/supabase"
 import type { CookieOptions } from "@supabase/ssr"
 
-export function createServerSupabaseClient() {
+export function createServerActionClient() {
   // We need to dynamically import next/headers because it's only available in server components
   try {
     // This will throw an error if we're not in a server component
@@ -41,8 +41,8 @@ export function createServerSupabaseClient() {
       },
     )
   } catch (error) {
-    // If we're not in a server component, return a client that doesn't use cookies
-    console.warn("Not in a server component, returning a client without cookie handling")
+    // If we're not in a server action, return a client that doesn't use cookies
+    console.warn("Not in a server action, returning a client without cookie handling")
     return createServerClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

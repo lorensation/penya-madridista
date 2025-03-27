@@ -1,173 +1,123 @@
-"use server"
-
+import { createServerActionClient } from "@/lib/supabase-server-actions"
 import { redirect } from "next/navigation"
-import { createServerSupabaseClient } from "@/lib/supabase-server"
-import Stripe from "stripe"
-import type { ApiResponse, StripeSession } from "@/types/common"
+import { stripe } from "@/lib/stripe"
+import { getBaseUrl } from "@/lib/utils"
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2025-02-24.acacia",
-})
+export async function createCheckoutSession(priceId: string) {
+  const supabase = createServerActionClient()
 
-export async function createCheckoutSession(formData: FormData): Promise<ApiResponse<StripeSession>> {
-  const priceId = formData.get("priceId") as string
-  const returnUrl = (formData.get("returnUrl") as string) || `${process.env.NEXT_PUBLIC_BASE_URL}/membership/success`
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  if (!priceId) {
+  if (!user) {
+    return redirect("/login")
+  }
+
+  // Create a checkout session
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ["card"],
+    line_items: [
+      {
+        price: priceId,
+        quantity: 1,
+      },
+    ],
+    mode: "subscription",
+    success_url: `${getBaseUrl()}/dashboard/membership?success=true`,
+    cancel_url: `${getBaseUrl()}/dashboard/membership?canceled=true`,
+    customer_email: user.email,
+    client_reference_id: user.id,
+    metadata: {
+      userId: user.id,
+    },
+  })
+
+  if (session.url) {
+    return redirect(session.url)
+  }
+
+  return redirect("/dashboard/membership?error=true")
+}
+
+export async function createPortalSession() {
+  const supabase = createServerActionClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return redirect("/login")
+  }
+
+  // Retrieve customer ID from Supabase
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("stripe_customer_id")
+    .eq("id", user.id)
+    .single()
+
+  if (!profile?.stripe_customer_id) {
+    return redirect("/dashboard/membership?error=no-customer")
+  }
+
+  // Create a billing portal session
+  const session = await stripe.billingPortal.sessions.create({
+    customer: profile.stripe_customer_id,
+    return_url: `${getBaseUrl()}/dashboard/membership`,
+  })
+
+  if (session.url) {
+    return redirect(session.url)
+  }
+
+  return redirect("/dashboard/membership?error=true")
+}
+
+export async function cancelSubscription() {
+  const supabase = createServerActionClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
     return {
       success: false,
-      error: "Price ID is required",
+      error: "Not authenticated"
     }
   }
 
   try {
-    const supabase = createServerSupabaseClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // Retrieve customer ID and subscription ID from Supabase
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("stripe_customer_id, stripe_subscription_id")
+      .eq("id", user.id)
+      .single()
 
-    if (!user) {
+    if (!profile?.stripe_subscription_id) {
       return {
         success: false,
-        error: "You must be logged in to subscribe",
+        error: "No active subscription found"
       }
     }
 
-    // Get or create the customer
-    let customerId: string
-    const { data: customers } = await supabase
-      .from("stripe_customers")
-      .select("stripe_customer_id")
-      .eq("user_id", user.id)
-      .single()
-
-    if (customers?.stripe_customer_id) {
-      customerId = customers.stripe_customer_id
-    } else {
-      // Create a new customer
-      const customer = await stripe.customers.create({
-        email: user.email,
-        metadata: {
-          supabase_user_id: user.id,
-        },
-      })
-      customerId = customer.id
-
-      // Save the customer ID
-      await supabase.from("stripe_customers").insert({
-        user_id: user.id,
-        stripe_customer_id: customerId,
-      })
-    }
-
-    // Create the checkout session
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      mode: "subscription",
-      success_url: returnUrl,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/membership?canceled=true`,
-      metadata: {
-        user_id: user.id,
-      },
+    // Cancel the subscription at period end
+    await stripe.subscriptions.update(profile.stripe_subscription_id, {
+      cancel_at_period_end: true
     })
 
     return {
       success: true,
-      data: {
-        id: session.id,
-        url: session.url || "",
-      },
+      message: "Subscription will be canceled at the end of the billing period"
     }
   } catch (error) {
-    console.error("Stripe checkout error:", error)
+    console.error("Error canceling subscription:", error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : "An unexpected error occurred",
+      error: "Failed to cancel subscription"
     }
   }
 }
-
-export async function createBillingPortalSession(): Promise<ApiResponse<StripeSession>> {
-  try {
-    const supabase = createServerSupabaseClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return {
-        success: false,
-        error: "You must be logged in to manage your subscription",
-      }
-    }
-
-    // Get the customer
-    const { data: customer } = await supabase
-      .from("stripe_customers")
-      .select("stripe_customer_id")
-      .eq("user_id", user.id)
-      .single()
-
-    if (!customer?.stripe_customer_id) {
-      return {
-        success: false,
-        error: "No subscription found",
-      }
-    }
-
-    // Create the billing portal session
-    const session = await stripe.billingPortal.sessions.create({
-      customer: customer.stripe_customer_id,
-      return_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/membership`,
-    })
-
-    return {
-      success: true,
-      data: {
-        id: session.id,
-        url: session.url,
-      },
-    }
-  } catch (error) {
-    console.error("Stripe billing portal error:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "An unexpected error occurred",
-    }
-  }
-}
-
-export async function redirectToCheckout(formData: FormData) {
-  const result = await createCheckoutSession(formData)
-
-  if (!result.success || !result.data?.url) {
-    // Handle error
-    return {
-      success: false,
-      error: result.error || "Failed to create checkout session",
-    }
-  }
-
-  redirect(result.data.url)
-}
-
-export async function redirectToBillingPortal() {
-  const result = await createBillingPortalSession()
-
-  if (!result.success || !result.data?.url) {
-    // Handle error
-    return {
-      success: false,
-      error: result.error || "Failed to create billing portal session",
-    }
-  }
-
-  redirect(result.data.url)
-}
-
