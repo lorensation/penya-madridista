@@ -74,7 +74,7 @@ export async function resetPassword(email: string) {
 }
 
 // User profile functions
-export async function getUserProfile(userId: string) {
+export async function getUserProfile() {
   // Get the auth user
   const { data: authUser } = await supabase.auth.getUser()
 
@@ -88,7 +88,7 @@ export async function getUserProfile(userId: string) {
   return { data, error }
 }
 
-export async function updateUserProfile(userId: string, updates: any) {
+export async function updateUserProfile(updates: Record<string, unknown>) {
   // Get the auth user
   const { data: authUser } = await supabase.auth.getUser()
 
@@ -103,7 +103,7 @@ export async function updateUserProfile(userId: string, updates: any) {
 }
 
 // Member functions
-export async function createMember(memberData: any) {
+export async function createMember(memberData: Record<string, unknown>) {
   // Get the auth user
   const { data: authUser } = await supabase.auth.getUser()
 
@@ -116,17 +116,6 @@ export async function createMember(memberData: any) {
 
   if (userError) {
     return { data: null, error: userError }
-  }
-
-  // Get the user record to get the numeric ID if needed
-  const { data: userData, error: userFetchError } = await supabase
-    .from("users")
-    .select("id")
-    .eq("id", authUser.user.id)
-    .single()
-
-  if (userFetchError) {
-    return { data: null, error: userFetchError }
   }
 
   // Then create the member record
@@ -156,7 +145,7 @@ export async function getMember() {
   return { data, error }
 }
 
-export async function updateMember(updates: any) {
+export async function updateMember(updates: Record<string, unknown>) {
   // Get the auth user
   const { data: authUser } = await supabase.auth.getUser()
 

@@ -4,56 +4,52 @@ import type React from "react"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ArrowLeft, Save } from "lucide-react"
+import type { BlogPost, FormResult } from "@/types/common"
 
-export default function EditBlogPost({ params }: { params: { id: string } }) {
+export default function EditBlogPostPage({ params }: { params: { id: string } }) {
   const router = useRouter()
+  const [post, setPost] = useState<BlogPost | null>(null)
   const [formData, setFormData] = useState({
     title: "",
     slug: "",
-    excerpt: "",
     content: "",
+    excerpt: "",
     author: "",
     category: "",
-    imageUrl: "",
   })
-  const [originalSlug, setOriginalSlug] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [result, setResult] = useState<FormResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchPost = async () => {
       try {
+        setLoading(true)
         const { data, error } = await supabase.from("posts").select("*").eq("id", params.id).single()
 
         if (error) throw error
 
-        if (!data) {
-          throw new Error("Artículo no encontrado")
-        }
-
+        setPost(data)
         setFormData({
-          title: data.title,
-          slug: data.slug,
+          title: data.title || "",
+          slug: data.slug || "",
+          content: data.content || "",
           excerpt: data.excerpt || "",
-          content: data.content,
-          author: data.author,
-          category: data.category,
-          imageUrl: data.image_url || "/placeholder.svg?height=600&width=1200",
+          author: data.author || "",
+          category: data.category || "",
         })
-        setOriginalSlug(data.slug)
-        setLoading(false)
-      } catch (error: any) {
+      } catch (error) {
         console.error("Error fetching post:", error)
-        setError(error.message || "Failed to load post")
+        setError(error instanceof Error ? error.message : "Failed to load post")
+      } finally {
         setLoading(false)
       }
     }
@@ -63,87 +59,63 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
+  }
 
-    // Auto-generate slug from title only if slug hasn't been manually edited
-    if (name === "title" && formData.slug === originalSlug) {
-      const slug = value
-        .toLowerCase()
-        .replace(/[^\w\s]/gi, "")
-        .replace(/\s+/g, "-")
+  const generateSlug = (title: string) => {
+    return title
+      .toLowerCase()
+      .replace(/[^\w\s]/gi, "")
+      .replace(/\s+/g, "-")
+  }
 
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-        slug,
-      }))
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-      }))
-    }
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const title = e.target.value
+    setFormData((prev) => ({
+      ...prev,
+      title,
+      slug: prev.slug || generateSlug(title),
+    }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
+    setResult(null)
     setError(null)
 
     try {
-      // Validate required fields
-      if (!formData.title || !formData.slug || !formData.content || !formData.author || !formData.category) {
-        throw new Error("Por favor, completa todos los campos obligatorios")
-      }
-
-      // Check if slug already exists (only if changed)
-      if (formData.slug !== originalSlug) {
-        const { data: existingPost, error: slugCheckError } = await supabase
-          .from("posts")
-          .select("id")
-          .eq("slug", formData.slug)
-          .single()
-
-        if (slugCheckError && slugCheckError.code !== "PGRST116") {
-          throw slugCheckError
-        }
-
-        if (existingPost) {
-          throw new Error(
-            "Ya existe un artículo con este slug. Por favor, elige otro título o modifica el slug manualmente.",
-          )
-        }
-      }
-
-      // Update post
-      const { error: updateError } = await supabase
+      const { error } = await supabase
         .from("posts")
         .update({
           title: formData.title,
           slug: formData.slug,
-          excerpt: formData.excerpt,
           content: formData.content,
+          excerpt: formData.excerpt,
           author: formData.author,
           category: formData.category,
-          image_url: formData.imageUrl,
           updated_at: new Date().toISOString(),
         })
         .eq("id", params.id)
 
-      if (updateError) throw updateError
+      if (error) throw error
 
-      // Redirect to blog list
-      router.push("/admin/blog")
-    } catch (error: any) {
+      setResult({
+        success: true,
+        message: "Post updated successfully!",
+      })
+    } catch (error) {
       console.error("Error updating post:", error)
-      setError(error.message || "Failed to update post")
+      setError(error instanceof Error ? error.message : "Failed to update post")
+    } finally {
       setSaving(false)
     }
   }
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-gray-600">Cargando artículo...</p>
         </div>
@@ -151,19 +123,28 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
     )
   }
 
+  if (!post) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Alert variant="destructive">
+          <AlertDescription>No se encontró el artículo solicitado.</AlertDescription>
+        </Alert>
+        <Button className="mt-4" onClick={() => router.push("/admin/blog")}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Volver al listado
+        </Button>
+      </div>
+    )
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center mb-8">
-        <Link href="/admin/blog" className="mr-4">
-          <Button variant="outline" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="sr-only">Volver</span>
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-primary">Editar Artículo</h1>
-          <p className="text-gray-600">Modifica los detalles del artículo</p>
-        </div>
+      <div className="flex items-center mb-6">
+        <Button variant="outline" onClick={() => router.push("/admin/blog")} className="mr-4">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Volver
+        </Button>
+        <h1 className="text-2xl font-bold text-primary">Editar Artículo</h1>
       </div>
 
       {error && (
@@ -172,61 +153,76 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
         </Alert>
       )}
 
+      {result?.success && (
+        <Alert className="bg-green-50 border-green-200 text-green-800 mb-6">
+          <AlertDescription>{result.message}</AlertDescription>
+        </Alert>
+      )}
+
       <div className="bg-white rounded-lg shadow-md p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <Label htmlFor="title">Título</Label>
+            <Input
+              id="title"
+              name="title"
+              value={formData.title}
+              onChange={handleTitleChange}
+              required
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="slug">Slug (URL)</Label>
+            <Input id="slug" name="slug" value={formData.slug} onChange={handleChange} required className="mt-1" />
+            <p className="text-sm text-gray-500 mt-1">
+              Identificador único para la URL del artículo (sin espacios ni caracteres especiales)
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="title">
-                Título <span className="text-red-500">*</span>
-              </Label>
-              <Input id="title" name="title" value={formData.title} onChange={handleChange} required />
+            <div>
+              <Label htmlFor="author">Autor</Label>
+              <Input id="author" name="author" value={formData.author} onChange={handleChange} className="mt-1" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="slug">
-                Slug <span className="text-red-500">*</span>
-              </Label>
-              <Input id="slug" name="slug" value={formData.slug} onChange={handleChange} required />
-              <p className="text-xs text-gray-500">Identificador único para la URL del artículo</p>
+            <div>
+              <Label htmlFor="category">Categoría</Label>
+              <Input id="category" name="category" value={formData.category} onChange={handleChange} className="mt-1" />
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div>
             <Label htmlFor="excerpt">Extracto</Label>
-            <Textarea id="excerpt" name="excerpt" value={formData.excerpt} onChange={handleChange} rows={2} />
-            <p className="text-xs text-gray-500">Breve descripción que aparecerá en la lista de artículos</p>
+            <Textarea
+              id="excerpt"
+              name="excerpt"
+              value={formData.excerpt}
+              onChange={handleChange}
+              className="mt-1 h-24"
+            />
+            <p className="text-sm text-gray-500 mt-1">Breve resumen del artículo (opcional)</p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="content">
-              Contenido <span className="text-red-500">*</span>
-            </Label>
-            <Textarea id="content" name="content" value={formData.content} onChange={handleChange} rows={15} required />
-            <p className="text-xs text-gray-500">Puedes usar HTML para dar formato al contenido</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="author">
-                Autor <span className="text-red-500">*</span>
-              </Label>
-              <Input id="author" name="author" value={formData.author} onChange={handleChange} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="category">
-                Categoría <span className="text-red-500">*</span>
-              </Label>
-              <Input id="category" name="category" value={formData.category} onChange={handleChange} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="imageUrl">URL de la imagen</Label>
-              <Input id="imageUrl" name="imageUrl" value={formData.imageUrl} onChange={handleChange} />
-            </div>
+          <div>
+            <Label htmlFor="content">Contenido</Label>
+            <Textarea
+              id="content"
+              name="content"
+              value={formData.content}
+              onChange={handleChange}
+              required
+              className="mt-1 min-h-[300px]"
+            />
           </div>
 
           <div className="flex justify-end">
             <Button type="submit" className="bg-primary hover:bg-secondary" disabled={saving}>
               {saving ? (
-                <>Guardando...</>
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Guardando...
+                </>
               ) : (
                 <>
                   <Save className="mr-2 h-4 w-4" />

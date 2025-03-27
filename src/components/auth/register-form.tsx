@@ -2,103 +2,127 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { signUp } from "@/lib/supabase"
+import Link from "next/link"
+import { signUp } from "@/app/actions/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
-export function RegisterForm() {
-  const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [envReady, setEnvReady] = useState(false)
+interface AuthResult {
+  success?: boolean
+  error?: string
+  message?: string
+}
+
+export default function RegisterForm() {
   const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<AuthResult | null>(null)
 
-  // Check if environment variables are loaded
-  useEffect(() => {
-    const checkEnv = () => {
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-      if (url && key) {
-        setEnvReady(true)
-      } else {
-        console.warn("Supabase environment variables not loaded yet")
-        // Try again in a second
-        setTimeout(checkEnv, 1000)
-      }
-    }
-
-    checkEnv()
-  }, [])
-
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
-    setError(null)
-
-    // Check if environment variables are loaded
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      setError("Application is still initializing. Please try again in a moment.")
-      setLoading(false)
-      return
-    }
+    setResult(null)
 
     try {
-      // Sign up with Supabase Auth using the unified function
-      const { error: signUpError } = await signUp(email, password, name)
+      const formData = new FormData(e.currentTarget)
+      const password = formData.get("password") as string
+      const confirmPassword = formData.get("confirmPassword") as string
 
-      if (signUpError) {
-        throw signUpError
+      // Check if passwords match
+      if (password !== confirmPassword) {
+        setResult({
+          success: false,
+          error: "Las contraseñas no coinciden",
+        })
+        setLoading(false)
+        return
       }
 
-      // We'll let the email verification process handle profile creation
-      router.push("/auth/verify")
-    } catch (error: any) {
-      console.error("Registration error:", error)
-      setError(error.message || "Failed to register")
+      const response = await signUp(formData)
+
+      if (response.error) {
+        setResult({
+          success: false,
+          error: response.error,
+        })
+      } else {
+        setResult({
+          success: true,
+          message: "Registro exitoso. Por favor verifica tu correo electrónico.",
+        })
+        // Redirect to verification page
+        router.push("/auth/verify")
+      }
+    } catch (error) {
+      setResult({
+        success: false,
+        error: error instanceof Error ? error.message : "Error en el registro",
+      })
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <form onSubmit={handleRegister} className="space-y-4">
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+    <div className="w-full max-w-md mx-auto">
+      <div className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
+        <h2 className="text-2xl font-bold text-center text-gray-700 mb-6">Crear Cuenta</h2>
 
-      {!envReady && (
-        <Alert className="bg-yellow-50 border-yellow-200 text-yellow-800">
-          <AlertDescription>
-            Application is initializing. You may need to refresh the page if registration doesn't work.
-          </AlertDescription>
-        </Alert>
-      )}
+        {result && (
+          <Alert
+            variant={result.success ? "default" : "destructive"}
+            className={result.success ? "bg-green-50 border-green-200 text-green-800 mb-4" : "mb-4"}
+          >
+            <AlertDescription>{result.success ? result.message : result.error}</AlertDescription>
+          </Alert>
+        )}
 
-      <div className="space-y-2">
-        <Label htmlFor="name">Name</Label>
-        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="name">Nombre completo</Label>
+            <Input id="name" name="name" required className="mt-1" />
+          </div>
+          <div>
+            <Label htmlFor="email">Correo electrónico</Label>
+            <Input id="email" name="email" type="email" required className="mt-1" />
+          </div>
+          <div>
+            <Label htmlFor="password">Contraseña</Label>
+            <Input id="password" name="password" type="password" required className="mt-1" />
+          </div>
+          <div>
+            <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
+            <Input id="confirmPassword" name="confirmPassword" type="password" required className="mt-1" />
+          </div>
+          <div className="text-sm text-gray-600 mt-2">
+            Al registrarte, aceptas nuestros{" "}
+            <Link href="/terms" className="text-primary hover:underline">
+              Términos de Servicio
+            </Link>{" "}
+            y{" "}
+            <Link href="/privacy" className="text-primary hover:underline">
+              Política de Privacidad
+            </Link>
+            .
+          </div>
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? "Procesando..." : "Registrarse"}
+          </Button>
+        </form>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+      <div className="text-center">
+        <p className="text-gray-600">
+          ¿Ya tienes una cuenta?{" "}
+          <Link href="/login" className="text-primary hover:underline">
+            Iniciar sesión
+          </Link>
+        </p>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-      </div>
-      <Button type="submit" className="w-full" disabled={loading || !envReady}>
-        {loading ? "Registering..." : "Register"}
-      </Button>
-    </form>
+    </div>
   )
 }
 

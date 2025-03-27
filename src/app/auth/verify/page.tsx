@@ -1,19 +1,24 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import Link from "next/link"
 
 export default function VerifyPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Check Your Email</CardTitle>
-          <CardDescription className="text-center">
-            We've sent you a verification link. Please check your email to verify your account.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-center">
-          <p className="text-sm text-gray-500 mt-4">Once verified, you'll be able to sign in to your account.</p>
-        </CardContent>
-      </Card>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+      <div className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4 w-full max-w-md">
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-center text-gray-700 mb-4">Verify Your Email</h2>
+          <p className="text-gray-600 mb-6">
+            We&apos;ve sent a verification link to your email. Please check your inbox and click on the link to verify
+            your account.
+          </p>
+          <p className="text-gray-600">
+            If you don&apos;t see the email, check your spam folder or{" "}
+            <Link href="/auth/resend-verification" className="text-primary hover:underline">
+              click here to resend
+            </Link>
+            .
+          </p>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
@@ -8,11 +8,10 @@ import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { FileText, Plus, Search, Edit, Trash2, Eye, MoreHorizontal, ChevronLeft, ChevronRight } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import type { BlogPost } from "@/types/common"
 
 export default function AdminBlogPage() {
-  // Remove this line
-  // const router = useRouter();
-  const [posts, setPosts] = useState<any[]>([])
+  const [posts, setPosts] = useState<BlogPost[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
@@ -20,11 +19,8 @@ export default function AdminBlogPage() {
   const [totalPages, setTotalPages] = useState(1)
   const postsPerPage = 10
 
-  useEffect(() => {
-    fetchPosts()
-  }, [currentPage, searchQuery])
-
-  const fetchPosts = async () => {
+  // Use useCallback to memoize the fetchPosts function
+  const fetchPosts = useCallback(async () => {
     try {
       setLoading(true)
 
@@ -46,12 +42,16 @@ export default function AdminBlogPage() {
       setPosts(data || [])
       setTotalPages(Math.ceil((count || 0) / postsPerPage))
       setLoading(false)
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching posts:", error)
-      setError(error.message || "Failed to load posts")
+      setError(error instanceof Error ? error.message : "Failed to load posts")
       setLoading(false)
     }
-  }
+  }, [currentPage, searchQuery, postsPerPage])
+
+  useEffect(() => {
+    fetchPosts()
+  }, [fetchPosts])
 
   const handleDeletePost = async (postId: string) => {
     if (!confirm("¿Estás seguro de que deseas eliminar este artículo? Esta acción no se puede deshacer.")) {
@@ -65,9 +65,9 @@ export default function AdminBlogPage() {
 
       // Refresh the posts list
       fetchPosts()
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error deleting post:", error)
-      setError(error.message || "Failed to delete post")
+      setError(error instanceof Error ? error.message : "Failed to delete post")
     }
   }
 

@@ -1,43 +1,87 @@
 "use server"
 
-import { subscribeToNewsletter } from "@/lib/mailgun"
-import { supabase } from "@/lib/supabase"
-import { revalidatePath } from "next/cache"
+import { createServerSupabaseClient } from "@/lib/supabase-server"
+import type { ApiResponse } from "@/types/common"
 
-export async function subscribeNewsletter(formData: FormData) {
+export async function subscribeToNewsletter(formData: FormData): Promise<ApiResponse> {
+  const email = formData.get("email") as string
+
+  if (!email) {
+    return {
+      success: false,
+      error: "Email is required",
+    }
+  }
+
   try {
-    const email = formData.get("email") as string
-    const name = (formData.get("name") as string) || undefined
-
-    if (!email) {
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
       return {
-        error: "Email is required",
+        success: false,
+        error: "Please enter a valid email address",
       }
     }
 
-    // Store subscriber in database
-    await supabase.from("newsletter_subscribers").insert({
-      email,
-      name,
-      status: "active",
-    })
+    // Add to Mailgun mailing list
+    const mailgunApiKey = process.env.MAILGUN_API_KEY
+    const mailgunDomain = process.env.MAILGUN_DOMAIN
+    const mailgunMailingList = process.env.MAILGUN_MAILING_LIST
 
-    // Subscribe to Mailgun
-    const result = await subscribeToNewsletter(email, name)
-
-    if (result.error) {
-      throw new Error(result.error)
+    if (!mailgunApiKey || !mailgunDomain || !mailgunMailingList) {
+      console.error("Mailgun configuration missing")
+      return {
+        success: false,
+        error: "Newsletter service is not configured properly",
+      }
     }
 
-    revalidatePath("/")
+    const response = await fetch(`https://api.mailgun.net/v3/lists/${mailgunMailingList}/members`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${Buffer.from(`api:${mailgunApiKey}`).toString("base64")}`,
+      },
+      body: new URLSearchParams({
+        address: email,
+        subscribed: "yes",
+        upsert: "yes",
+      }).toString(),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      console.error("Mailgun API error:", errorData)
+      return {
+        success: false,
+        error: "Failed to subscribe to the newsletter",
+      }
+    }
+
+    // Also store in our database
+    const supabase = createServerSupabaseClient()
+    const { error } = await supabase.from("newsletter_subscribers").upsert(
+      {
+        email,
+        subscribed_at: new Date().toISOString(),
+      },
+      { onConflict: "email" },
+    )
+
+    if (error) {
+      console.error("Supabase error:", error)
+      // We don't return an error here since the subscription to Mailgun was successful
+    }
 
     return {
       success: true,
+      message: "Successfully subscribed to the newsletter!",
     }
-  } catch (error: any) {
-    console.error("Error subscribing to newsletter:", error)
+  } catch (error) {
+    console.error("Newsletter subscription error:", error)
     return {
-      error: error.message || "Failed to subscribe to newsletter",
+      success: false,
+      error: "An unexpected error occurred",
     }
   }
 }

@@ -3,14 +3,28 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { supabase } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { FileText, Video, Download, AlertTriangle } from "lucide-react"
+import type { Database } from "@/types/supabase"
+
+// Define types for our content
+interface ContentItem {
+  id: number
+  title: string
+  description: string
+  type: "video" | "pdf" | "gallery"
+  date: string
+  duration?: string
+  pages?: number
+  images?: number
+  thumbnail: string
+}
 
 // Mock content data
-const exclusiveContent = [
+const exclusiveContent: ContentItem[] = [
   {
     id: 1,
     title: "Entrevista exclusiva con Fernando Sanz",
@@ -59,25 +73,31 @@ const exclusiveContent = [
   },
 ]
 
+// Define types for profile
+interface Profile {
+  id: string
+  subscription_status: string
+  [key: string]: any
+}
+
 export default function ContentPage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Initialize Supabase client
+  const supabase = createClientComponentClient<Database>()
 
   useEffect(() => {
     const checkUser = async () => {
       try {
-        const { data: userData } = await supabase.auth.getUser()
+        const { data: userData, error: userError } = await supabase.auth.getUser()
 
-        if (!userData.user) {
+        if (userError || !userData.user) {
           router.push("/login")
           return
         }
-
-        // Remove the unused user variable
-        // setUser(userData.user);
 
         // Fetch user profile
         const { data: profileData, error: profileError } = await supabase
@@ -88,17 +108,21 @@ export default function ContentPage() {
 
         if (profileError) throw profileError
 
-        setProfile(profileData)
-        setLoading(false)
+        setProfile(profileData as Profile)
       } catch (error: any) {
         console.error("Error fetching user data:", error)
         setError(error.message || "Failed to load user data")
+      } finally {
         setLoading(false)
       }
     }
 
     checkUser()
-  }, [router])
+  }, [router, supabase])
+
+  const handleSubscribe = () => {
+    router.push("/membership")
+  }
 
   if (loading) {
     return (
@@ -112,6 +136,7 @@ export default function ContentPage() {
   }
 
   const subscriptionStatus = profile?.subscription_status || "inactive"
+  const isSubscribed = subscriptionStatus === "active"
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -120,7 +145,7 @@ export default function ContentPage() {
         <p className="text-gray-600">Accede a contenido exclusivo disponible solo para socios</p>
       </div>
 
-      {subscriptionStatus !== "active" && (
+      {!isSubscribed && (
         <Alert className="mb-8 bg-yellow-50 border-yellow-200">
           <AlertTriangle className="h-4 w-4 text-yellow-800" />
           <AlertDescription className="text-yellow-800">
@@ -132,6 +157,31 @@ export default function ContentPage() {
           </AlertDescription>
         </Alert>
       )}
+
+      <Card className="p-4 border-black/5 mb-8">
+        {isSubscribed ? (
+          <CardHeader>
+            <CardTitle className="font-medium">Membresía Activa</CardTitle>
+            <CardDescription>
+              Tienes acceso completo a todo el contenido exclusivo de la Peña Madridista Lorenzo Sanz.
+            </CardDescription>
+          </CardHeader>
+        ) : (
+          <>
+            <CardHeader>
+              <CardTitle className="font-medium">Membresía Requerida</CardTitle>
+              <CardDescription>
+                Hazte socio para acceder a todo el contenido exclusivo de la Peña Madridista Lorenzo Sanz.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={handleSubscribe} className="w-full">
+                Suscribirse Ahora
+              </Button>
+            </CardContent>
+          </>
+        )}
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {exclusiveContent.map((content) => (
@@ -179,8 +229,8 @@ export default function ContentPage() {
                   {content.type === "gallery" && `${content.images} imágenes`}
                 </span>
               </div>
-              <Button className="w-full bg-primary hover:bg-secondary" disabled={subscriptionStatus !== "active"}>
-                {subscriptionStatus === "active"
+              <Button className="w-full" disabled={!isSubscribed}>
+                {isSubscribed
                   ? content.type === "video"
                     ? "Ver Video"
                     : content.type === "pdf"
@@ -195,4 +245,3 @@ export default function ContentPage() {
     </div>
   )
 }
-

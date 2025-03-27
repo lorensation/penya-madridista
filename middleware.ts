@@ -1,55 +1,54 @@
-import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
+import { createServerClient, type CookieOptions } from "@supabase/ssr"
+import { NextResponse, type NextRequest } from "next/server"
 
-export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
-  const supabase = createMiddlewareClient({ req, res })
+export async function middleware(request: NextRequest) {
+  const response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  // Create a Supabase client configured to use cookies
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        // Correctly typed getAll method
+        getAll() {
+          return request.cookies.getAll().map((cookie) => ({
+            name: cookie.name,
+            value: cookie.value,
+          }))
+        },
+        setAll(cookieOptions) {
+          cookieOptions.forEach(({ name, value, ...options }) => {
+            response.cookies.set({
+              name,
+              value,
+              ...options,
+            })
+          })
+        },
+      },
+    },
+  )
 
-  // Check if user is authenticated
-  if (!session) {
-    const redirectUrl = req.nextUrl.clone()
-    redirectUrl.pathname = "/login"
-    redirectUrl.searchParams.set("redirect", req.nextUrl.pathname)
-    return NextResponse.redirect(redirectUrl)
-  }
+  // Refresh session if expired - required for Server Components
+  await supabase.auth.getUser()
 
-  // Skip profile check for complete-profile page to avoid redirect loop
-  if (req.nextUrl.pathname === "/complete-profile") {
-    return res
-  }
-
-  // Check if profile is complete for dashboard and other protected routes
-  if (req.nextUrl.pathname.startsWith("/dashboard") || req.nextUrl.pathname.startsWith("/admin")) {
-    const { data: profile } = await supabase
-      .from("miembros")
-      .select("dni_pasaporte, name, apellido1")
-      .eq("auth_id", session.user.id)
-      .single()
-
-    // If profile is not complete, redirect to complete-profile page
-    if (!profile || !profile.dni_pasaporte || !profile.name || !profile.apellido1) {
-      return NextResponse.redirect(new URL("/complete-profile", req.url))
-    }
-  }
-
-  // For admin routes, check if user has admin role
-  if (req.nextUrl.pathname.startsWith("/admin")) {
-    const { data: profile } = await supabase.from("miembros").select("role").eq("auth_id", session.user.id).single()
-
-    if (!profile || profile.role !== "admin") {
-      return NextResponse.redirect(new URL("/dashboard", req.url))
-    }
-  }
-
-  return res
+  return response
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*", "/complete-profile"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public (public files)
+     */
+    "/((?!_next/static|_next/image|favicon.ico|public).*)",
+  ],
 }
-

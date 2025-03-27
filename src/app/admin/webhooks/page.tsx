@@ -8,21 +8,20 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { setupWebhooks } from "@/app/actions/setup-webhooks"
+import type { ApiResponse } from "@/types/common"
+
+// Define a type for the webhook secret data
+interface WebhookData {
+  webhookSecret: string;
+}
 
 export default function WebhooksSetupPage() {
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<ApiResponse<WebhookData> | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : ""
-
-  // Generate a random webhook secret
-  const generateSecret = () => {
-    // In the browser, we can't use Node.js crypto directly
-    // So we use Web Crypto API
-    const array = new Uint8Array(32)
-    window.crypto.getRandomValues(array)
-    return Array.from(array, (byte) => byte.toString(16).padStart(2, "0")).join("")
-  }
+  const baseUrl = "https://www.lorenzosanz.com"
+  const webhookUrl = `${baseUrl}/api/webhooks/supabase`
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -32,18 +31,18 @@ export default function WebhooksSetupPage() {
 
     try {
       const formData = new FormData(e.currentTarget)
-      const webhookUrl = formData.get("webhookUrl") as string
-      const webhookSecret = (formData.get("webhookSecret") as string) || generateSecret()
-
-      // Instead of calling a server action, we'll just provide instructions
-      // since we're having issues with Supabase initialization
-      setResult({
-        success: true,
-        webhookSecret,
-        message: "Use this webhook secret with your Supabase webhook configuration.",
-      })
-    } catch (error: any) {
-      setError(error.message || "An error occurred")
+      
+      // Call the server action to update the webhook secret
+      const response = await setupWebhooks(formData)
+      
+      if (response.success) {
+        // Cast the response to the correct type
+        setResult(response as ApiResponse<WebhookData>)
+      } else {
+        setError(response.error || "Failed to update webhook secret")
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "An error occurred")
     } finally {
       setLoading(false)
     }
@@ -52,14 +51,14 @@ export default function WebhooksSetupPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold text-primary mb-8">Supabase Webhook Setup</h1>
+        <h1 className="text-3xl font-bold text-primary mb-8">Supabase Webhook Management</h1>
 
         <div className="max-w-2xl mx-auto">
           <Card>
             <CardHeader>
-              <CardTitle>Configure Webhook</CardTitle>
+              <CardTitle>Manage Webhook Secret</CardTitle>
               <CardDescription>
-                Set up a webhook to handle Supabase events like user creation, updates, and deletions.
+                Update the secret key used to verify webhook requests from Supabase.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -72,60 +71,72 @@ export default function WebhooksSetupPage() {
               {result?.success && (
                 <Alert className="bg-green-50 border-green-200 text-green-800 mb-6">
                   <AlertDescription>
-                    <p>{result.message}</p>
-                    <div className="mt-2 p-2 bg-gray-100 rounded font-mono text-sm break-all">
-                      SUPABASE_WEBHOOK_SECRET={result.webhookSecret}
-                    </div>
+                    <p>{result.message || "Webhook secret updated successfully"}</p>
+                    {result.data && (
+                      <div className="mt-2 p-2 bg-gray-100 rounded font-mono text-sm break-all">
+                        SUPABASE_WEBHOOK_SECRET={result.data.webhookSecret}
+                      </div>
+                    )}
                     <p className="mt-2">
-                      Add this to your environment variables in your Vercel project settings or .env.local file.
+                      Make sure to update this secret in your Supabase webhook configuration and in your environment variables.
                     </p>
                   </AlertDescription>
                 </Alert>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="webhookUrl">Webhook URL</Label>
-                  <Input id="webhookUrl" name="webhookUrl" defaultValue={`${baseUrl}/api/webhooks/supabase`} required />
-                  <p className="text-sm text-gray-500">This is the URL that Supabase will send webhook events to.</p>
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
+                <h3 className="font-medium text-blue-800 mb-2">Active Webhook Configuration</h3>
+                <p className="text-blue-700 mb-2">
+                  Your webhook is configured at:
+                </p>
+                <div className="p-2 bg-white rounded font-mono text-sm break-all mb-2">
+                  {webhookUrl}
                 </div>
+                <p className="text-blue-700 text-sm">
+                  This page allows you to update the webhook secret. After updating, you&apos;ll need to:
+                </p>
+                <ol className="list-decimal text-blue-700 text-sm ml-5 mt-2">
+                  <li>Copy the new secret</li>
+                  <li>Update it in your Supabase dashboard (Project Settings → API → Webhooks)</li>
+                  <li>Update your environment variable (SUPABASE_WEBHOOK_SECRET)</li>
+                </ol>
+              </div>
 
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <input type="hidden" name="webhookUrl" value={webhookUrl} />
+                
                 <div className="space-y-2">
-                  <Label htmlFor="webhookSecret">Webhook Secret (Optional)</Label>
-                  <Input id="webhookSecret" name="webhookSecret" placeholder="Leave blank to generate one" />
+                  <Label htmlFor="webhookSecret">New Webhook Secret</Label>
+                  <Input 
+                    id="webhookSecret" 
+                    name="webhookSecret" 
+                    placeholder="Leave blank to generate a new random secret" 
+                  />
                   <p className="text-sm text-gray-500">
-                    A secret key used to verify webhook requests. If left blank, one will be generated for you.
+                    Enter a specific secret or leave blank to generate a random one.
                   </p>
                 </div>
 
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Generating..." : "Generate Webhook Secret"}
+                  {loading ? "Updating..." : "Update Webhook Secret"}
                 </Button>
               </form>
             </CardContent>
             <CardFooter className="flex flex-col space-y-4">
               <div className="text-sm text-gray-500">
-                <h3 className="font-medium mb-2">Manual Setup Instructions:</h3>
+                <h3 className="font-medium mb-2">How Webhook Verification Works:</h3>
                 <ol className="list-decimal pl-5 space-y-2">
                   <li>
-                    Go to your Supabase project dashboard and navigate to{" "}
-                    <span className="font-mono bg-gray-100 px-1 rounded">Project Settings &gt; API</span>.
+                    Supabase signs each webhook request with the secret you configure in their dashboard.
                   </li>
                   <li>
-                    Scroll down to the <span className="font-mono bg-gray-100 px-1 rounded">Webhooks</span> section and
-                    click <span className="font-mono bg-gray-100 px-1 rounded">Create webhook</span>.
+                    Your API endpoint verifies this signature using the same secret stored in your environment variables.
                   </li>
                   <li>
-                    Enter the webhook URL:{" "}
-                    <span className="font-mono bg-gray-100 px-1 rounded">{`${baseUrl}/api/webhooks/supabase`}</span>
+                    If the signatures match, you know the request is genuinely from Supabase.
                   </li>
                   <li>
-                    Select the events you want to trigger the webhook (e.g.,{" "}
-                    <span className="font-mono bg-gray-100 px-1 rounded">user.created</span>).
-                  </li>
-                  <li>
-                    Generate a webhook secret and add it to your environment variables as{" "}
-                    <span className="font-mono bg-gray-100 px-1 rounded">SUPABASE_WEBHOOK_SECRET</span>.
+                    This prevents malicious actors from sending fake webhook events to your API.
                   </li>
                 </ol>
               </div>

@@ -5,7 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { subscribeNewsletter } from "../app/actions/newsletter"
+import { subscribeToNewsletter } from "@/app/actions/newsletter"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function NewsletterForm() {
@@ -18,54 +18,56 @@ export default function NewsletterForm() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setSuccess(false)
 
     try {
       const formData = new FormData()
       formData.append("email", email)
 
-      const result = await subscribeNewsletter(formData)
+      const result = await subscribeToNewsletter(formData)
 
-      if (result.error) {
-        throw new Error(result.error)
+      if (result.success) {
+        setSuccess(true)
+        setEmail("")
+      } else {
+        setError(result.error || "Error al suscribirse. Inténtalo de nuevo.")
       }
-
-      setSuccess(true)
-      setEmail("")
-    } catch (error: any) {
-      console.error("Error subscribing to newsletter:", error)
-      setError(error.message || "Failed to subscribe to newsletter")
+    } catch (error) {
+      setError("Error al suscribirse. Inténtalo de nuevo.")
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div>
+    <div className="w-full max-w-md mx-auto">
       {success ? (
-        <Alert className="bg-green-50 border-green-200 text-green-800 mb-6">
-          <AlertDescription>¡Gracias por suscribirte! Te hemos enviado un correo de confirmación.</AlertDescription>
+        <Alert className="bg-white/10 border-white/20 text-white mb-6">
+          <AlertDescription>
+            ¡Gracias por suscribirte! Recibirás nuestras actualizaciones en tu correo electrónico.
+          </AlertDescription>
         </Alert>
       ) : error ? (
-        <Alert variant="destructive" className="mb-6">
+        <Alert className="bg-red-500/20 border-red-500/30 text-white mb-6">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
 
-      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4 max-w-lg mx-auto">
+      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
         <Input
           type="email"
           placeholder="Tu correo electrónico"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="flex-grow px-4 py-3 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-accent"
           required
+          className="bg-white/10 border-white/20 text-white placeholder:text-white/70 focus:border-white"
         />
         <Button
           type="submit"
-          className="bg-white text-primary hover:bg-accent hover:text-white whitespace-nowrap"
           disabled={loading}
+          className="bg-white text-primary hover:bg-accent hover:text-white transition-colors"
         >
-          {loading ? "Suscribiendo..." : "Suscribirse"}
+          {loading ? "Enviando..." : "Suscribirse"}
         </Button>
       </form>
     </div>

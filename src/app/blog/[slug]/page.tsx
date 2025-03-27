@@ -4,6 +4,14 @@ import { supabase } from "@/lib/supabase"
 import { notFound } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import type { Metadata } from "next"
+
+// Define a proper type for the page props
+type BlogPostProps = {
+  params: {
+    slug: string
+  }
+}
 
 async function getBlogPost(slug: string) {
   try {
@@ -42,7 +50,7 @@ async function getRelatedPosts(currentPostId: string, category: string) {
   }
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }) {
+export async function generateMetadata({ params }: BlogPostProps): Promise<Metadata> {
   const post = await getBlogPost(params.slug)
 
   if (!post) {
@@ -61,7 +69,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   }
 }
 
-export default async function BlogPost({ params }: { params: { slug: string } }) {
+export default async function BlogPost({ params }: BlogPostProps) {
   const post = await getBlogPost(params.slug)
 
   if (!post) {

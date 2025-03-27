@@ -1,70 +1,137 @@
 "use server"
 
+import { redirect } from "next/navigation"
 import { createServerSupabaseClient } from "@/lib/supabase-server"
+import type { ApiResponse } from "@/types/common"
+import type { User } from "@supabase/supabase-js"
 
-export async function createUserProfile(userId: string, email: string, name: string) {
-  try {
-    const supabase = createServerSupabaseClient()
+export async function signUp(formData: FormData) {
+  const supabase = createServerSupabaseClient()
+  const email = formData.get("email") as string
+  const password = formData.get("password") as string
+  const name = formData.get("name") as string
 
-    // Check if profile already exists to avoid duplicates
-    const { data: existingProfile } = await supabase.from("miembros").select("id").eq("auth_id", userId).single()
-
-    if (existingProfile) {
-      return { success: true, message: "Profile already exists" }
+  if (!email || !password || !name) {
+    return {
+      error: "Missing required fields",
     }
+  }
 
-    // Insert user profile into the "miembros" table
-    const { error } = await supabase.from("miembros").insert({
-      auth_id: userId,
-      email: email,
-      name: name || email.split("@")[0],
-      role: "user", // Default role
-      created_at: new Date().toISOString(),
-    })
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
+      data: {
+        name,
+      },
+    },
+  })
 
-    if (error) {
-      console.error("Database error creating profile:", error)
-      throw error
+  if (error) {
+    return {
+      error: error.message,
     }
+  }
 
-    return { success: true }
-  } catch (error: any) {
-    console.error("Error creating user profile:", error)
-    return { error: error.message || "Failed to create user profile" }
+  return {
+    success: true,
   }
 }
 
-export async function createUserProfileFromAuth(formData: FormData) {
-  try {
-    const supabase = createServerSupabaseClient()
-    const userId = formData.get("userId") as string
-    const email = formData.get("email") as string
-    const name = formData.get("name") as string
+export async function signIn(formData: FormData): Promise<ApiResponse> {
+  const supabase = createServerSupabaseClient()
+  const email = formData.get("email") as string
+  const password = formData.get("password") as string
 
-    if (!userId || !email) {
-      return {
-        error: "Missing required fields",
-      }
+  if (!email || !password) {
+    return {
+      success: false,
+      error: "Missing required fields",
     }
+  }
 
-    // Insert user profile into the "miembros" table
-    const { error } = await supabase.from("miembros").insert({
-      auth_id: userId,
-      email: email,
-      name: name || email.split("@")[0], // Use part of email as name if not provided
-      role: "user", // Default role
-      created_at: new Date().toISOString(),
-    })
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
 
-    if (error) {
-      throw error
+  if (error) {
+    return {
+      success: false,
+      error: error.message,
     }
+  }
 
-    return { success: true }
-  } catch (error: any) {
-    console.error("Error creating user profile:", error)
-    return { error: error.message || "Failed to create user profile" }
+  return {
+    success: true,
   }
 }
 
+export async function signOut() {
+  const supabase = createServerSupabaseClient()
+  await supabase.auth.signOut()
+  redirect("/login")
+}
+
+export async function resetPassword(formData: FormData) {
+  const supabase = createServerSupabaseClient()
+  const email = formData.get("email") as string
+
+  if (!email) {
+    return {
+      error: "Email is required",
+    }
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password`,
+  })
+
+  if (error) {
+    return {
+      error: error.message,
+    }
+  }
+
+  return {
+    success: true,
+  }
+}
+
+export async function updatePassword(formData: FormData) {
+  const supabase = createServerSupabaseClient()
+  const password = formData.get("password") as string
+
+  if (!password) {
+    return {
+      error: "Password is required",
+    }
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password,
+  })
+
+  if (error) {
+    return {
+      error: error.message,
+    }
+  }
+
+  return {
+    success: true,
+  }
+}
+
+export async function getSession() {
+  const supabase = createServerSupabaseClient()
+  return supabase.auth.getSession()
+}
+
+export async function getUser(): Promise<User | null> {
+  const supabase = createServerSupabaseClient()
+  const { data } = await supabase.auth.getUser()
+  return data.user
+}
 

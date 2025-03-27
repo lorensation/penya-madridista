@@ -4,115 +4,126 @@ import type React from "react"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ArrowLeft, Save } from "lucide-react"
+import type { FormResult } from "@/types/common"
 
-export default function NewBlogPost() {
+export default function NewBlogPostPage() {
   const router = useRouter()
   const [formData, setFormData] = useState({
     title: "",
     slug: "",
-    excerpt: "",
     content: "",
+    excerpt: "",
     author: "",
     category: "",
-    imageUrl: "/placeholder.svg?height=600&width=1200",
   })
   const [saving, setSaving] = useState(false)
+  const [result, setResult] = useState<FormResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
+  }
 
-    // Auto-generate slug from title
-    if (name === "title") {
-      const slug = value
-        .toLowerCase()
-        .replace(/[^\w\s]/gi, "")
-        .replace(/\s+/g, "-")
+  const generateSlug = (title: string) => {
+    return title
+      .toLowerCase()
+      .replace(/[^\w\s]/gi, "")
+      .replace(/\s+/g, "-")
+  }
 
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-        slug,
-      }))
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-      }))
-    }
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const title = e.target.value
+    setFormData((prev) => ({
+      ...prev,
+      title,
+      slug: prev.slug || generateSlug(title),
+    }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
+    setResult(null)
     setError(null)
 
     try {
       // Validate required fields
-      if (!formData.title || !formData.slug || !formData.content || !formData.author || !formData.category) {
-        throw new Error("Por favor, completa todos los campos obligatorios")
+      if (!formData.title || !formData.slug || !formData.content) {
+        throw new Error("Por favor completa los campos obligatorios")
       }
 
       // Check if slug already exists
-      const { data: existingPost, error: slugCheckError } = await supabase
+      const { data: existingPost, error: checkError } = await supabase
         .from("posts")
         .select("id")
         .eq("slug", formData.slug)
         .single()
 
-      if (slugCheckError && slugCheckError.code !== "PGRST116") {
-        throw slugCheckError
+      if (checkError && checkError.code !== "PGRST116") {
+        throw checkError
       }
 
       if (existingPost) {
-        throw new Error(
-          "Ya existe un artículo con este slug. Por favor, elige otro título o modifica el slug manualmente.",
-        )
+        throw new Error("Ya existe un artículo con este slug. Por favor usa uno diferente.")
       }
 
-      // Insert new post
+      // Create the post
       const { error: insertError } = await supabase.from("posts").insert({
         title: formData.title,
         slug: formData.slug,
-        excerpt: formData.excerpt,
         content: formData.content,
-        author: formData.author,
-        category: formData.category,
-        image_url: formData.imageUrl,
+        excerpt: formData.excerpt || null,
+        author: formData.author || null,
+        category: formData.category || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
 
       if (insertError) throw insertError
 
-      // Redirect to blog list
-      router.push("/admin/blog")
-    } catch (error: any) {
+      setResult({
+        success: true,
+        message: "¡Artículo creado con éxito!",
+      })
+
+      // Reset form after successful submission
+      setFormData({
+        title: "",
+        slug: "",
+        content: "",
+        excerpt: "",
+        author: "",
+        category: "",
+      })
+
+      // Redirect to blog list after a short delay
+      setTimeout(() => {
+        router.push("/admin/blog")
+      }, 2000)
+    } catch (error) {
       console.error("Error creating post:", error)
-      setError(error.message || "Failed to create post")
+      setError(error instanceof Error ? error.message : "Error al crear el artículo")
+    } finally {
       setSaving(false)
     }
   }
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center mb-8">
-        <Link href="/admin/blog" className="mr-4">
-          <Button variant="outline" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="sr-only">Volver</span>
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-primary">Nuevo Artículo</h1>
-          <p className="text-gray-600">Crea un nuevo artículo para el blog</p>
-        </div>
+      <div className="flex items-center mb-6">
+        <Button variant="outline" onClick={() => router.push("/admin/blog")} className="mr-4">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Volver
+        </Button>
+        <h1 className="text-2xl font-bold text-primary">Nuevo Artículo</h1>
       </div>
 
       {error && (
@@ -121,65 +132,80 @@ export default function NewBlogPost() {
         </Alert>
       )}
 
+      {result?.success && (
+        <Alert className="bg-green-50 border-green-200 text-green-800 mb-6">
+          <AlertDescription>{result.message}</AlertDescription>
+        </Alert>
+      )}
+
       <div className="bg-white rounded-lg shadow-md p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <Label htmlFor="title">Título *</Label>
+            <Input
+              id="title"
+              name="title"
+              value={formData.title}
+              onChange={handleTitleChange}
+              required
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="slug">Slug (URL) *</Label>
+            <Input id="slug" name="slug" value={formData.slug} onChange={handleChange} required className="mt-1" />
+            <p className="text-sm text-gray-500 mt-1">
+              Identificador único para la URL del artículo (sin espacios ni caracteres especiales)
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="title">
-                Título <span className="text-red-500">*</span>
-              </Label>
-              <Input id="title" name="title" value={formData.title} onChange={handleChange} required />
+            <div>
+              <Label htmlFor="author">Autor</Label>
+              <Input id="author" name="author" value={formData.author} onChange={handleChange} className="mt-1" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="slug">
-                Slug <span className="text-red-500">*</span>
-              </Label>
-              <Input id="slug" name="slug" value={formData.slug} onChange={handleChange} required />
-              <p className="text-xs text-gray-500">Identificador único para la URL del artículo</p>
+            <div>
+              <Label htmlFor="category">Categoría</Label>
+              <Input id="category" name="category" value={formData.category} onChange={handleChange} className="mt-1" />
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div>
             <Label htmlFor="excerpt">Extracto</Label>
-            <Textarea id="excerpt" name="excerpt" value={formData.excerpt} onChange={handleChange} rows={2} />
-            <p className="text-xs text-gray-500">Breve descripción que aparecerá en la lista de artículos</p>
+            <Textarea
+              id="excerpt"
+              name="excerpt"
+              value={formData.excerpt}
+              onChange={handleChange}
+              className="mt-1 h-24"
+            />
+            <p className="text-sm text-gray-500 mt-1">Breve resumen del artículo (opcional)</p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="content">
-              Contenido <span className="text-red-500">*</span>
-            </Label>
-            <Textarea id="content" name="content" value={formData.content} onChange={handleChange} rows={15} required />
-            <p className="text-xs text-gray-500">Puedes usar HTML para dar formato al contenido</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="author">
-                Autor <span className="text-red-500">*</span>
-              </Label>
-              <Input id="author" name="author" value={formData.author} onChange={handleChange} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="category">
-                Categoría <span className="text-red-500">*</span>
-              </Label>
-              <Input id="category" name="category" value={formData.category} onChange={handleChange} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="imageUrl">URL de la imagen</Label>
-              <Input id="imageUrl" name="imageUrl" value={formData.imageUrl} onChange={handleChange} />
-            </div>
+          <div>
+            <Label htmlFor="content">Contenido *</Label>
+            <Textarea
+              id="content"
+              name="content"
+              value={formData.content}
+              onChange={handleChange}
+              required
+              className="mt-1 min-h-[300px]"
+            />
           </div>
 
           <div className="flex justify-end">
             <Button type="submit" className="bg-primary hover:bg-secondary" disabled={saving}>
               {saving ? (
-                <>Guardando...</>
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Guardando...
+                </>
               ) : (
                 <>
                   <Save className="mr-2 h-4 w-4" />
-                  Guardar Artículo
+                  Publicar Artículo
                 </>
               )}
             </Button>

@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
-import type { Session, User } from "@supabase/supabase-js"
+import type { Session, User, AuthError } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 
@@ -9,10 +9,10 @@ type AuthContextType = {
   user: User | null
   session: Session | null
   isLoading: boolean
-  signUp: (email: string, password: string, name: string) => Promise<{ error: any }>
-  signIn: (email: string, password: string) => Promise<{ error: any }>
-  signOut: () => Promise<{ error: any }>
-  resetPassword: (email: string) => Promise<{ error: any }>
+  signUp: (email: string, password: string, name: string) => Promise<{ error: AuthError | null }>
+  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>
+  signOut: () => Promise<{ error: AuthError | null }>
+  resetPassword: (email: string) => Promise<{ error: AuthError | null }>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)

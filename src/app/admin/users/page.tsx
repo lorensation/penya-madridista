@@ -1,15 +1,16 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Users, Search, UserCheck, UserX, MoreHorizontal, ChevronLeft, ChevronRight } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import type { UserProfile } from "@/types/common"
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<any[]>([])
+  const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
@@ -17,11 +18,8 @@ export default function AdminUsersPage() {
   const [totalPages, setTotalPages] = useState(1)
   const usersPerPage = 10
 
-  useEffect(() => {
-    fetchUsers()
-  }, [currentPage, searchQuery])
-
-  const fetchUsers = async () => {
+  // Use useCallback to memoize the fetchUsers function
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true)
 
@@ -63,12 +61,16 @@ export default function AdminUsersPage() {
       setUsers(filteredUsers)
       setTotalPages(Math.ceil(filteredUsers.length / usersPerPage))
       setLoading(false)
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching users:", error)
-      setError(error.message || "Failed to load users")
+      setError(error instanceof Error ? error.message : "Failed to load users")
       setLoading(false)
     }
-  }
+  }, [currentPage, searchQuery, usersPerPage])
+
+  useEffect(() => {
+    fetchUsers()
+  }, [fetchUsers])
 
   const handleUpdateUserRole = async (userId: string, role: string) => {
     try {
@@ -78,9 +80,9 @@ export default function AdminUsersPage() {
 
       // Refresh the users list
       fetchUsers()
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error updating user role:", error)
-      setError(error.message || "Failed to update user role")
+      setError(error instanceof Error ? error.message : "Failed to update user role")
     }
   }
 
