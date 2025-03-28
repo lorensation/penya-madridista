@@ -3,14 +3,7 @@ import { redirect } from "next/navigation";
 import { BlogPostForm } from "@/components/blog/blog-post-form";
 import type { Metadata } from "next";
 
-// Define the page props using a unique interface name to prevent conflicts
-interface BlogEditPageProps {
-  params: {
-    id: string;
-  };
-  searchParams?: Record<string, string | string[] | undefined>;
-}
-
+// Simple function to get blog post data
 async function getBlogPost(id: string) {
   try {
     const supabase = createServerSupabaseClient();
@@ -32,8 +25,15 @@ async function getBlogPost(id: string) {
   }
 }
 
-export async function generateMetadata({ params }: BlogEditPageProps): Promise<Metadata> {
-  const post = await getBlogPost(params.id);
+// Metadata generation function with Promise params
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  // Await the params Promise
+  const resolvedParams = await params;
+  const post = await getBlogPost(resolvedParams.id);
 
   if (!post) {
     return {
@@ -48,7 +48,14 @@ export async function generateMetadata({ params }: BlogEditPageProps): Promise<M
   };
 }
 
-export default async function BlogEditPage({ params }: BlogEditPageProps) {
+// Page component with Promise params
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  // Await the params Promise
+  const resolvedParams = await params;
   const supabase = createServerSupabaseClient();
   
   // Check if user is authenticated and is an admin
@@ -70,7 +77,7 @@ export default async function BlogEditPage({ params }: BlogEditPageProps) {
   }
   
   // Fetch the blog post to edit
-  const post = await getBlogPost(params.id);
+  const post = await getBlogPost(resolvedParams.id);
   
   if (!post) {
     redirect("/admin/blog");

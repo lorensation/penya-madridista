@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import type { Metadata } from "next"
 
-// Define a proper type for the page props
+// Updated type for the page props to use Promise-based params for Next.js 15+
 type BlogPostProps = {
-  params: {
+  params: Promise<{
     slug: string
-  }
+  }>
 }
 
 async function getBlogPost(slug: string) {
@@ -51,7 +51,9 @@ async function getRelatedPosts(currentPostId: string, category: string) {
 }
 
 export async function generateMetadata({ params }: BlogPostProps): Promise<Metadata> {
-  const post = await getBlogPost(params.slug)
+  // Await the params Promise to get the actual params object
+  const resolvedParams = await params
+  const post = await getBlogPost(resolvedParams.slug)
 
   if (!post) {
     return {
@@ -70,7 +72,9 @@ export async function generateMetadata({ params }: BlogPostProps): Promise<Metad
 }
 
 export default async function BlogPost({ params }: BlogPostProps) {
-  const post = await getBlogPost(params.slug)
+  // Await the params Promise to get the actual params object
+  const resolvedParams = await params
+  const post = await getBlogPost(resolvedParams.slug)
 
   if (!post) {
     notFound()
@@ -223,4 +227,3 @@ export default async function BlogPost({ params }: BlogPostProps) {
     </div>
   )
 }
-

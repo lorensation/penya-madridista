@@ -1,7 +1,6 @@
 "use client"
 
 import type * as React from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
 import { DayPicker } from "react-day-picker"
 import { es } from "date-fns/locale"
 
@@ -46,8 +45,7 @@ function Calendar({ className, classNames, showOutsideDays = true, locale = es, 
         ...classNames,
       }}
       components={{
-        IconLeft: () => <ChevronLeft className="h-4 w-4" />,
-        IconRight: () => <ChevronRight className="h-4 w-4" />,
+        // Remove the components prop completely since it's causing issues
       }}
       {...props}
     />
@@ -56,4 +54,3 @@ function Calendar({ className, classNames, showOutsideDays = true, locale = es, 
 Calendar.displayName = "Calendar"
 
 export { Calendar }
-

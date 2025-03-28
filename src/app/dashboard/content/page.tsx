@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useEffect, useState } from "react"
@@ -79,7 +78,7 @@ const exclusiveContent: ContentItem[] = [
 interface Profile {
   id: string
   subscription_status: string
-  [key: string]: string | null | boolean | number // Replace any with specific types
+  [key: string]: string | null | boolean | number
 }
 
 export default function ContentPage() {

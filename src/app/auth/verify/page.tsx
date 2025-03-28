@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 
 export default function VerifyPage() {
@@ -22,4 +24,3 @@ export default function VerifyPage() {
     </div>
   )
 }
-
