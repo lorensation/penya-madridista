@@ -10,12 +10,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CreditCard, CheckCircle, AlertTriangle, Calendar } from "lucide-react"
 import { cancelSubscription } from "@/app/actions/stripe"
 
-// Define interfaces for our data types
-/*interface User {
-  id: string
-  email?: string
-}*/
-
 interface Profile {
   id: string
   subscription_status?: string
@@ -27,7 +21,6 @@ interface Profile {
 
 export default function MembershipPage() {
   const router = useRouter()
-  // Removed unused 'user' state variable
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [cancelLoading, setCancelLoading] = useState(false)
@@ -43,9 +36,6 @@ export default function MembershipPage() {
           router.push("/login")
           return
         }
-
-        // We don't need to set the user state since it's not used elsewhere
-        // Just use the user data directly for fetching the profile
 
         // Fetch user profile
         const { data: profileData, error: profileError } = await supabase
@@ -276,7 +266,7 @@ export default function MembershipPage() {
                   <>
                     <li className="flex items-start">
                       <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm">Válido para hasta 4 miembros de la familia</span>
+                      <span className="text-sm">Válido para un menor y un adulto miembros de la familia</span>
                     </li>
                     <li className="flex items-start">
                       <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />

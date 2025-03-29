@@ -66,7 +66,7 @@ export default function NewsletterForm() {
         <Button
           type="submit"
           disabled={loading}
-          className="bg-white text-primary hover:bg-accent hover:text-white transition-colors"
+          className="bg-white text-primary hover:bg-black hover:text-white transition-colors"
         >
           {loading ? "Enviando..." : "Suscribirse"}
         </Button>

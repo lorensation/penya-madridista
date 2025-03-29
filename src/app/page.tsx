@@ -15,16 +15,16 @@ export default function Home() {
               <p className="text-xl md:text-2xl">
                 Honrando el legado de un presidente que marcó una época dorada en el Real Madrid
               </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/membership">
-                  <Button className="bg-white text-primary hover:bg-accent hover:text-white text-lg px-8 py-6">
+              <div className="flex flex-col sm:flex-row gap-4 mt-8">
+                <Link href="/membership" className="sm:w-auto">
+                  <Button className="bg-accent text-black hover:bg-black hover:text-secondary text-lg px-8 py-6 w-full sm:w-auto shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 font-bold">
                     Hazte Socio
                   </Button>
                 </Link>
-                <Link href="/about">
+                <Link href="/about" className="sm:w-auto">
                   <Button
                     variant="outline"
-                    className="border-white text-white hover:bg-white hover:text-primary text-lg px-8 py-6"
+                    className="border-white text-black hover:bg-black hover:text-secondary text-lg px-8 py-6 w-full sm:w-auto transition-colors duration-300"
                   >
                     Conoce Más
                   </Button>
@@ -33,7 +33,7 @@ export default function Home() {
             </div>
             <div className="relative h-80 md:h-96 rounded-lg overflow-hidden shadow-xl">
               <Image
-                src="/placeholder.svg?height=400&width=600"
+                src="/lorenzosanz-copa.jpg"
                 alt="Lorenzo Sanz"
                 fill
                 className="object-cover"
@@ -59,20 +59,20 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="bg-gray-50 p-8 rounded-lg shadow-md hover:shadow-lg transition-shadow">
               <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mb-6 mx-auto">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-8 w-8 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-8 w-8 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
               </div>
               <h3 className="text-xl font-bold text-primary text-center mb-3">Eventos Exclusivos</h3>
               <p className="text-gray-600 text-center">
@@ -82,20 +82,13 @@ export default function Home() {
 
             <div className="bg-gray-50 p-8 rounded-lg shadow-md hover:shadow-lg transition-shadow">
               <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-6 mx-auto">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-8 w-8 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                  />
-                </svg>
+                <Image
+                  src="/money.svg"
+                  alt="Logo Dinero"
+                  width={90}
+                  height={90}
+                  className="object-contain"
+                />
               </div>
               <h3 className="text-xl font-bold text-primary text-center mb-3">Descuentos Especiales</h3>
               <p className="text-gray-600 text-center">
@@ -105,20 +98,13 @@ export default function Home() {
 
             <div className="bg-gray-50 p-8 rounded-lg shadow-md hover:shadow-lg transition-shadow">
               <div className="w-16 h-16 bg-accent rounded-full flex items-center justify-center mb-6 mx-auto">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-8 w-8 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                  />
-                </svg>
+                <Image
+                  src="/logo-rm-icon.png"
+                  alt="Logo Real Madrid"
+                  width={90}
+                  height={90}
+                  className="object-contain"
+                />
               </div>
               <h3 className="text-xl font-bold text-primary text-center mb-3">Comunidad Madridista</h3>
               <p className="text-gray-600 text-center">
@@ -129,9 +115,30 @@ export default function Home() {
 
           <div className="text-center mt-12">
             <Link href="/membership">
-              <Button className="bg-primary text-white hover:bg-secondary">Únete Ahora</Button>
+              <Button className="text-white bg-black hover:bg-white hover:text-primary text-lg px-8 py-6 w-full sm:w-auto shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 font-bold">
+                Únete ahora
+              </Button>
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* Full-width Banner Section */}
+      <section 
+        className="relative w-full h-96 md:h-[400px] bg-cover bg-center flex items-center justify-center"
+        style={{
+          backgroundImage: 'url(/septima-banner.jpg)',
+          backgroundPosition: 'center',
+          backgroundSize: 'cover',
+          backgroundRepeat: 'no-repeat'
+        }}
+      >
+        <div className="absolute inset-0 bg-transparent bg-opacity-40"></div>
+        <div className="relative z-10 text-center text-white px-4">
+          <h2 className="text-3xl md:text-5xl font-bold mb-4 drop-shadow-lg">Un Legado de Victorias</h2>
+          <p className="text-xl md:text-2xl max-w-3xl mx-auto drop-shadow-lg">
+            Bajo la presidencia de Lorenzo Sanz, el Real Madrid volvió a conquistar Europa
+          </p>
         </div>
       </section>
 
@@ -148,7 +155,22 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="bg-white p-8 rounded-lg shadow-md">
               <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-gray-200 rounded-full mr-4"></div>
+                <div className="w-12 h-12 bg-gray-200 rounded-full mr-4">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={"h-full w-full text-gray-400"}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
                 <div>
                   <h4 className="font-bold">Carlos Rodríguez</h4>
                   <p className="text-sm text-gray-500">Socio desde 2020</p>
@@ -162,7 +184,22 @@ export default function Home() {
 
             <div className="bg-white p-8 rounded-lg shadow-md">
               <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-gray-200 rounded-full mr-4"></div>
+                <div className="w-12 h-12 bg-gray-200 rounded-full mr-4">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={"h-full w-full text-gray-400"}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
                 <div>
                   <h4 className="font-bold">Ana Martínez</h4>
                   <p className="text-sm text-gray-500">Socia desde 2021</p>
@@ -176,7 +213,22 @@ export default function Home() {
 
             <div className="bg-white p-8 rounded-lg shadow-md">
               <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-gray-200 rounded-full mr-4"></div>
+                <div className="w-12 h-12 bg-gray-200 rounded-full mr-4">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={"h-full w-full text-gray-400"}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
                 <div>
                   <h4 className="font-bold">Miguel Fernández</h4>
                   <p className="text-sm text-gray-500">Socio desde 2019</p>

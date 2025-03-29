@@ -69,7 +69,7 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-2">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="Peña Lorenzo Sanz Logo" width={40} height={40} className="rounded-full" />
+            <Image src="/logo.jpg" alt="Peña Lorenzo Sanz Logo" width={40} height={40} className="rounded-full" />
             <span className="hidden font-bold sm:inline-block">Peña Lorenzo Sanz</span>
           </Link>
         </div>
@@ -118,17 +118,17 @@ export function Header() {
             Blog
           </Link>
           <Link
-            href="/hazte-socio"
+            href="/membership"
             className={`text-sm font-medium transition-colors hover:text-primary ${
-              isActive("/hazte-socio") ? "text-primary" : "text-gray-600"
+              isActive("/membership") ? "text-primary" : "text-gray-600"
             }`}
           >
             Hazte Socio
           </Link>
           <Link
-            href="/contacto"
+            href="/contact"
             className={`text-sm font-medium transition-colors hover:text-primary ${
-              isActive("/contacto") ? "text-primary" : "text-gray-600"
+              isActive("/contact") ? "text-primary" : "text-gray-600"
             }`}
           >
             Contacto

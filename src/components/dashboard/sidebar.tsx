@@ -3,154 +3,156 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useMobile } from "@/hooks/use-mobile"
 import {
-  ChevronLeft,
-  ChevronRight,
-  LayoutDashboard,
+  Home,
   CreditCard,
   Calendar,
   FileText,
   Settings,
+  LogOut,
   Menu,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 
-interface SidebarProps {
-  className?: string
-}
-
-export function DashboardSidebar({ className }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
-  const [mobileOpen, setMobileOpen] = useState(false)
+export function DashboardSidebar() {
+  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isMobileOpen, setIsMobileOpen] = useState(false)
   const pathname = usePathname()
+  const isMobile = useMobile()
 
-  // Check if we're on mobile
+  // Reset mobile menu state when screen size changes
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768)
-      if (window.innerWidth < 768) {
-        setCollapsed(true)
+    if (!isMobile) {
+      setIsMobileOpen(false)
+    }
+  }, [isMobile])
+
+  // Close mobile sidebar when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as HTMLElement
+      if (isMobile && isMobileOpen && !target.closest("[data-sidebar]") && !target.closest("[data-sidebar-toggle]")) {
+        setIsMobileOpen(false)
       }
     }
 
-    checkMobile()
-    window.addEventListener("resize", checkMobile)
-    return () => window.removeEventListener("resize", checkMobile)
-  }, [])
-
-  const toggleSidebar = () => {
-    setCollapsed(!collapsed)
-    if (isMobile) {
-      setMobileOpen(!mobileOpen)
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
     }
+  }, [isMobile, isMobileOpen])
+
+  const toggleCollapse = () => {
+    setIsCollapsed(!isCollapsed)
   }
 
-  const closeMobileSidebar = () => {
-    if (isMobile) {
-      setMobileOpen(false)
-    }
+  const toggleMobileMenu = () => {
+    setIsMobileOpen(!isMobileOpen)
+  }
+
+  const isActive = (path: string) => {
+    return pathname === path || pathname?.startsWith(path + "/")
   }
 
   const navItems = [
     {
-      title: "Panel Principal",
+      name: "Panel Principal",
       href: "/dashboard",
-      icon: LayoutDashboard,
+      icon: <Home className="h-5 w-5" />,
     },
     {
-      title: "Membresía",
+      name: "Membresía",
       href: "/dashboard/membership",
-      icon: CreditCard,
+      icon: <CreditCard className="h-5 w-5" />,
     },
     {
-      title: "Eventos",
+      name: "Eventos",
       href: "/dashboard/events",
-      icon: Calendar,
+      icon: <Calendar className="h-5 w-5" />,
     },
     {
-      title: "Contenido Exclusivo",
+      name: "Contenido Exclusivo",
       href: "/dashboard/content",
-      icon: FileText,
+      icon: <FileText className="h-5 w-5" />,
     },
     {
-      title: "Configuración",
+      name: "Configuración",
       href: "/dashboard/settings",
-      icon: Settings,
+      icon: <Settings className="h-5 w-5" />,
     },
   ]
 
   return (
     <>
       {/* Mobile overlay */}
-      {isMobile && mobileOpen && <div className="fixed inset-0 bg-black/50 z-40" onClick={closeMobileSidebar} />}
+      {isMobile && isMobileOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-40" />}
 
       {/* Mobile toggle button */}
       {isMobile && (
-        <Button variant="outline" size="icon" className="fixed top-20 left-4 z-50 md:hidden" onClick={toggleSidebar}>
-          <Menu className="h-4 w-4" />
-          <span className="sr-only">Toggle sidebar</span>
-        </Button>
+        <button
+          data-sidebar-toggle
+          className="fixed top-20 left-4 z-50 p-2 rounded-md bg-primary text-white shadow-md"
+          onClick={toggleMobileMenu}
+          aria-label={isMobileOpen ? "Cerrar menú" : "Abrir menú"}
+        >
+          {isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
       )}
 
+      {/* Sidebar */}
       <div
-        className={cn(
-          "fixed top-0 left-0 z-40 h-screen bg-white border-r transition-all duration-300 pt-16",
-          collapsed && !mobileOpen ? "w-16" : "w-64",
-          isMobile && !mobileOpen && "transform -translate-x-full",
-          isMobile && mobileOpen && "transform translate-x-0",
-          className,
-        )}
+        data-sidebar
+        className={`fixed top-16 bottom-0 left-0 z-40 flex flex-col bg-primary text-white transition-all duration-300 ${
+          isCollapsed ? "w-16" : "w-64"
+        } ${isMobile ? (isMobileOpen ? "translate-x-0" : "-translate-x-full") : "translate-x-0"}`}
       >
-        <div className="flex flex-col h-full">
-          <div className="flex items-center justify-between p-4 border-b">
-            <h2
-              className={cn(
-                "font-semibold text-primary transition-opacity",
-                collapsed && !mobileOpen ? "opacity-0 w-0" : "opacity-100",
-              )}
+        {/* Sidebar header */}
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
+          {!isCollapsed && <h2 className="text-lg font-bold">Panel de Socio</h2>}
+          {!isMobile && (
+            <button
+              onClick={toggleCollapse}
+              className="p-1 rounded-md hover:bg-secondary"
+              aria-label={isCollapsed ? "Expandir" : "Colapsar"}
             >
-              Panel de Socio
-            </h2>
-            <Button variant="ghost" size="icon" onClick={toggleSidebar} className="ml-auto">
-              {collapsed && !mobileOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-            </Button>
-          </div>
+              {isCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+            </button>
+          )}
+        </div>
 
-          <nav className="flex-1 p-2 space-y-1">
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto py-4">
+          <ul className="space-y-1 px-2">
             {navItems.map((item) => (
-              <Link key={item.href} href={item.href} onClick={closeMobileSidebar}>
-                <div
-                  className={cn(
-                    "flex items-center px-3 py-2 rounded-md text-sm transition-colors",
-                    pathname === item.href ? "bg-primary text-primary-foreground" : "text-gray-700 hover:bg-gray-100",
-                    collapsed && !mobileOpen ? "justify-center" : "justify-start",
-                  )}
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={`flex items-center rounded-md px-3 py-2 transition-colors ${
+                    isActive(item.href)
+                      ? "bg-secondary text-white"
+                      : "text-white/80 hover:bg-secondary/70 hover:text-white"
+                  }`}
                 >
-                  <item.icon
-                    className={cn("h-5 w-5", pathname === item.href ? "text-primary-foreground" : "text-gray-500")}
-                  />
-                  <span
-                    className={cn(
-                      "ml-3 transition-opacity",
-                      collapsed && !mobileOpen ? "opacity-0 w-0 hidden" : "opacity-100",
-                    )}
-                  >
-                    {item.title}
-                  </span>
-                </div>
-              </Link>
+                  <span className="mr-3">{item.icon}</span>
+                  {!isCollapsed && <span>{item.name}</span>}
+                </Link>
+              </li>
             ))}
-          </nav>
+          </ul>
+        </nav>
 
-          <div className={cn("p-4 border-t", collapsed && !mobileOpen ? "hidden" : "block")}>
-            <Link href="/dashboard/logout">
-              <Button variant="outline" className="w-full">
-                Cerrar Sesión
-              </Button>
-            </Link>
-          </div>
+        {/* Logout */}
+        <div className="p-4 border-t border-white/10">
+          <Link
+            href="/dashboard/logout"
+            className="flex items-center rounded-md px-3 py-2 text-red-300 hover:bg-secondary/70 hover:text-red-200 transition-colors"
+          >
+            <LogOut className="mr-3 h-5 w-5" />
+            {!isCollapsed && <span>Cerrar Sesión</span>}
+          </Link>
         </div>
       </div>
     </>

@@ -36,6 +36,7 @@ const membershipPlans = [
       "Válido para un adulto y un menor miembros de la familia",
       "Descuentos adicionales en eventos familiares",
       "Carnets oficiales para todos los miembros incluidos",
+      "Actividades para los más pequeños",
     ],
     popular: true,
   },
@@ -105,7 +106,7 @@ export default function Membership() {
                 } ${selectedPlan === plan.id ? "ring-2 ring-primary" : ""}`}
                 onClick={() => handleSelectPlan(plan.id)}
               >
-                <div className={`${plan.popular ? "bg-secondary" : "bg-primary"} p-6 text-white text-center relative`}>
+                <div className={`${plan.popular ? "bg-primary  text-white" : "bg-primary  text-white"} p-6 text-center relative`}>
                   {plan.popular && (
                     <div className="absolute top-0 right-0 bg-accent text-primary text-xs font-bold px-3 py-1 transform translate-y-2 rotate-45">
                       POPULAR

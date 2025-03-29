@@ -71,14 +71,14 @@ export default function Contact() {
                     <Mail className="h-5 w-5 text-primary mr-3 mt-0.5" />
                     <div>
                       <p className="font-medium">Email</p>
-                      <p className="text-gray-600">info@penalorenzosanz.com</p>
+                      <p className="text-gray-600">info@lorenzosanz.com</p>
                     </div>
                   </div>
                   <div className="flex items-start">
                     <Phone className="h-5 w-5 text-primary mr-3 mt-0.5" />
                     <div>
                       <p className="font-medium">Teléfono</p>
-                      <p className="text-gray-600">+34 XXX XXX XXX</p>
+                      <p className="text-gray-600">+34 679 240 500</p>
                     </div>
                   </div>
                   <div className="flex items-start">
@@ -86,9 +86,7 @@ export default function Contact() {
                     <div>
                       <p className="font-medium">Dirección</p>
                       <p className="text-gray-600">
-                        Calle Ejemplo, 123
-                        <br />
-                        28001 Madrid, España
+                        Madrid, España
                       </p>
                     </div>
                   </div>

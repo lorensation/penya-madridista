@@ -17,7 +17,7 @@ export default function About() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center mb-16">
             <div className="relative h-96 rounded-lg overflow-hidden shadow-xl">
-              <Image src="/placeholder.svg?height=600&width=800" alt="Lorenzo Sanz" fill className="object-cover" />
+              <Image src="/copa-fernandosanz-a-hombros.jpg" alt="Lorenzo Sanz" fill className="object-cover" />
             </div>
             <div className="space-y-6">
               <h2 className="text-2xl md:text-3xl font-bold text-primary">Nuestra Historia</h2>
@@ -60,20 +60,13 @@ export default function About() {
               </div>
               <div className="text-center">
                 <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-4 mx-auto">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-8 w-8 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                    />
-                  </svg>
+                  <Image
+                    src="/logo-rm-icon.png"
+                    alt="Logo Real Madrid"
+                    width={90}
+                    height={90}
+                    className="object-contain"
+                  />
                 </div>
                 <h3 className="text-xl font-bold text-primary mb-2">Unir Madridistas</h3>
                 <p className="text-gray-600">
@@ -83,20 +76,13 @@ export default function About() {
               </div>
               <div className="text-center">
                 <div className="w-16 h-16 bg-accent rounded-full flex items-center justify-center mb-4 mx-auto">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-8 w-8 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
-                    />
-                  </svg>
+                  <Image
+                    src="/valores-icon.png"
+                    alt="Valores"
+                    width={90}
+                    height={90}
+                    className="object-contain"
+                  />
                 </div>
                 <h3 className="text-xl font-bold text-primary mb-2">Promover Valores</h3>
                 <p className="text-gray-600">
@@ -122,15 +108,10 @@ export default function About() {
                 <li>Torneos deportivos entre socios y otras peñas madridistas.</li>
                 <li>Cenas y eventos sociales para fortalecer los lazos entre los miembros.</li>
               </ul>
-              <div className="pt-4">
-                <Link href="/membership">
-                  <Button className="bg-primary hover:bg-secondary">Hazte Socio</Button>
-                </Link>
-              </div>
             </div>
             <div className="relative h-96 rounded-lg overflow-hidden shadow-xl order-1 md:order-2">
               <Image
-                src="/placeholder.svg?height=600&width=800"
+                src="/padre-hijo-rueda-prensa.jpg"
                 alt="Eventos de la Peña"
                 fill
                 className="object-cover"
@@ -146,10 +127,12 @@ export default function About() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/membership">
-                <Button className="bg-white text-primary hover:bg-accent hover:text-white">Hazte Socio</Button>
+                <Button className="text-black bg-white hover:bg-black hover:text-secondary text-lg px-8 py-6 w-full sm:w-auto shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 font-bold">
+                  Hazte Socio
+                </Button>
               </Link>
-              <Link href="/contact">
-                <Button variant="outline" className="border-white text-white hover:bg-white hover:text-primary">
+              <Link href="/membership">
+                <Button className="text-black bg-white hover:bg-black hover:text-secondary text-lg px-8 py-6 w-full sm:w-auto shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 font-bold">
                   Contáctanos
                 </Button>
               </Link>
