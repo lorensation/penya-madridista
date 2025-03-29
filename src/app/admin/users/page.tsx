@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -23,36 +22,20 @@ export default function AdminUsersPage() {
     try {
       setLoading(true)
 
-      // Get users from auth.users
-      const {
-        data: { users: authUsers },
-        error: authError,
-      } = await supabase.auth.admin.listUsers({
-        page: currentPage,
-        perPage: usersPerPage,
-      })
+      // Make a server request to fetch users instead of directly using admin API
+      const response = await fetch("/api/admin/users?page=" + currentPage + "&perPage=" + usersPerPage)
 
-      if (authError) throw authError
+      if (!response.ok) {
+        throw new Error("Failed to fetch users: " + response.statusText)
+      }
 
-      // Get profiles from profiles table
-      const { data: profiles, error: profilesError } = await supabase.from("miembros").select("*")
-
-      if (profilesError) throw profilesError
-
-      // Merge auth users with profiles
-      const mergedUsers = authUsers.map((authUser) => {
-        const profile = profiles.find((p) => p.id === authUser.id) || {}
-        return {
-          ...authUser,
-          ...profile,
-        }
-      })
+      const data = await response.json()
 
       // Apply search filter if query exists
-      let filteredUsers = mergedUsers
+      let filteredUsers = data.users || []
       if (searchQuery) {
-        filteredUsers = mergedUsers.filter(
-          (user) =>
+        filteredUsers = filteredUsers.filter(
+          (user: UserProfile) =>
             user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             user.user_metadata?.name?.toLowerCase().includes(searchQuery.toLowerCase()),
         )
@@ -74,9 +57,17 @@ export default function AdminUsersPage() {
 
   const handleUpdateUserRole = async (userId: string, role: string) => {
     try {
-      const { error } = await supabase.from("miembros").update({ role }).eq("id", userId)
+      const response = await fetch("/api/admin/users/update-role", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userId, role }),
+      })
 
-      if (error) throw error
+      if (!response.ok) {
+        throw new Error("Failed to update user role")
+      }
 
       // Refresh the users list
       fetchUsers()
