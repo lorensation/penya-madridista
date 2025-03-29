@@ -95,7 +95,7 @@ export default function Dashboard() {
   const subscriptionPlan = profile?.subscription_plan || null
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 md:pl-4">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-primary">Bienvenido a tu Panel de Socio</h1>

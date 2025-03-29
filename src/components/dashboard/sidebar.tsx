@@ -3,122 +3,153 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { supabase } from "@/lib/supabase"
-import { Button } from "@/components/ui/button"
+import {
+  ChevronLeft,
+  ChevronRight,
+  LayoutDashboard,
+  CreditCard,
+  Calendar,
+  FileText,
+  Settings,
+  Menu,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Home, CreditCard, Calendar, FileText, Settings, LogOut, Menu, X } from "lucide-react"
-import { User } from "@supabase/supabase-js"
+import { Button } from "@/components/ui/button"
 
-const navigation = [
-  { name: "Panel Principal", href: "/dashboard", icon: Home },
-  { name: "Membresía", href: "/dashboard/membership", icon: CreditCard },
-  { name: "Eventos", href: "/dashboard/events", icon: Calendar },
-  { name: "Contenido Exclusivo", href: "/dashboard/content", icon: FileText },
-  { name: "Configuración", href: "/dashboard/settings", icon: Settings },
-]
+interface SidebarProps {
+  className?: string
+}
 
-export default function DashboardSidebar() {
+export function DashboardSidebar({ className }: SidebarProps) {
+  const [collapsed, setCollapsed] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [user, setUser] = useState<User | null>(null)
 
+  // Check if we're on mobile
   useEffect(() => {
-    const checkUser = async () => {
-      const { data } = await supabase.auth.getUser()
-      setUser(data.user)
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+      if (window.innerWidth < 768) {
+        setCollapsed(true)
+      }
     }
 
-    checkUser()
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+    return () => window.removeEventListener("resize", checkMobile)
   }, [])
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    window.location.href = "/"
+  const toggleSidebar = () => {
+    setCollapsed(!collapsed)
+    if (isMobile) {
+      setMobileOpen(!mobileOpen)
+    }
   }
+
+  const closeMobileSidebar = () => {
+    if (isMobile) {
+      setMobileOpen(false)
+    }
+  }
+
+  const navItems = [
+    {
+      title: "Panel Principal",
+      href: "/dashboard",
+      icon: LayoutDashboard,
+    },
+    {
+      title: "Membresía",
+      href: "/dashboard/membership",
+      icon: CreditCard,
+    },
+    {
+      title: "Eventos",
+      href: "/dashboard/events",
+      icon: Calendar,
+    },
+    {
+      title: "Contenido Exclusivo",
+      href: "/dashboard/content",
+      icon: FileText,
+    },
+    {
+      title: "Configuración",
+      href: "/dashboard/settings",
+      icon: Settings,
+    },
+  ]
 
   return (
     <>
-      {/* Mobile menu button */}
-      <div className="fixed top-4 left-4 z-50 md:hidden">
-        <Button variant="outline" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="bg-white">
-          {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+      {/* Mobile overlay */}
+      {isMobile && mobileOpen && <div className="fixed inset-0 bg-black/50 z-40" onClick={closeMobileSidebar} />}
+
+      {/* Mobile toggle button */}
+      {isMobile && (
+        <Button variant="outline" size="icon" className="fixed top-20 left-4 z-50 md:hidden" onClick={toggleSidebar}>
+          <Menu className="h-4 w-4" />
+          <span className="sr-only">Toggle sidebar</span>
         </Button>
-      </div>
+      )}
 
-      {/* Sidebar for mobile */}
       <div
-        className={`fixed inset-0 z-40 transform ${
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-        } md:hidden transition-transform duration-300 ease-in-out`}
+        className={cn(
+          "fixed top-0 left-0 z-40 h-screen bg-white border-r transition-all duration-300 pt-16",
+          collapsed && !mobileOpen ? "w-16" : "w-64",
+          isMobile && !mobileOpen && "transform -translate-x-full",
+          isMobile && mobileOpen && "transform translate-x-0",
+          className,
+        )}
       >
-        <div className="fixed inset-0 bg-black/20" onClick={() => setMobileMenuOpen(false)} />
-        <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out">
-          <div className="flex flex-col h-full">
-            <div className="px-4 py-6 border-b">
-              <h2 className="text-xl font-bold text-primary">Panel de Socio</h2>
-              <p className="text-sm text-gray-500 mt-1">{user?.user_metadata?.name || user?.email || "Cargando..."}</p>
-            </div>
-            <nav className="flex-1 px-2 py-4 space-y-1">
-              {navigation.map((item) => (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center px-3 py-2 text-sm font-medium rounded-md",
-                    pathname === item.href ? "bg-primary text-white" : "text-gray-700 hover:bg-gray-100",
-                  )}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <item.icon className="mr-3 h-5 w-5" aria-hidden="true" />
-                  {item.name}
-                </Link>
-              ))}
-            </nav>
-            <div className="px-4 py-4 border-t">
-              <Button
-                variant="outline"
-                className="w-full justify-start text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-                onClick={handleSignOut}
-              >
-                <LogOut className="mr-3 h-5 w-5" />
-                Cerrar Sesión
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Sidebar for desktop */}
-      <div className="hidden md:flex md:flex-col md:w-64 md:fixed md:inset-y-0 bg-white shadow-lg">
         <div className="flex flex-col h-full">
-          <div className="px-4 py-6 border-b">
-            <h2 className="text-xl font-bold text-primary">Panel de Socio</h2>
-            <p className="text-sm text-gray-500 mt-1">{user?.user_metadata?.name || user?.email || "Cargando..."}</p>
+          <div className="flex items-center justify-between p-4 border-b">
+            <h2
+              className={cn(
+                "font-semibold text-primary transition-opacity",
+                collapsed && !mobileOpen ? "opacity-0 w-0" : "opacity-100",
+              )}
+            >
+              Panel de Socio
+            </h2>
+            <Button variant="ghost" size="icon" onClick={toggleSidebar} className="ml-auto">
+              {collapsed && !mobileOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </Button>
           </div>
-          <nav className="flex-1 px-2 py-4 space-y-1">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  "flex items-center px-3 py-2 text-sm font-medium rounded-md",
-                  pathname === item.href ? "bg-primary text-white" : "text-gray-700 hover:bg-gray-100",
-                )}
-              >
-                <item.icon className="mr-3 h-5 w-5" aria-hidden="true" />
-                {item.name}
+
+          <nav className="flex-1 p-2 space-y-1">
+            {navItems.map((item) => (
+              <Link key={item.href} href={item.href} onClick={closeMobileSidebar}>
+                <div
+                  className={cn(
+                    "flex items-center px-3 py-2 rounded-md text-sm transition-colors",
+                    pathname === item.href ? "bg-primary text-primary-foreground" : "text-gray-700 hover:bg-gray-100",
+                    collapsed && !mobileOpen ? "justify-center" : "justify-start",
+                  )}
+                >
+                  <item.icon
+                    className={cn("h-5 w-5", pathname === item.href ? "text-primary-foreground" : "text-gray-500")}
+                  />
+                  <span
+                    className={cn(
+                      "ml-3 transition-opacity",
+                      collapsed && !mobileOpen ? "opacity-0 w-0 hidden" : "opacity-100",
+                    )}
+                  >
+                    {item.title}
+                  </span>
+                </div>
               </Link>
             ))}
           </nav>
-          <div className="px-4 py-4 border-t">
-            <Button
-              variant="outline"
-              className="w-full justify-start text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-              onClick={handleSignOut}
-            >
-              <LogOut className="mr-3 h-5 w-5" />
-              Cerrar Sesión
-            </Button>
+
+          <div className={cn("p-4 border-t", collapsed && !mobileOpen ? "hidden" : "block")}>
+            <Link href="/dashboard/logout">
+              <Button variant="outline" className="w-full">
+                Cerrar Sesión
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
