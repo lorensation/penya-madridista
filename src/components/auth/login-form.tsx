@@ -10,11 +10,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AuthError } from "@supabase/supabase-js"
+import { CheckCircle } from "lucide-react"
 
 export function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
@@ -22,6 +24,7 @@ export function LoginForm() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setSuccess(false)
 
     try {
       const { error } = await signIn(email, password) // Using the unified function
@@ -30,8 +33,14 @@ export function LoginForm() {
         throw error
       }
 
-      router.push("/dashboard")
-      router.refresh()
+      // Set success state before redirecting
+      setSuccess(true)
+
+      // Delay redirect to show success message
+      setTimeout(() => {
+        router.push("/dashboard")
+        router.refresh()
+      }, 1500)
     } catch (error: unknown) {
       if (error instanceof AuthError) {
         setError(error.message)
@@ -52,6 +61,16 @@ export function LoginForm() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
+
+      {success && (
+        <Alert className="bg-green-50 border-green-200">
+          <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
+          <AlertDescription className="text-green-800">
+            ¡Inicio de sesión exitoso! Redirigiendo al panel de control...
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -60,8 +79,8 @@ export function LoginForm() {
         <Label htmlFor="password">Password</Label>
         <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
       </div>
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? "Signing in..." : "Sign In"}
+      <Button type="submit" className="w-full" disabled={loading || success}>
+        {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
       </Button>
     </form>
   )

@@ -86,7 +86,7 @@ export default function ContentPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
+
   // Initialize Supabase client
   const supabase = createClientComponentClient<Database>()
 
@@ -102,16 +102,20 @@ export default function ContentPage() {
 
         // Fetch user profile
         const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
+          .from("miembros")
           .select("*")
-          .eq("id", userData.user.id)
+          .eq("auth_id", userData.user.id)
           .single()
 
-        if (profileError) throw profileError
-
-        setProfile(profileData as Profile)
+        if (profileError) {
+          console.log("Profile fetch error:", profileError)
+          // Don't throw error, just set profile to null
+          setProfile(null)
+        } else {
+          setProfile(profileData as Profile)
+        }
       } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : "Failed to load user data";
+        const errorMsg = err instanceof Error ? err.message : "Failed to load user data"
         console.error("Error fetching user data:", err)
         setError(errorMsg)
       } finally {
@@ -141,15 +145,13 @@ export default function ContentPage() {
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <Alert className="mb-8 bg-red-50 border-red-200">
-          <AlertTriangle className="h-4 w-4 text-red-800" />
-          <AlertDescription className="text-red-800">
-            {error}
-          </AlertDescription>
-        </Alert>
-        <Button onClick={() => router.push("/dashboard")}>
-          Volver al Dashboard
-        </Button>
+        <div className="flex justify-center w-full">
+          <Alert className="mb-8 bg-red-50 border-red-200 max-w-md">
+            <AlertTriangle className="h-4 w-4 text-red-800" />
+            <AlertDescription className="text-red-800 text-center">{error}</AlertDescription>
+          </Alert>
+        </div>
+        <Button onClick={() => router.push("/dashboard")}>Volver al Dashboard</Button>
       </div>
     )
   }
@@ -206,12 +208,7 @@ export default function ContentPage() {
         {exclusiveContent.map((content) => (
           <Card key={content.id} className="overflow-hidden">
             <div className="relative h-48">
-              <Image
-                src={content.thumbnail || "/placeholder.svg"}
-                alt={content.title}
-                fill
-                className="object-cover"
-              />
+              <Image src={content.thumbnail || "/placeholder.svg"} alt={content.title} fill className="object-cover" />
               {content.type === "video" && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                   <div className="w-16 h-16 rounded-full bg-white/80 flex items-center justify-center">

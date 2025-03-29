@@ -78,22 +78,27 @@ export default function SettingsPage() {
         const { data: profileData, error: profileError } = await supabase
           .from("miembros")
           .select("*")
-          .eq("id", userData.user.id)
+          .eq("auth_id", userData.user.id)
           .single()
 
-        if (profileError) throw profileError
-
-        // Initialize form data
-        setFormData({
-          name: userData.user.user_metadata?.name || "",
-          email: userData.user.email || "",
-          phone: profileData?.phone || "",
-          address: profileData?.address || "",
-          city: profileData?.city || "",
-          postalCode: profileData?.postal_code || "",
-          emailNotifications: profileData?.email_notifications !== false,
-          marketingEmails: profileData?.marketing_emails !== false,
-        })
+        if (profileError) {
+          console.log("Profile fetch error:", profileError)
+          // Don't throw error, handle it gracefully
+          setError(profileError.message || "Failed to load profile data")
+        } else {
+          // Continue with the profile data
+          // Initialize form data
+          setFormData({
+            name: userData.user.user_metadata?.name || "",
+            email: userData.user.email || "",
+            phone: profileData?.phone || "",
+            address: profileData?.address || "",
+            city: profileData?.city || "",
+            postalCode: profileData?.postal_code || "",
+            emailNotifications: profileData?.email_notifications !== false,
+            marketingEmails: profileData?.marketing_emails !== false,
+          })
+        }
 
         setLoading(false)
       } catch (error: unknown) {
@@ -215,9 +220,11 @@ export default function SettingsPage() {
       </div>
 
       {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <div className="flex justify-center w-full">
+          <Alert variant="destructive" className="mb-6 max-w-md">
+            <AlertDescription className="text-center">{error}</AlertDescription>
+          </Alert>
+        </div>
       )}
 
       {success && (
@@ -342,7 +349,7 @@ export default function SettingsPage() {
                         if (!user?.email) {
                           throw new Error("Email not found")
                         }
-                        
+
                         const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
                           redirectTo: `${window.location.origin}/reset-password`,
                         })

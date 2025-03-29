@@ -19,7 +19,7 @@ import { cancelSubscription } from "@/app/actions/stripe"
 interface Profile {
   id: string
   subscription_status?: string
-  subscription_plan?: 'annual' | 'family' | null
+  subscription_plan?: "annual" | "family" | null
   subscription_updated_at?: string
   subscription_id?: string
   last_four?: string
@@ -51,12 +51,17 @@ export default function MembershipPage() {
         const { data: profileData, error: profileError } = await supabase
           .from("miembros")
           .select("*")
-          .eq("id", userData.user.id)
+          .eq("auth_id", userData.user.id)
           .single()
 
-        if (profileError) throw profileError
+        if (profileError) {
+          console.log("Profile fetch error:", profileError)
+          // Don't throw error, just set profile to null
+          setProfile(null)
+        } else {
+          setProfile(profileData)
+        }
 
-        setProfile(profileData)
         setLoading(false)
       } catch (error: unknown) {
         console.error("Error fetching user data:", error)
@@ -134,9 +139,11 @@ export default function MembershipPage() {
       </div>
 
       {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <div className="flex justify-center w-full">
+          <Alert variant="destructive" className="mb-6 max-w-md">
+            <AlertDescription className="text-center">{error}</AlertDescription>
+          </Alert>
+        </div>
       )}
 
       {cancelSuccess && (

@@ -88,14 +88,19 @@ export default function EventsPage() {
 
         // Fetch user profile
         const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
+          .from("miembros")
           .select("*")
-          .eq("id", userData.user.id)
+          .eq("auth_id", userData.user.id)
           .single()
 
-        if (profileError) throw profileError
+        if (profileError) {
+          console.log("Profile fetch error:", profileError)
+          // Don't throw error, just set profile to null
+          setProfile(null)
+        } else {
+          setProfile(profileData)
+        }
 
-        setProfile(profileData)
         setLoading(false)
       } catch (error: unknown) {
         console.error("Error fetching user data:", error)
@@ -121,12 +126,10 @@ export default function EventsPage() {
   // Display error message if there was an error
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Alert className="mb-8 bg-red-50 border-red-200">
+      <div className="flex justify-center w-full">
+        <Alert className="mb-8 bg-red-50 border-red-200 max-w-md">
           <AlertTriangle className="h-4 w-4 text-red-800" />
-          <AlertDescription className="text-red-800">
-            {error}
-          </AlertDescription>
+          <AlertDescription className="text-red-800 text-center">{error}</AlertDescription>
         </Alert>
       </div>
     )
@@ -158,12 +161,7 @@ export default function EventsPage() {
         {events.map((event) => (
           <Card key={event.id} className="overflow-hidden">
             <div className="relative h-48">
-              <Image 
-                src={event.image || "/placeholder.svg"} 
-                alt={event.title} 
-                fill
-                className="object-cover"
-              />
+              <Image src={event.image || "/placeholder.svg"} alt={event.title} fill className="object-cover" />
             </div>
             <CardHeader className="pb-2">
               <CardTitle>{event.title}</CardTitle>

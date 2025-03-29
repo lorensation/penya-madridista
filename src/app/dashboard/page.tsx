@@ -20,7 +20,7 @@ interface Profile {
   name?: string
   auth_id?: string
   subscription_status?: string
-  subscription_plan?: 'annual' | 'family' | null
+  subscription_plan?: "annual" | "family" | null
 }
 
 export default function Dashboard() {
@@ -49,9 +49,13 @@ export default function Dashboard() {
           .eq("auth_id", userData.user.id)
           .single()
 
-        if (profileError) throw profileError
-
-        setProfile(profileData)
+        if (profileError) {
+          console.log("Profile fetch error:", profileError)
+          // Don't throw error, just set profile to null
+          setProfile(null)
+        } else {
+          setProfile(profileData)
+        }
         setLoading(false)
       } catch (error: unknown) {
         console.error("Error fetching user data:", error)
@@ -77,9 +81,11 @@ export default function Dashboard() {
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <Alert variant="destructive" className="mb-6">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <div className="flex justify-center w-full">
+          <Alert variant="destructive" className="mb-6 max-w-md">
+            <AlertDescription className="text-center">{error}</AlertDescription>
+          </Alert>
+        </div>
         <Button onClick={() => router.push("/login")}>Volver a Iniciar Sesión</Button>
       </div>
     )
@@ -222,7 +228,9 @@ export default function Dashboard() {
               <div className="space-y-4">
                 <div className="border-b pb-4">
                   <p className="font-medium">Nuevo artículo publicado</p>
-                  <p className="text-sm text-gray-500">&ldquo;Los 5 Mejores Momentos de la Era Lorenzo Sanz&rdquo; - Hace 2 días</p>
+                  <p className="text-sm text-gray-500">
+                    &ldquo;Los 5 Mejores Momentos de la Era Lorenzo Sanz&rdquo; - Hace 2 días
+                  </p>
                 </div>
                 <div className="border-b pb-4">
                   <p className="font-medium">Próximo evento anunciado</p>
