@@ -10,7 +10,13 @@ import { ProfileDropdown } from "@/components/profile-dropdown"
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [user, setUser] = useState<any>(null)
+  interface User {
+    id: string
+    email?: string
+    name?: string
+  }
+
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const pathname = usePathname()
 
@@ -28,7 +34,8 @@ export function Header() {
             .single()
 
           setUser({
-            ...data.user,
+            id: data.user.id,
+            email: data.user.email,
             name: profileData?.name || null,
           })
         } else {
