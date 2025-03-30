@@ -16,7 +16,7 @@ const membershipPlans = [
     name: "Membresía Anual",
     price: "€100",
     period: "/año",
-    checkoutUrl: "https://buy.stripe.com/dR69C47a4e0TccU4gg",
+    checkoutUrl: "https://buy.stripe.com/test_aEUfZ3cEyf73aUo000", //CAMBIADO TEMPORALMENTE A ENLACE DE PRUEBA, ESTE ES EL REAL: https://buy.stripe.com/dR69C47a4e0TccU4gg"
     features: [
       "Acceso a eventos exclusivos organizados por la peña",
       "Descuentos en viajes organizados para ver partidos",
