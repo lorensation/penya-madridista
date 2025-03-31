@@ -2,10 +2,10 @@ import type React from "react"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { checkAdminStatus } from "@/lib/auth"
+import { checkAdminStatusSSR } from "@/lib/auth"
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const adminData = await checkAdminStatus()
+  const adminData = await checkAdminStatusSSR()
 
   // If not an admin, redirect to login
   if (!adminData) {

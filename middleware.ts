@@ -35,12 +35,12 @@ export async function middleware(request: NextRequest) {
   )
 
   // Refresh session if expired - required for Server Components
-  const { data } = await supabase.auth.getUser()
-  const user = data?.user || null
+  const { data: authData } = await supabase.auth.getUser()
+  const authUser = authData?.user || null
 
-  // If no user and trying to access protected routes, redirect to login
+  // If no authenticated user and trying to access protected routes, redirect to login
   if (
-    !user &&
+    !authUser &&
     (request.nextUrl.pathname.startsWith("/dashboard") ||
       request.nextUrl.pathname.startsWith("/admin") ||
       request.nextUrl.pathname.startsWith("/account"))
@@ -48,64 +48,105 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url))
   }
 
-  // For admin routes, check if the user has admin role
-  if (request.nextUrl.pathname.startsWith("/admin")) {
-    // If we already know there's no user, redirect (this should be caught by the previous check,
-    // but adding an extra check here for type safety)
-    if (!user) {
-      return NextResponse.redirect(new URL("/login", request.url))
-    }
-
+  // If we have an authenticated user and they're accessing protected routes,
+  // get their basic info from the users table
+  if (
+    authUser &&
+    (request.nextUrl.pathname.startsWith("/dashboard") ||
+      request.nextUrl.pathname.startsWith("/admin") ||
+      request.nextUrl.pathname.startsWith("/account"))
+  ) {
     try {
-      // First try by user_uuid (which matches session.user.id)
-      let { data: profile, error } = await supabase
-        .from("miembros")
-        .select("*")
-        .eq("user_uuid", user.id)
+      // First get basic user info from users table
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("id, email, name, is_member")
+        .eq("id", authUser.id)
         .single()
 
-      // If that fails, try by id
-      if (error || !profile) {
-        const { data: profileById, error: errorById } = await supabase
+      if (userError || !userData) {
+        console.error("Failed to fetch user data:", userError)
+        // If we can't get user data, redirect to login
+        return NextResponse.redirect(new URL("/login", request.url))
+      }
+
+      // For dashboard or admin routes, we need detailed member info
+      if (
+        request.nextUrl.pathname.startsWith("/dashboard") ||
+        request.nextUrl.pathname.startsWith("/admin")
+      ) {
+        // Try to get member data using multiple methods
+        let memberData = null
+        
+        // 1. Try by user_uuid first
+        const { data: memberByUuid, error: uuidError } = await supabase
           .from("miembros")
           .select("*")
-          .eq("id", user.id)
+          .eq("user_uuid", authUser.id)
           .single()
-
-        if (errorById || !profileById) {
-          // If both UUID lookups fail, try by email
-          if (user.email) {
-            const { data: profileByEmail, error: errorByEmail } = await supabase
+          
+        if (!uuidError && memberByUuid) {
+          memberData = memberByUuid
+        } else {
+          // 2. Try by id
+          const { data: memberById, error: idError } = await supabase
+            .from("miembros")
+            .select("*")
+            .eq("id", authUser.id)
+            .single()
+            
+          if (!idError && memberById) {
+            memberData = memberById
+          } else {
+            // 3. Try by email as last resort
+            const { data: memberByEmail, error: emailError } = await supabase
               .from("miembros")
               .select("*")
-              .eq("email", user.email)
+              .eq("email", authUser.email)
               .single()
-
-            if (errorByEmail || !profileByEmail) {
-              console.error("Failed to find user profile by email:", errorByEmail)
-              return NextResponse.redirect(new URL("/dashboard", request.url))
+              
+            if (!emailError && memberByEmail) {
+              memberData = memberByEmail
             }
+          }
+        }
 
-            profile = profileByEmail
-          } else {
-            console.error("Failed to find user profile and no email available")
+        // For admin routes, check if the user has admin role
+        if (request.nextUrl.pathname.startsWith("/admin")) {
+          if (!memberData || memberData.role !== "admin") {
+            console.log("User does not have admin role:", memberData?.role || "no profile found")
             return NextResponse.redirect(new URL("/dashboard", request.url))
           }
-        } else {
-          profile = profileById
+          
+          console.log("Admin access granted for user:", authUser.email || authUser.id)
+        }
+        
+        // For dashboard routes, ensure we have member data
+        if (request.nextUrl.pathname.startsWith("/dashboard")) {
+          // If accessing settings but no member data, redirect to complete profile
+          if (
+            request.nextUrl.pathname.includes("/settings") && 
+            !memberData
+          ) {
+            return NextResponse.redirect(new URL("/dashboard/complete-profile", request.url))
+          }
+          
+          // If checking subscription status, ensure we have the data
+          if (
+            request.nextUrl.pathname.includes("/subscription") && 
+            (!memberData || !memberData.subscription_status)
+          ) {
+            // Allow access but the page will handle showing appropriate message
+            console.log("User accessing subscription without status data")
+          }
         }
       }
-
-      // Check if the user has admin role
-      if (!profile || profile.role !== "admin") {
-        console.log("User does not have admin role:", profile?.role || "no profile found")
+    } catch (error) {
+      console.error("Error in middleware:", error)
+      // For any unexpected errors, redirect to dashboard
+      if (request.nextUrl.pathname.startsWith("/admin")) {
         return NextResponse.redirect(new URL("/dashboard", request.url))
       }
-
-      console.log("Admin access granted for user:", user.email || user.id)
-    } catch (error) {
-      console.error("Error checking admin status:", error)
-      return NextResponse.redirect(new URL("/dashboard", request.url))
     }
   }
 
@@ -124,4 +165,3 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico|public).*)",
   ],
 }
-
