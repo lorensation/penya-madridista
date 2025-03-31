@@ -9,10 +9,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import type { UserProfile } from "@/types/common"
+import type { Database } from "@/types/supabase"
+
+type Member = Database["public"]["Tables"]["miembros"]["Row"]
 
 export default function SettingsPage() {
-  const [user, setUser] = useState<any>(null)
-  const [member, setMember] = useState<any>(null)
+  const [user, setUser] = useState<UserProfile | null>(null)
+  const [member, setMember] = useState<Member | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
@@ -33,7 +37,13 @@ export default function SettingsPage() {
           return
         }
 
-        setUser(userData.user)
+        // Convert Supabase User to UserProfile
+        const userProfile: UserProfile = {
+          ...userData.user,
+          // Add any additional properties needed
+        }
+
+        setUser(userProfile)
 
         // Get the member data using user_uuid instead of auth_id
         const { data: memberData, error } = await supabase

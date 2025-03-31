@@ -1,16 +1,16 @@
 // Common types used throughout the application
 
-// User profile type
-export interface UserProfile {
-  id: string
-  email?: string
-  name?: string
+import type { User as SupabaseUser } from "@supabase/supabase-js"
+
+// User profile type - extends Supabase User type
+export interface UserProfile extends Omit<SupabaseUser, "app_metadata" | "user_metadata"> {
   role?: string
   subscription_status?: string
-  created_at?: string
-  updated_at?: string
   user_metadata?: {
     name?: string
+    [key: string]: unknown
+  }
+  app_metadata?: {
     [key: string]: unknown
   }
   [key: string]: unknown
