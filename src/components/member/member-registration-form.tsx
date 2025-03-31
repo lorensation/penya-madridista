@@ -53,7 +53,7 @@ export default function MemberRegistrationForm() {
     es_socio_realmadrid: false,
     num_socio: "",
     socio_carnet_madrid: false,
-    num_carnet_madridista: "",
+    num_carnet: "",
     direccion: "",
     direccion_extra: "",
     poblacion: "",
@@ -262,7 +262,7 @@ export default function MemberRegistrationForm() {
                     <Input
                       id="num_carnet_madridista"
                       name="num_carnet_madridista"
-                      value={formData.num_carnet_madridista}
+                      value={formData.num_carnet}
                       onChange={handleChange}
                       required={formData.socio_carnet_madrid}
                       placeholder="Introduce tu número de Carnet Madridista"
