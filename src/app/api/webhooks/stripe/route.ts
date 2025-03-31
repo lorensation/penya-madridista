@@ -2,6 +2,51 @@ import { type NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { getServiceSupabase } from "@/lib/supabase"
 
+// Add this function to manually update a member's subscription status
+async function updateMemberSubscription(userId: string, subscription: Stripe.Subscription) {
+  const supabase = getServiceSupabase()
+  try {
+    // First check if the member exists
+    const { data: member, error: memberError } = await supabase
+      .from("miembros")
+      .select("*")
+      .or(`user_id.eq.${userId},user_uuid.eq.${userId},auth_id.eq.${userId}`)
+      .single()
+
+    if (memberError) {
+      console.error(`Error finding member for subscription update: ${memberError.message}`)
+      return false
+    }
+
+    if (member) {
+      // Update the member's subscription information
+      const { error: updateError } = await supabase
+        .from("miembros")
+        .update({
+          subscription_status: subscription.status,
+          subscription_plan: subscription.items.data[0].price.id,
+          subscription_id: subscription.id,
+          subscription_updated_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", member.id)
+
+      if (updateError) {
+        console.error(`Error updating member subscription: ${updateError.message}`)
+        return false
+      }
+
+      console.log(`Successfully updated subscription for member: ${member.id}`)
+      return true
+    }
+
+    return false
+  } catch (error) {
+    console.error(`Exception in updateMemberSubscription: ${error}`)
+    return false
+  }
+}
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-02-24.acacia",
 })
@@ -92,8 +137,8 @@ export async function POST(request: NextRequest) {
           // Check if user already exists in miembros table
           const { data: existingMember, error: memberCheckError } = await supabase
             .from("miembros")
-            .select("id")
-            .eq("user_id", userId)
+            .select("id, user_uuid")
+            .or(`user_id.eq.${userId},user_uuid.eq.${userId},auth_id.eq.${userId}`)
             .single()
 
           // Only create a minimal miembros entry if it doesn't exist
@@ -101,6 +146,8 @@ export async function POST(request: NextRequest) {
           if (!existingMember && !memberCheckError) {
             const { error: memberError } = await supabase.from("miembros").insert({
               user_id: userId,
+              user_uuid: userId, // Make sure user_uuid is set
+              auth_id: userId, // Add auth_id field to match with the user
               email: userData.email,
               name: userData.name,
               subscription_status: subscription.status,
@@ -114,6 +161,24 @@ export async function POST(request: NextRequest) {
             if (memberError) {
               throw new Error(`Error creating member: ${memberError.message}`)
             }
+          } else if (existingMember) {
+            // Update the existing member with subscription information
+            const { error: updateError } = await supabase
+              .from("miembros")
+              .update({
+                subscription_status: subscription.status,
+                subscription_plan: subscription.items.data[0].price.id,
+                subscription_id: subscription.id,
+                subscription_updated_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("user_uuid", userId)
+
+            if (updateError) {
+              throw new Error(`Error updating member subscription: ${updateError.message}`)
+            }
+
+            console.log(`Successfully updated subscription for existing member: ${userId}`)
           }
 
           console.log(`Successfully processed subscription for user: ${userId}`)
@@ -161,17 +226,9 @@ export async function POST(request: NextRequest) {
         }
 
         // Update miembros subscription status
-        const { error: memberError } = await supabase
-          .from("miembros")
-          .update({
-            subscription_status: subscription.status,
-            subscription_updated_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("user_id", userId)
-
-        if (memberError) {
-          throw new Error(`Error updating member: ${memberError.message}`)
+        const updated = await updateMemberSubscription(userId, subscription)
+        if (!updated) {
+          console.error(`Failed to update member subscription for user ${userId}`)
         }
         break
       }
@@ -194,7 +251,6 @@ export async function POST(request: NextRequest) {
 
         // If we have a userId, update the user's membership status
         if (userId) {
-          
           // Update users table
           try {
             await supabase

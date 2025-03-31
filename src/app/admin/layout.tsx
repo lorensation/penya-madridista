@@ -1,5 +1,5 @@
 import type React from "react"
-import { supabase } from "@/lib/supabase" // Updated import
+import { supabase } from "@/lib/supabase"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -15,7 +15,7 @@ async function getAdminUser() {
   }
 
   // Get the user profile from the miembros table
-  const { data: profile } = await supabase.from("miembros").select("*").eq("email", session.user.email).single()
+  const { data: profile } = await supabase.from("miembros").select("*").eq("auth_id", session.user.id).single()
 
   // Check if user is an admin
   if (!profile || profile.role !== "admin") {
@@ -47,9 +47,24 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 Dashboard
               </Button>
             </Link>
+            <Link href="/admin/blog">
+              <Button variant="ghost" className="text-white hover:text-white hover:bg-primary/80">
+                Blog
+              </Button>
+            </Link>
+            <Link href="/admin/users">
+              <Button variant="ghost" className="text-white hover:text-white hover:bg-primary/80">
+                Users
+              </Button>
+            </Link>
             <Link href="/admin/webhooks">
               <Button variant="ghost" className="text-white hover:text-white hover:bg-primary/80">
                 Webhooks
+              </Button>
+            </Link>
+            <Link href="/admin/fix-subscription">
+              <Button variant="ghost" className="text-white hover:text-white hover:bg-primary/80">
+                Fix Subscriptions
               </Button>
             </Link>
             <Link href="/dashboard">

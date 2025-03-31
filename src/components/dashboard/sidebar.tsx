@@ -18,7 +18,7 @@ import {
 } from "lucide-react"
 
 export function DashboardSidebar() {
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(true) // Default to collapsed/hidden
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const pathname = usePathname()
   const isMobile = useMobile()
@@ -54,7 +54,10 @@ export function DashboardSidebar() {
   }
 
   const isActive = (path: string) => {
-    return pathname === path || pathname?.startsWith(path + "/")
+    if (path === "/dashboard" && pathname === "/dashboard") {
+      return true
+    }
+    return pathname !== "/dashboard" && pathname?.startsWith(path)
   }
 
   const navItems = [
@@ -102,25 +105,28 @@ export function DashboardSidebar() {
         </button>
       )}
 
+      {/* Desktop toggle button (always visible) */}
+      {!isMobile && (
+        <button
+          data-sidebar-toggle
+          className="fixed top-20 left-4 z-50 p-2 rounded-md bg-primary text-white shadow-md"
+          onClick={toggleCollapse}
+          aria-label={isCollapsed ? "Expandir menú" : "Colapsar menú"}
+        >
+          {isCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+        </button>
+      )}
+
       {/* Sidebar */}
       <div
         data-sidebar
         className={`fixed top-16 bottom-0 left-0 z-40 flex flex-col bg-primary text-white transition-all duration-300 ${
-          isCollapsed ? "w-16" : "w-64"
+          isCollapsed ? "w-0 overflow-hidden" : "w-64"
         } ${isMobile ? (isMobileOpen ? "translate-x-0" : "-translate-x-full") : "translate-x-0"}`}
       >
         {/* Sidebar header */}
         <div className="flex items-center justify-between p-4 border-b border-white/10">
-          {!isCollapsed && <h2 className="text-lg font-bold">Panel de Socio</h2>}
-          {!isMobile && (
-            <button
-              onClick={toggleCollapse}
-              className="p-1 rounded-md hover:bg-secondary"
-              aria-label={isCollapsed ? "Expandir" : "Colapsar"}
-            >
-              {isCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
-            </button>
-          )}
+          <h2 className="text-lg font-bold">Panel de Socio</h2>
         </div>
 
         {/* Navigation */}
@@ -132,12 +138,12 @@ export function DashboardSidebar() {
                   href={item.href}
                   className={`flex items-center rounded-md px-3 py-2 transition-colors ${
                     isActive(item.href)
-                      ? "bg-secondary text-white"
+                      ? "bg-secondary text-black font-medium" // Changed text-white to text-black for selected items
                       : "text-white/80 hover:bg-secondary/70 hover:text-white"
                   }`}
                 >
                   <span className="mr-3">{item.icon}</span>
-                  {!isCollapsed && <span>{item.name}</span>}
+                  <span>{item.name}</span>
                 </Link>
               </li>
             ))}
@@ -151,10 +157,11 @@ export function DashboardSidebar() {
             className="flex items-center rounded-md px-3 py-2 text-red-300 hover:bg-secondary/70 hover:text-red-200 transition-colors"
           >
             <LogOut className="mr-3 h-5 w-5" />
-            {!isCollapsed && <span>Cerrar Sesión</span>}
+            <span>Cerrar Sesión</span>
           </Link>
         </div>
       </div>
     </>
   )
 }
+
