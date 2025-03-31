@@ -1,38 +1,15 @@
 import type React from "react"
-import { supabase } from "@/lib/supabase"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-
-async function getAdminUser() {
-  // Get the current user
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session) {
-    return null
-  }
-
-  // Get the user profile from the miembros table
-  const { data: profile } = await supabase.from("miembros").select("*").eq("user_uuid", session.user.id).single()
-
-  // Check if user is an admin
-  if (!profile || profile.role !== "admin") {
-    return null
-  }
-
-  return {
-    user: session.user,
-    profile,
-  }
-}
+import { checkAdminStatus } from "@/lib/auth"
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const adminUser = await getAdminUser()
+  const adminData = await checkAdminStatus()
 
   // If not an admin, redirect to login
-  if (!adminUser) {
+  if (!adminData) {
+    console.log("Redirecting non-admin user to login page");
     redirect("/login")
   }
 
@@ -79,4 +56,3 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     </div>
   )
 }
-
