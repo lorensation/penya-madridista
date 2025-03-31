@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
           // Get user details from Supabase
           const { data: userData, error: userError } = await supabase
-            .from("webusers")
+            .from("users")
             .select("email, name")
             .eq("id", userId)
             .single()

@@ -37,17 +37,46 @@ export default function MembershipPage() {
           return
         }
 
-        // Fetch user profile
+        // Fetch user profile - try with user_uuid first (which is the correct column name)
         const { data: profileData, error: profileError } = await supabase
           .from("miembros")
           .select("*")
-          .eq("auth_id", userData.user.id)
+          .eq("user_uuid", userData.user.id)
           .single()
 
         if (profileError) {
-          console.log("Profile fetch error:", profileError)
-          // Don't throw error, just set profile to null
-          setProfile(null)
+          console.log("Profile fetch error with user_uuid:", profileError)
+
+          // Try with id as fallback
+          const { data: profileByIdData, error: profileByIdError } = await supabase
+            .from("miembros")
+            .select("*")
+            .eq("id", userData.user.id)
+            .single()
+
+          if (profileByIdError) {
+            console.log("Profile fetch error with id:", profileByIdError)
+
+            // If user has email, try with that as last resort
+            if (userData.user.email) {
+              const { data: profileByEmailData, error: profileByEmailError } = await supabase
+                .from("miembros")
+                .select("*")
+                .eq("email", userData.user.email)
+                .single()
+
+              if (profileByEmailError) {
+                console.log("Profile fetch error with email:", profileByEmailError)
+                setProfile(null)
+              } else {
+                setProfile(profileByEmailData)
+              }
+            } else {
+              setProfile(null)
+            }
+          } else {
+            setProfile(profileByIdData)
+          }
         } else {
           setProfile(profileData)
         }

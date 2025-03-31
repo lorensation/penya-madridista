@@ -53,7 +53,7 @@ export async function createPortalSession() {
 
   // Retrieve customer ID from Supabase
   const { data: profile } = await supabase
-    .from("profiles")
+    .from("miembros")
     .select("stripe_customer_id")
     .eq("id", user.id)
     .single()
@@ -92,7 +92,7 @@ export async function cancelSubscription() {
   try {
     // Retrieve customer ID and subscription ID from Supabase
     const { data: profile } = await supabase
-      .from("profiles")
+      .from("miembros")
       .select("stripe_customer_id, stripe_subscription_id")
       .eq("id", user.id)
       .single()
