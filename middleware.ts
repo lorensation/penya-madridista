@@ -1,4 +1,4 @@
-import { createServerClient, type CookieOptions } from "@supabase/ssr"
+import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
@@ -39,56 +39,57 @@ export async function middleware(request: NextRequest) {
   const user = data?.user || null
 
   // If no user and trying to access protected routes, redirect to login
-  if (!user && (
-    request.nextUrl.pathname.startsWith('/dashboard') || 
-    request.nextUrl.pathname.startsWith('/admin') || 
-    request.nextUrl.pathname.startsWith('/account')
-  )) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  if (
+    !user &&
+    (request.nextUrl.pathname.startsWith("/dashboard") ||
+      request.nextUrl.pathname.startsWith("/admin") ||
+      request.nextUrl.pathname.startsWith("/account"))
+  ) {
+    return NextResponse.redirect(new URL("/login", request.url))
   }
 
   // For admin routes, check if the user has admin role
-  if (request.nextUrl.pathname.startsWith('/admin')) {
+  if (request.nextUrl.pathname.startsWith("/admin")) {
     // If we already know there's no user, redirect (this should be caught by the previous check,
     // but adding an extra check here for type safety)
     if (!user) {
-      return NextResponse.redirect(new URL('/login', request.url))
+      return NextResponse.redirect(new URL("/login", request.url))
     }
-    
+
     try {
       // First try by user_uuid (which matches session.user.id)
       let { data: profile, error } = await supabase
-        .from('miembros')
-        .select('*')
-        .eq('user_uuid', user.id)
+        .from("miembros")
+        .select("*")
+        .eq("user_uuid", user.id)
         .single()
 
       // If that fails, try by id
       if (error || !profile) {
         const { data: profileById, error: errorById } = await supabase
-          .from('miembros')
-          .select('*')
-          .eq('id', user.id)
+          .from("miembros")
+          .select("*")
+          .eq("id", user.id)
           .single()
-          
+
         if (errorById || !profileById) {
           // If both UUID lookups fail, try by email
           if (user.email) {
             const { data: profileByEmail, error: errorByEmail } = await supabase
-              .from('miembros')
-              .select('*')
-              .eq('email', user.email)
+              .from("miembros")
+              .select("*")
+              .eq("email", user.email)
               .single()
-              
+
             if (errorByEmail || !profileByEmail) {
-              console.error('Failed to find user profile by email:', errorByEmail)
-              return NextResponse.redirect(new URL('/dashboard', request.url))
+              console.error("Failed to find user profile by email:", errorByEmail)
+              return NextResponse.redirect(new URL("/dashboard", request.url))
             }
-            
+
             profile = profileByEmail
           } else {
-            console.error('Failed to find user profile and no email available')
-            return NextResponse.redirect(new URL('/dashboard', request.url))
+            console.error("Failed to find user profile and no email available")
+            return NextResponse.redirect(new URL("/dashboard", request.url))
           }
         } else {
           profile = profileById
@@ -96,16 +97,15 @@ export async function middleware(request: NextRequest) {
       }
 
       // Check if the user has admin role
-      if (!profile || profile.role !== 'admin') {
-        console.log('User does not have admin role:', profile?.role || 'no profile found')
-        return NextResponse.redirect(new URL('/dashboard', request.url))
+      if (!profile || profile.role !== "admin") {
+        console.log("User does not have admin role:", profile?.role || "no profile found")
+        return NextResponse.redirect(new URL("/dashboard", request.url))
       }
-      
-      console.log('Admin access granted for user:', user.email || user.id)
-      
+
+      console.log("Admin access granted for user:", user.email || user.id)
     } catch (error) {
-      console.error('Error checking admin status:', error)
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+      console.error("Error checking admin status:", error)
+      return NextResponse.redirect(new URL("/dashboard", request.url))
     }
   }
 
@@ -124,3 +124,4 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico|public).*)",
   ],
 }
+
