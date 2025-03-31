@@ -22,16 +22,6 @@ interface User {
   }
 }
 
-/*interface ProfileData {
-  id: string
-  phone?: string
-  address?: string
-  city?: string
-  postal_code?: string
-  email_notifications?: boolean
-  marketing_emails?: boolean
-}*/
-
 interface FormData {
   name: string
   email: string
@@ -78,7 +68,7 @@ export default function SettingsPage() {
         const { data: profileData, error: profileError } = await supabase
           .from("miembros")
           .select("*")
-          .eq("auth_id", userData.user.id)
+          .eq("user_uuid", userData.user.id)
           .single()
 
         if (profileError) {

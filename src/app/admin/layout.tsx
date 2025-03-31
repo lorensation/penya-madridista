@@ -15,7 +15,7 @@ async function getAdminUser() {
   }
 
   // Get the user profile from the miembros table
-  const { data: profile } = await supabase.from("miembros").select("*").eq("auth_id", session.user.id).single()
+  const { data: profile } = await supabase.from("miembros").select("*").eq("user_uuid", session.user.id).single()
 
   // Check if user is an admin
   if (!profile || profile.role !== "admin") {

@@ -201,12 +201,12 @@ export function Header() {
                 <div className="pt-2">
                   {user ? (
                     <div className="flex flex-col space-y-2">
-                      <Link href="/dashboard" className="text-sm font-medium text-primary" onClick={closeMenu}>
+                      <Link href="/dashboard" className="text-sm font-medium text-black hover:bg-black hover:text-white" onClick={closeMenu}>
                         Panel de Socio
                       </Link>
                       <Link
                         href="/dashboard/settings"
-                        className="text-sm font-medium text-gray-600"
+                        className="text-sm font-medium text-black hover:bg-black hover:text-white"
                         onClick={closeMenu}
                       >
                         Configuración
