@@ -15,7 +15,6 @@ export default function DashboardLayout({
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [authenticated, setAuthenticated] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     const checkUser = async () => {

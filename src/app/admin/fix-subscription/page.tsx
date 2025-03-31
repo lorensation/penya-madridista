@@ -57,7 +57,7 @@ export default function FixSubscriptionPage() {
       <Card className="max-w-md mx-auto">
         <CardHeader>
           <CardTitle>Fix User Subscription</CardTitle>
-          <CardDescription>Manually update a user's subscription status in the miembros table</CardDescription>
+          <CardDescription>Manually update a user&apos;s subscription status in the miembros table</CardDescription>
         </CardHeader>
         <CardContent>
           {result && (
