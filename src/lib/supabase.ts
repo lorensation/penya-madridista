@@ -130,8 +130,20 @@ export async function updateUserProfile(updates: Record<string, unknown>) {
   return { data: data?.[0] || null, error }
 }
 
+// Define an interface for the member data
+interface MemberData {
+  id?: string;
+  user_uuid?: string;
+  telefono?: string | number;
+  cp?: string | number | null;
+  num_socio?: string | number | null;
+  num_carnet?: string | number | null;
+  fecha_nacimiento?: string | Date | null;
+  [key: string]: unknown; // Allow for additional properties
+}
+
 // Member functions
-export async function createMember(memberData: Record<string, unknown>) {
+export async function createMember(memberData: MemberData) {
   const client =
     typeof window !== "undefined" ? createBrowserSupabaseClient() : createClient<Database>(supabaseUrl, supabaseAnonKey)
 
@@ -150,21 +162,39 @@ export async function createMember(memberData: Record<string, unknown>) {
     // Continue anyway to try creating the member record
   }
 
-  // Ensure user_uuid is set correctly
-  const memberDataWithUUID = {
+  // Ensure user_uuid and id are set correctly
+  const memberDataWithIDs: MemberData = {
     ...memberData,
+    id: authUser.user.id,
     user_uuid: authUser.user.id,
   }
 
-  // Remove auth_id if it exists to avoid the error
-  if ("auth_id" in memberDataWithUUID) {
-    delete memberDataWithUUID.auth_id
+  // Convert string values to appropriate types based on schema
+  if (memberDataWithIDs.telefono && typeof memberDataWithIDs.telefono === "string") {
+    memberDataWithIDs.telefono = Number.parseInt(memberDataWithIDs.telefono as string, 10) || 0
   }
 
-  console.log("Creating member with data:", memberDataWithUUID)
+  if (memberDataWithIDs.cp && typeof memberDataWithIDs.cp === "string") {
+    memberDataWithIDs.cp = Number.parseInt(memberDataWithIDs.cp as string, 10) || null
+  }
+
+  if (memberDataWithIDs.num_socio && typeof memberDataWithIDs.num_socio === "string") {
+    memberDataWithIDs.num_socio = Number.parseInt(memberDataWithIDs.num_socio as string, 10) || null
+  }
+
+  if (memberDataWithIDs.num_carnet && typeof memberDataWithIDs.num_carnet === "string") {
+    memberDataWithIDs.num_carnet = Number.parseInt(memberDataWithIDs.num_carnet as string, 10) || null
+  }
+
+  // Format date correctly if it's a string
+  if (memberDataWithIDs.fecha_nacimiento && typeof memberDataWithIDs.fecha_nacimiento === "string") {
+    // Keep the date as is, Supabase will handle the conversion
+  }
+
+  console.log("Creating member with data:", memberDataWithIDs)
 
   // Then create the member record
-  const { data, error } = await client.from("miembros").insert(memberDataWithUUID).select()
+  const { data, error } = await client.from("miembros").insert(memberDataWithIDs).select()
 
   if (error) {
     console.error("Error creating member:", error)
@@ -190,7 +220,7 @@ export async function getMember() {
   return { data, error }
 }
 
-export async function updateMember(updates: Record<string, unknown>) {
+export async function updateMember(updates: MemberData) {
   const client =
     typeof window !== "undefined" ? createBrowserSupabaseClient() : createClient<Database>(supabaseUrl, supabaseAnonKey)
 
