@@ -69,28 +69,28 @@ export function ProfileDropdown({ user }: ProfileDropdownProps) {
         >
           <div className="py-1 rounded-md bg-secondary text-white shadow-xs">
             {user.name && (
-              <div className="px-4 py-2 text-sm border-b border-white/10">
+              <div className="px-4 py-2 text-sm text-black border-b border-white/10">
                 <p className="font-medium">{user.name}</p>
                 <p className="text-xs opacity-75 truncate">{user.email}</p>
               </div>
             )}
             <Link
               href="/dashboard"
-              className="block px-4 py-2 text-sm hover:bg-primary transition-colors"
+              className="block px-4 py-2 text-sm text-black hover:bg-primary hover:text-white transition-colors"
               onClick={() => setIsOpen(false)}
             >
               Panel de Socio
             </Link>
             <Link
               href="/dashboard/settings"
-              className="block px-4 py-2 text-sm hover:bg-primary transition-colors"
+              className="block px-4 py-2 text-sm text-black hover:bg-primary hover:text-white transition-colors"
               onClick={() => setIsOpen(false)}
             >
               Configuración
             </Link>
             <Link
               href="/dashboard/logout"
-              className="block px-4 py-2 text-sm text-red-300 hover:bg-primary transition-colors"
+              className="block px-4 py-2 text-sm text-red-600 hover:bg-primary hover:text-red-300 transition-colors"
               onClick={() => setIsOpen(false)}
             >
               Cerrar Sesión

@@ -180,9 +180,9 @@ export function Header() {
                 Blog
               </Link>
               <Link
-                href="/hazte-socio"
+                href="/membership"
                 className={`text-sm font-medium transition-colors hover:text-primary ${
-                  isActive("/hazte-socio") ? "text-primary" : "text-gray-600"
+                  isActive("/membership") ? "text-primary" : "text-gray-600"
                 }`}
                 onClick={closeMenu}
               >

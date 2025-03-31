@@ -15,6 +15,7 @@ export default function DashboardLayout({
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [authenticated, setAuthenticated] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     const checkUser = async () => {
@@ -56,7 +57,7 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-gray-50">
       <DashboardSidebar />
-      <div className="pt-16 transition-all duration-300">
+      <div className="pt-16 pl-16 transition-all duration-300">
         <div className="container mx-auto px-4 py-8">{children}</div>
       </div>
     </div>
