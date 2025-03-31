@@ -37,16 +37,20 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      mode: "subscription",
+      mode: "subscription", // Ensure this is set to subscription
       allow_promotion_codes: true,
       subscription_data: {
         metadata: {
           userId,
         },
       },
-      // Update the success URL to redirect to the member registration form
+      // Make sure to include the session_id parameter in the success URL
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/complete-profile?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/membership?canceled=true`,
+      // Add metadata to the session itself as well
+      metadata: {
+        userId,
+      },
     })
 
     return NextResponse.json({ sessionId: session.id })
@@ -56,3 +60,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }
+
