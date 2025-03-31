@@ -52,7 +52,7 @@ export default function MemberRegistrationForm() {
     fecha_nacimiento: "",
     es_socio_realmadrid: false,
     num_socio: "",
-    socio_carnet_madrid: false,
+    socio_carnet_madridista: false,
     num_carnet: "",
     direccion: "",
     direccion_extra: "",
@@ -230,11 +230,11 @@ export default function MemberRegistrationForm() {
                     <Checkbox
                       id="socio_carnet_madrid"
                       name="socio_carnet_madrid"
-                      checked={formData.socio_carnet_madrid}
+                      checked={formData.socio_carnet_madridista}
                       onCheckedChange={(checked) =>
                         setFormData({
                           ...formData,
-                          socio_carnet_madrid: checked as boolean,
+                          socio_carnet_madridista: checked as boolean,
                         })
                       }
                     />
@@ -256,7 +256,7 @@ export default function MemberRegistrationForm() {
                   </div>
                 )}
 
-                {formData.socio_carnet_madrid && (
+                {formData.socio_carnet_madridista && (
                   <div className="space-y-2">
                     <Label htmlFor="num_carnet_madridista">Número de Carnet Madridista *</Label>
                     <Input
@@ -264,7 +264,7 @@ export default function MemberRegistrationForm() {
                       name="num_carnet_madridista"
                       value={formData.num_carnet}
                       onChange={handleChange}
-                      required={formData.socio_carnet_madrid}
+                      required={formData.socio_carnet_madridista}
                       placeholder="Introduce tu número de Carnet Madridista"
                     />
                   </div>
