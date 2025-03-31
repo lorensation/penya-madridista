@@ -80,3 +80,28 @@ export interface WebhookEvent {
   [key: string]: unknown
 }
 
+// Define an interface for the member data
+export interface MemberData {
+  id?: string
+  user_uuid?: string
+  dni_pasaporte?: string
+  name?: string
+  apellido1?: string
+  apellido2?: string
+  telefono?: string | number | null
+  email?: string
+  fecha_nacimiento?: string | Date | null
+  es_socio_realmadrid?: boolean
+  num_socio?: string | number | null
+  socio_carnet_madridista?: boolean
+  num_carnet?: string | number | null
+  direccion?: string
+  direccion_extra?: string
+  poblacion?: string
+  cp?: string | number | null
+  provincia?: string
+  pais?: string
+  nacionalidad?: string
+  [key: string]: unknown // Allow for additional properties
+}
+

@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { createMember } from "@/lib/supabase"
+import type { MemberData } from "@/types/common"
 
 // Define a type for potential errors
 interface ErrorWithMessage {
@@ -42,7 +43,7 @@ export default function MemberRegistrationForm() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get("session_id")
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<MemberData>({
     dni_pasaporte: "",
     name: "",
     apellido1: "",
@@ -61,7 +62,7 @@ export default function MemberRegistrationForm() {
     provincia: "",
     pais: "España",
     nacionalidad: "Española",
-    // Add user_uuid field to match database schema
+    id: user?.id || "",
     user_uuid: user?.id || "",
   })
 
@@ -79,6 +80,15 @@ export default function MemberRegistrationForm() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
+
+    // For numeric fields, ensure we're only accepting numbers
+    if (["telefono", "cp", "num_socio", "num_carnet"].includes(name) && value !== "") {
+      // Only allow numeric input for these fields
+      if (!/^\d*$/.test(value)) {
+        return // Ignore non-numeric input
+      }
+    }
+
     setFormData({
       ...formData,
       [name]: type === "checkbox" ? checked : value,
@@ -94,7 +104,8 @@ export default function MemberRegistrationForm() {
       // Create member record in Supabase
       const { error } = await createMember({
         ...formData,
-        user_uuid: user.id, // Use user_uuid instead of user_id
+        id: user.id,
+        user_uuid: user.id,
       })
 
       if (error) {
@@ -176,7 +187,17 @@ export default function MemberRegistrationForm() {
 
             <div className="space-y-2">
               <Label htmlFor="telefono">Teléfono *</Label>
-              <Input id="telefono" name="telefono" value={formData.telefono} onChange={handleChange} required />
+              <Input
+                id="telefono"
+                name="telefono"
+                value={formData.telefono?.toString() || ""}
+                onChange={handleChange}
+                required
+                type="tel"
+                pattern="[0-9]*"
+                inputMode="numeric"
+                placeholder="Solo números"
+              />
             </div>
 
             <div className="space-y-2">
@@ -198,7 +219,7 @@ export default function MemberRegistrationForm() {
                 id="fecha_nacimiento"
                 name="fecha_nacimiento"
                 type="date"
-                value={formData.fecha_nacimiento}
+                value={formData.fecha_nacimiento as string}
                 onChange={handleChange}
                 required
               />
@@ -228,8 +249,8 @@ export default function MemberRegistrationForm() {
                 <div className="space-y-2 flex items-center">
                   <div className="flex items-center space-x-2">
                     <Checkbox
-                      id="socio_carnet_madrid"
-                      name="socio_carnet_madrid"
+                      id="socio_carnet_madridista"
+                      name="socio_carnet_madridista"
                       checked={formData.socio_carnet_madridista}
                       onCheckedChange={(checked) =>
                         setFormData({
@@ -238,7 +259,7 @@ export default function MemberRegistrationForm() {
                         })
                       }
                     />
-                    <Label htmlFor="socio_carnet_madrid">¿Tienes Carnet Madridista?</Label>
+                    <Label htmlFor="socio_carnet_madridista">¿Tienes Carnet Madridista?</Label>
                   </div>
                 </div>
 
@@ -248,24 +269,30 @@ export default function MemberRegistrationForm() {
                     <Input
                       id="num_socio"
                       name="num_socio"
-                      value={formData.num_socio}
+                      value={formData.num_socio?.toString() || ""}
                       onChange={handleChange}
                       required={formData.es_socio_realmadrid}
                       placeholder="Introduce tu número de socio"
+                      type="text"
+                      pattern="[0-9]*"
+                      inputMode="numeric"
                     />
                   </div>
                 )}
 
                 {formData.socio_carnet_madridista && (
                   <div className="space-y-2">
-                    <Label htmlFor="num_carnet_madridista">Número de Carnet Madridista *</Label>
+                    <Label htmlFor="num_carnet">Número de Carnet Madridista *</Label>
                     <Input
-                      id="num_carnet_madridista"
-                      name="num_carnet_madridista"
-                      value={formData.num_carnet}
+                      id="num_carnet"
+                      name="num_carnet"
+                      value={formData.num_carnet?.toString() || ""}
                       onChange={handleChange}
                       required={formData.socio_carnet_madridista}
                       placeholder="Introduce tu número de Carnet Madridista"
+                      type="text"
+                      pattern="[0-9]*"
+                      inputMode="numeric"
                     />
                   </div>
                 )}
@@ -298,7 +325,17 @@ export default function MemberRegistrationForm() {
 
                 <div className="space-y-2">
                   <Label htmlFor="cp">Código Postal *</Label>
-                  <Input id="cp" name="cp" value={formData.cp} onChange={handleChange} required />
+                  <Input
+                    id="cp"
+                    name="cp"
+                    value={formData.cp?.toString() || ""}
+                    onChange={handleChange}
+                    required
+                    type="text"
+                    pattern="[0-9]*"
+                    inputMode="numeric"
+                    placeholder="Solo números"
+                  />
                 </div>
 
                 <div className="space-y-2">

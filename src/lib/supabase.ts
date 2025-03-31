@@ -1,13 +1,14 @@
 import { createClient } from "@supabase/supabase-js"
 import { createBrowserClient } from "@supabase/ssr"
 import type { Database } from "@/types/supabase"
+import type { MemberData } from "@/types/common"
 
 // Environment variables are accessible in both client and server components
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // For server-side operations that need more privileges
-//const supabaseServiceKey = process.env.SUPABASE_WEBHOOK_SECRET
+const supabaseServiceKey = process.env.SUPABASE_WEBHOOK_SECRET
 
 // Create a single client instance that can be used in browser environments
 // Use a singleton pattern to prevent multiple instances
@@ -30,8 +31,6 @@ export const supabase =
 
 // For server-side operations that need admin privileges
 export const getServiceSupabase = () => {
-  const supabaseServiceKey = process.env.SUPABASE_WEBHOOK_SECRET
-
   if (!supabaseServiceKey) {
     console.error("SUPABASE_WEBHOOK_SECRET is not defined - admin operations will fail")
     throw new Error("Service role key is required for admin operations")
@@ -130,18 +129,6 @@ export async function updateUserProfile(updates: Record<string, unknown>) {
   return { data: data?.[0] || null, error }
 }
 
-// Define an interface for the member data
-interface MemberData {
-  id?: string;
-  user_uuid?: string;
-  telefono?: string | number;
-  cp?: string | number | null;
-  num_socio?: string | number | null;
-  num_carnet?: string | number | null;
-  fecha_nacimiento?: string | Date | null;
-  [key: string]: unknown; // Allow for additional properties
-}
-
 // Member functions
 export async function createMember(memberData: MemberData) {
   const client =
@@ -170,20 +157,45 @@ export async function createMember(memberData: MemberData) {
   }
 
   // Convert string values to appropriate types based on schema
-  if (memberDataWithIDs.telefono && typeof memberDataWithIDs.telefono === "string") {
-    memberDataWithIDs.telefono = Number.parseInt(memberDataWithIDs.telefono as string, 10) || 0
+  // For bigint columns, we need to ensure we're not sending empty strings or invalid values
+  if (memberDataWithIDs.telefono) {
+    if (typeof memberDataWithIDs.telefono === "string") {
+      const parsedValue = Number.parseInt(memberDataWithIDs.telefono as string, 10)
+      memberDataWithIDs.telefono = isNaN(parsedValue) ? null : parsedValue
+    }
+  } else {
+    // If telefono is empty or undefined, set it to null
+    memberDataWithIDs.telefono = null
   }
 
-  if (memberDataWithIDs.cp && typeof memberDataWithIDs.cp === "string") {
-    memberDataWithIDs.cp = Number.parseInt(memberDataWithIDs.cp as string, 10) || null
+  if (memberDataWithIDs.cp) {
+    if (typeof memberDataWithIDs.cp === "string") {
+      const parsedValue = Number.parseInt(memberDataWithIDs.cp as string, 10)
+      memberDataWithIDs.cp = isNaN(parsedValue) ? null : parsedValue
+    }
+  } else {
+    // If cp is empty or undefined, set it to null
+    memberDataWithIDs.cp = null
   }
 
-  if (memberDataWithIDs.num_socio && typeof memberDataWithIDs.num_socio === "string") {
-    memberDataWithIDs.num_socio = Number.parseInt(memberDataWithIDs.num_socio as string, 10) || null
+  if (memberDataWithIDs.num_socio) {
+    if (typeof memberDataWithIDs.num_socio === "string") {
+      const parsedValue = Number.parseInt(memberDataWithIDs.num_socio as string, 10)
+      memberDataWithIDs.num_socio = isNaN(parsedValue) ? null : parsedValue
+    }
+  } else {
+    // If num_socio is empty or undefined, set it to null
+    memberDataWithIDs.num_socio = null
   }
 
-  if (memberDataWithIDs.num_carnet && typeof memberDataWithIDs.num_carnet === "string") {
-    memberDataWithIDs.num_carnet = Number.parseInt(memberDataWithIDs.num_carnet as string, 10) || null
+  if (memberDataWithIDs.num_carnet) {
+    if (typeof memberDataWithIDs.num_carnet === "string") {
+      const parsedValue = Number.parseInt(memberDataWithIDs.num_carnet as string, 10)
+      memberDataWithIDs.num_carnet = isNaN(parsedValue) ? null : parsedValue
+    }
+  } else {
+    // If num_carnet is empty or undefined, set it to null
+    memberDataWithIDs.num_carnet = null
   }
 
   // Format date correctly if it's a string
@@ -220,7 +232,7 @@ export async function getMember() {
   return { data, error }
 }
 
-export async function updateMember(updates: MemberData) {
+export async function updateMember(updates: Partial<MemberData>) {
   const client =
     typeof window !== "undefined" ? createBrowserSupabaseClient() : createClient<Database>(supabaseUrl, supabaseAnonKey)
 
