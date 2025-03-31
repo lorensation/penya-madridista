@@ -25,9 +25,12 @@ export async function POST(request: NextRequest) {
   const supabase = getServiceSupabase()
 
   try {
+    console.log(`Processing webhook event: ${event.type}`)
+
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session
+        console.log("Checkout session completed:", session.id)
 
         if (session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
@@ -36,6 +39,8 @@ export async function POST(request: NextRequest) {
           if (!userId) {
             throw new Error("No userId found in subscription metadata")
           }
+
+          console.log(`Updating membership status for user: ${userId}`)
 
           // Get user details from Supabase
           const { data: userData, error: userError } = await supabase
@@ -48,11 +53,18 @@ export async function POST(request: NextRequest) {
             throw new Error(`User not found: ${userError?.message}`)
           }
 
-          // Update webusers to mark as member
-          const { error: updateError } = await supabase.from("webusers").update({ is_member: true }).eq("id", userId)
-
-          if (updateError) {
-            throw new Error(`Error updating user: ${updateError.message}`)
+          // Also update the users table if it exists
+          try {
+            await supabase
+              .from("users")
+              .update({
+                is_member: true,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", userId)
+          } catch (error) {
+            console.log("No users table or user not found in users table:", error)
+            // Continue even if this fails
           }
 
           // Insert subscription data into the database
@@ -103,6 +115,8 @@ export async function POST(request: NextRequest) {
               throw new Error(`Error creating member: ${memberError.message}`)
             }
           }
+
+          console.log(`Successfully processed subscription for user: ${userId}`)
         }
         break
       }
@@ -114,17 +128,18 @@ export async function POST(request: NextRequest) {
           throw new Error("No userId found in subscription metadata")
         }
 
-        // Update webusers membership status based on subscription status
-        const { error: userError } = await supabase
-          .from("webusers")
-          .update({
-            is_member: subscription.status === "active",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", userId)
-
-        if (userError) {
-          throw new Error(`Error updating user: ${userError.message}`)
+        // Also update the users table if it exists
+        try {
+          await supabase
+            .from("users")
+            .update({
+              is_member: subscription.status === "active",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", userId)
+        } catch (error) {
+          console.log("No users table or user not found in users table:", error)
+          // Continue even if this fails
         }
 
         // Update subscription data in the database
@@ -162,6 +177,7 @@ export async function POST(request: NextRequest) {
       }
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription
+        const userId = subscription.metadata.userId
 
         // Update subscription data in the database
         const { error: subscriptionError } = await supabase
@@ -174,6 +190,23 @@ export async function POST(request: NextRequest) {
 
         if (subscriptionError) {
           throw new Error(`Error updating subscription: ${subscriptionError.message}`)
+        }
+
+        // If we have a userId, update the user's membership status
+        if (userId) {
+          
+          // Update users table
+          try {
+            await supabase
+              .from("users")
+              .update({
+                is_member: false,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", userId)
+          } catch (error) {
+            console.log("Error updating users:", error)
+          }
         }
         break
       }

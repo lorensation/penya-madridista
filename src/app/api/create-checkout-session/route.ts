@@ -44,8 +44,9 @@ export async function POST(request: NextRequest) {
           userId,
         },
       },
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/miembro/registro?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/hazte-socio`,
+      // Update the success URL to redirect to the member registration form
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/complete-profile?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/membership?canceled=true`,
     })
 
     return NextResponse.json({ sessionId: session.id })
