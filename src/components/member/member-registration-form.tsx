@@ -15,25 +15,25 @@ import { createMember } from "@/lib/supabase"
 
 // Define a type for potential errors
 interface ErrorWithMessage {
-  message: string;
+  message: string
 }
 
 // Type guard to check if an error has a message property
 function isErrorWithMessage(error: unknown): error is ErrorWithMessage {
   return (
-    typeof error === 'object' &&
+    typeof error === "object" &&
     error !== null &&
-    'message' in error &&
-    typeof (error as Record<string, unknown>).message === 'string'
-  );
+    "message" in error &&
+    typeof (error as Record<string, unknown>).message === "string"
+  )
 }
 
 // Function to extract error message from unknown error
 function getErrorMessage(error: unknown): string {
   if (isErrorWithMessage(error)) {
-    return error.message;
+    return error.message
   }
-  return String(error);
+  return String(error)
 }
 
 export default function MemberRegistrationForm() {
@@ -52,8 +52,8 @@ export default function MemberRegistrationForm() {
     fecha_nacimiento: "",
     es_socio_realmadrid: false,
     num_socio: "",
-    socio_carnet_madrid: false, // Changed to boolean
-    num_carnet_madridista: "", // New field for Carnet Madridista number
+    socio_carnet_madrid: false,
+    num_carnet_madridista: "",
     direccion: "",
     direccion_extra: "",
     poblacion: "",
@@ -61,6 +61,8 @@ export default function MemberRegistrationForm() {
     provincia: "",
     pais: "España",
     nacionalidad: "Española",
+    // Add user_uuid field to match database schema
+    user_uuid: user?.id || "",
   })
 
   const [loading, setLoading] = useState(false)
@@ -70,7 +72,7 @@ export default function MemberRegistrationForm() {
   // Redirect if no user or session ID
   if (!user || !sessionId) {
     if (typeof window !== "undefined") {
-      router.push("/membership")
+      router.push("/hazte-socio")
     }
     return null
   }
@@ -92,7 +94,7 @@ export default function MemberRegistrationForm() {
       // Create member record in Supabase
       const { error } = await createMember({
         ...formData,
-        user_id: user.id,
+        user_uuid: user.id, // Use user_uuid instead of user_id
       })
 
       if (error) {
@@ -243,10 +245,10 @@ export default function MemberRegistrationForm() {
                 {formData.es_socio_realmadrid && (
                   <div className="space-y-2">
                     <Label htmlFor="num_socio">Número de Socio Real Madrid *</Label>
-                    <Input 
-                      id="num_socio" 
-                      name="num_socio" 
-                      value={formData.num_socio} 
+                    <Input
+                      id="num_socio"
+                      name="num_socio"
+                      value={formData.num_socio}
                       onChange={handleChange}
                       required={formData.es_socio_realmadrid}
                       placeholder="Introduce tu número de socio"
@@ -257,10 +259,10 @@ export default function MemberRegistrationForm() {
                 {formData.socio_carnet_madrid && (
                   <div className="space-y-2">
                     <Label htmlFor="num_carnet_madridista">Número de Carnet Madridista *</Label>
-                    <Input 
-                      id="num_carnet_madridista" 
-                      name="num_carnet_madridista" 
-                      value={formData.num_carnet_madridista} 
+                    <Input
+                      id="num_carnet_madridista"
+                      name="num_carnet_madridista"
+                      value={formData.num_carnet_madridista}
                       onChange={handleChange}
                       required={formData.socio_carnet_madrid}
                       placeholder="Introduce tu número de Carnet Madridista"

@@ -146,18 +146,29 @@ export async function createMember(memberData: Record<string, unknown>) {
   const { error: userError } = await client.from("users").update({ is_member: true }).eq("id", authUser.user.id)
 
   if (userError) {
-    return { data: null, error: userError }
+    console.error("Error updating user:", userError)
+    // Continue anyway to try creating the member record
   }
 
+  // Ensure user_uuid is set correctly
+  const memberDataWithUUID = {
+    ...memberData,
+    user_uuid: authUser.user.id,
+  }
+
+  // Remove auth_id if it exists to avoid the error
+  if ("auth_id" in memberDataWithUUID) {
+    delete memberDataWithUUID.auth_id
+  }
+
+  console.log("Creating member with data:", memberDataWithUUID)
+
   // Then create the member record
-  const { data, error } = await client
-    .from("miembros")
-    .insert({
-      user_uuid: authUser.user.id,
-      auth_id: authUser.user.id, // Keep for backward compatibility
-      ...memberData,
-    })
-    .select()
+  const { data, error } = await client.from("miembros").insert(memberDataWithUUID).select()
+
+  if (error) {
+    console.error("Error creating member:", error)
+  }
 
   return { data, error }
 }
