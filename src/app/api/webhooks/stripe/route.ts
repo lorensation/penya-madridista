@@ -10,7 +10,7 @@ async function updateMemberSubscription(userId: string, subscription: Stripe.Sub
     const { data: member, error: memberError } = await supabase
       .from("miembros")
       .select("*")
-      .or(`user_id.eq.${userId},user_uuid.eq.${userId},auth_id.eq.${userId}`)
+      .or(`user_id.eq.${userId},user_uuid.eq.${userId}`)
       .single()
 
     if (memberError) {
@@ -79,10 +79,10 @@ export async function POST(request: NextRequest) {
 
         if (session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
-          const userId = subscription.metadata.userId
+          const userId = session.client_reference_id || subscription.metadata.userId
 
           if (!userId) {
-            throw new Error("No userId found in subscription metadata")
+            throw new Error("No userId found in session or subscription metadata")
           }
 
           console.log(`Updating membership status for user: ${userId}`)
@@ -95,7 +95,17 @@ export async function POST(request: NextRequest) {
             .single()
 
           if (userError || !userData) {
-            throw new Error(`User not found: ${userError?.message}`)
+            console.log("User not found in users table, trying miembros table")
+            // Try to find user in miembros table
+            const { data: memberData, error: memberError } = await supabase
+              .from("miembros")
+              .select("email, name")
+              .or(`user_id.eq.${userId},user_uuid.eq.${userId}`)
+              .single()
+
+            if (memberError || !memberData) {
+              throw new Error(`User not found: ${memberError?.message || userError?.message}`)
+            }
           }
 
           // Also update the users table if it exists
@@ -113,43 +123,50 @@ export async function POST(request: NextRequest) {
           }
 
           // Insert subscription data into the database
-          const { error: subscriptionError } = await supabase.from("subscriptions").insert({
-            id: subscription.id,
-            user_id: userId,
-            status: subscription.status,
-            price_id: subscription.items.data[0].price.id,
-            quantity: subscription.items.data[0].quantity,
-            cancel_at_period_end: subscription.cancel_at_period_end,
-            created_at: new Date(subscription.created * 1000).toISOString(),
-            current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-            ended_at: subscription.ended_at ? new Date(subscription.ended_at * 1000).toISOString() : null,
-            cancel_at: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
-            canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
-            trial_start: subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null,
-            trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
-          })
+          try {
+            const { error: subscriptionError } = await supabase.from("subscriptions").insert({
+              id: subscription.id,
+              user_id: userId,
+              status: subscription.status,
+              price_id: subscription.items.data[0].price.id,
+              quantity: subscription.items.data[0].quantity,
+              cancel_at_period_end: subscription.cancel_at_period_end,
+              created_at: new Date(subscription.created * 1000).toISOString(),
+              current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+              current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+              ended_at: subscription.ended_at ? new Date(subscription.ended_at * 1000).toISOString() : null,
+              cancel_at: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
+              canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
+              trial_start: subscription.trial_start ? new Date(subscription.trial_start * 1000).toISOString() : null,
+              trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
+            })
 
-          if (subscriptionError) {
-            throw new Error(`Error inserting subscription: ${subscriptionError.message}`)
+            if (subscriptionError) {
+              console.error("Error inserting subscription:", subscriptionError)
+              // Continue even if this fails
+            }
+          } catch (error) {
+            console.error("Error inserting subscription:", error)
+            // Continue even if this fails
           }
 
           // Check if user already exists in miembros table
           const { data: existingMember, error: memberCheckError } = await supabase
             .from("miembros")
             .select("id, user_uuid")
-            .or(`user_id.eq.${userId},user_uuid.eq.${userId},auth_id.eq.${userId}`)
+            .or(`user_id.eq.${userId},user_uuid.eq.${userId}`)
             .single()
 
           // Only create a minimal miembros entry if it doesn't exist
           // The user will complete their profile later
           if (!existingMember && !memberCheckError) {
+            const { data: userData } = await supabase.from("users").select("email, name").eq("id", userId).single()
+
             const { error: memberError } = await supabase.from("miembros").insert({
               user_id: userId,
               user_uuid: userId, // Make sure user_uuid is set
-              auth_id: userId, // Add auth_id field to match with the user
-              email: userData.email,
-              name: userData.name,
+              email: userData?.email || session.customer_details?.email || "",
+              name: userData?.name || session.customer_details?.name || "",
               subscription_status: subscription.status,
               subscription_plan: subscription.items.data[0].price.id,
               subscription_id: subscription.id,
@@ -159,7 +176,7 @@ export async function POST(request: NextRequest) {
             })
 
             if (memberError) {
-              throw new Error(`Error creating member: ${memberError.message}`)
+              console.error(`Error creating member: ${memberError.message}`)
             }
           } else if (existingMember) {
             // Update the existing member with subscription information
@@ -172,13 +189,13 @@ export async function POST(request: NextRequest) {
                 subscription_updated_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               })
-              .eq("user_uuid", userId)
+              .eq("id", existingMember.id)
 
             if (updateError) {
-              throw new Error(`Error updating member subscription: ${updateError.message}`)
+              console.error(`Error updating member subscription: ${updateError.message}`)
+            } else {
+              console.log(`Successfully updated subscription for existing member: ${existingMember.id}`)
             }
-
-            console.log(`Successfully updated subscription for existing member: ${userId}`)
           }
 
           console.log(`Successfully processed subscription for user: ${userId}`)
@@ -208,21 +225,25 @@ export async function POST(request: NextRequest) {
         }
 
         // Update subscription data in the database
-        const { error: subscriptionError } = await supabase
-          .from("subscriptions")
-          .update({
-            status: subscription.status,
-            cancel_at_period_end: subscription.cancel_at_period_end,
-            current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-            ended_at: subscription.ended_at ? new Date(subscription.ended_at * 1000).toISOString() : null,
-            cancel_at: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
-            canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
-          })
-          .eq("id", subscription.id)
+        try {
+          const { error: subscriptionError } = await supabase
+            .from("subscriptions")
+            .update({
+              status: subscription.status,
+              cancel_at_period_end: subscription.cancel_at_period_end,
+              current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+              current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+              ended_at: subscription.ended_at ? new Date(subscription.ended_at * 1000).toISOString() : null,
+              cancel_at: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
+              canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
+            })
+            .eq("id", subscription.id)
 
-        if (subscriptionError) {
-          throw new Error(`Error updating subscription: ${subscriptionError.message}`)
+          if (subscriptionError) {
+            console.error(`Error updating subscription: ${subscriptionError.message}`)
+          }
+        } catch (error) {
+          console.error("Error updating subscription:", error)
         }
 
         // Update miembros subscription status
@@ -237,16 +258,22 @@ export async function POST(request: NextRequest) {
         const userId = subscription.metadata.userId
 
         // Update subscription data in the database
-        const { error: subscriptionError } = await supabase
-          .from("subscriptions")
-          .update({
-            status: subscription.status,
-            ended_at: new Date(subscription.ended_at! * 1000).toISOString(),
-          })
-          .eq("id", subscription.id)
+        try {
+          const { error: subscriptionError } = await supabase
+            .from("subscriptions")
+            .update({
+              status: subscription.status,
+              ended_at: subscription.ended_at
+                ? new Date(subscription.ended_at * 1000).toISOString()
+                : new Date().toISOString(),
+            })
+            .eq("id", subscription.id)
 
-        if (subscriptionError) {
-          throw new Error(`Error updating subscription: ${subscriptionError.message}`)
+          if (subscriptionError) {
+            console.error(`Error updating subscription: ${subscriptionError.message}`)
+          }
+        } catch (error) {
+          console.error("Error updating subscription:", error)
         }
 
         // If we have a userId, update the user's membership status
@@ -262,6 +289,27 @@ export async function POST(request: NextRequest) {
               .eq("id", userId)
           } catch (error) {
             console.log("Error updating users:", error)
+          }
+
+          // Update miembros table
+          try {
+            const { data: member, error: memberError } = await supabase
+              .from("miembros")
+              .select("id")
+              .or(`user_id.eq.${userId},user_uuid.eq.${userId}`)
+              .single()
+
+            if (!memberError && member) {
+              await supabase
+                .from("miembros")
+                .update({
+                  subscription_status: "canceled",
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", member.id)
+            }
+          } catch (error) {
+            console.log("Error updating miembros:", error)
           }
         }
         break
