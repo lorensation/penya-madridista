@@ -63,9 +63,9 @@ export default function MemberRegistrationForm() {
     provincia: "",
     pais: "España",
     nacionalidad: "Española",
-    id: user?.id || "",
-    user_uuid: user?.id || "",
-    auth_id: user?.id || "",
+    // Set the ID fields correctly
+    id: user?.id, // This links to auth.users(id)
+    user_uuid: user?.id, // This links to users(id)
   })
 
   const [loading, setLoading] = useState(false)
@@ -110,9 +110,8 @@ export default function MemberRegistrationForm() {
       // Create member record in Supabase
       const memberDataToSave: MemberData = {
         ...formData,
-        id: user.id,
-        user_uuid: user.id,
-        auth_id: user.id,
+        id: user.id, // This links to auth.users(id)
+        user_uuid: user.id, // This links to users(id)
       }
 
       // If we have a session_id, get the checkout session data and update subscription info

@@ -149,12 +149,11 @@ export async function createMember(memberData: MemberData) {
     // Continue anyway to try creating the member record
   }
 
-  // Ensure user_uuid and id are set correctly
+  // Ensure ID fields are set correctly
   const memberDataWithIDs: MemberData = {
     ...memberData,
-    id: authUser.user.id,
-    user_uuid: authUser.user.id,
-    auth_id: authUser.user.id, // Make sure auth_id is set too
+    id: authUser.user.id, // This links to auth.users(id)
+    user_uuid: authUser.user.id, // This links to users(id)
   }
 
   // Set default subscription status if not provided

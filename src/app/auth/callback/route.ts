@@ -15,16 +15,17 @@ export async function GET(request: NextRequest) {
         const { data: profile, error: profileError } = await supabase
           .from("miembros")
           .select("id")
-          .eq("auth_id", data.user.id)
+          .eq("id", data.user.id)
           .single()
 
         // If profile doesn't exist, create it
         if ((profileError || !profile) && data.user.email) {
           const { error: insertError } = await supabase.from("miembros").insert({
-            auth_id: data.user.id,
+            id: data.user.id, // This links to auth.users(id)
+            user_uuid: data.user.id, // This links to users(id)
             email: data.user.email,
             name: data.user.user_metadata?.name || data.user.email.split("@")[0] || "",
-            role: "user", // It's OK to set role here since this is the miembros table
+            role: "user",
             created_at: new Date().toISOString(),
           })
 

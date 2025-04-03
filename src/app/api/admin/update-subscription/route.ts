@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getServiceSupabase } from "@/lib/supabase"
+import { getServiceSupabase } from "@/lib/supabase" // Changed from @/lib/supabase-server
 import { stripe } from "@/lib/stripe"
 
 export async function POST(request: NextRequest) {
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
         subscription_updated_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .eq("id", member.id)
+      .or(`id.eq.${userId},user_uuid.eq.${userId}`)
 
     if (updateError) {
       return NextResponse.json({ error: `Failed to update subscription: ${updateError.message}` }, { status: 500 })

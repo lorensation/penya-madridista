@@ -82,9 +82,10 @@ export interface WebhookEvent {
 
 // Define an interface for the member data
 export interface MemberData {
-  id?: string
-  user_uuid?: string
-  auth_id?: string
+  user_id?: number
+  id?: string // This should match the auth.users(id)
+  user_uuid?: string // This should match users(id)
+  temp_auth_id?: string
   dni_pasaporte?: string
   name?: string
   apellido1?: string
@@ -103,12 +104,18 @@ export interface MemberData {
   provincia?: string
   pais?: string
   nacionalidad?: string
+  cargo_directivo?: string
+  created_at?: string | Date
+  role?: string
   // Subscription related fields
   subscription_status?: string
   subscription_plan?: string
   subscription_id?: string
   subscription_updated_at?: string | Date
   stripe_customer_id?: string
+  last_four?: string
+  email_notifications?: boolean
+  marketing_emails?: boolean
   [key: string]: unknown // Allow for additional properties
 }
 

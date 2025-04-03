@@ -244,7 +244,7 @@ async function updateSubscriptionStatus(subscription: Stripe.Subscription, userI
         subscription_updated_at: new Date().toISOString(),
         stripe_customer_id: subscription.customer as string,
       })
-      .or(`user_id.eq.${userId},user_uuid.eq.${userId},auth_id.eq.${userId},id.eq.${userId}`)
+      .or(`id.eq.${userId},user_uuid.eq.${userId}`)
 
     if (error) {
       console.error("Error updating member subscription:", error)
