@@ -47,31 +47,48 @@ async function updateMemberSubscription(userId: string, subscription: Stripe.Sub
   }
 }
 
+// Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-02-24.acacia",
 })
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
+// Get webhook secret from environment variable
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+
+// Export config to disable body parsing for raw body access
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+}
 
 export async function POST(request: NextRequest) {
-  const payload = await request.text()
-  const signature = request.headers.get("stripe-signature") as string
-
-  let event: Stripe.Event
-
   try {
-    event = stripe.webhooks.constructEvent(payload, signature, webhookSecret)
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : "Unknown error"
-    console.error(`Webhook signature verification failed: ${errorMessage}`)
-    return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
-  }
+    // Get the raw request body as text
+    const payload = await request.text()
 
-  const supabase = getServiceSupabase()
+    // Get the Stripe signature from headers
+    const signature = request.headers.get("stripe-signature")
 
-  try {
+    if (!signature || !webhookSecret) {
+      console.error("Missing signature or webhook secret")
+      return NextResponse.json({ error: "Missing signature or webhook secret" }, { status: 400 })
+    }
+
+    // Verify the event
+    let event: Stripe.Event
+    try {
+      event = stripe.webhooks.constructEvent(payload, signature, webhookSecret)
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error"
+      console.error(`Webhook signature verification failed: ${errorMessage}`)
+      return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
+    }
+
     console.log(`Processing webhook event: ${event.type}`)
+    const supabase = getServiceSupabase()
 
+    // Handle different event types
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session
@@ -314,6 +331,22 @@ export async function POST(request: NextRequest) {
         }
         break
       }
+      // Handle payment_intent.succeeded event
+      case "payment_intent.succeeded": {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent
+        console.log(`PaymentIntent for ${paymentIntent.amount} was successful!`)
+
+        // If there's a customer ID, you might want to update their payment status
+        if (paymentIntent.customer) {
+          console.log(`Customer: ${paymentIntent.customer}`)
+          // Add any customer-specific logic here
+        }
+
+        break
+      }
+      // You can add more event handlers as needed
+      default:
+        console.log(`Unhandled event type ${event.type}`)
     }
 
     return NextResponse.json({ received: true })

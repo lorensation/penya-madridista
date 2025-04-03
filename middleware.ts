@@ -2,6 +2,11 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
+  // Skip middleware for webhook endpoints
+  if (request.nextUrl.pathname.startsWith("/api/webhooks")) {
+    return NextResponse.next()
+  }
+
   const response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -71,20 +76,17 @@ export async function middleware(request: NextRequest) {
       }
 
       // For dashboard or admin routes, we need detailed member info
-      if (
-        request.nextUrl.pathname.startsWith("/dashboard") ||
-        request.nextUrl.pathname.startsWith("/admin")
-      ) {
+      if (request.nextUrl.pathname.startsWith("/dashboard") || request.nextUrl.pathname.startsWith("/admin")) {
         // Try to get member data using multiple methods
         let memberData = null
-        
+
         // 1. Try by user_uuid first
         const { data: memberByUuid, error: uuidError } = await supabase
           .from("miembros")
           .select("*")
           .eq("user_uuid", authUser.id)
           .single()
-          
+
         if (!uuidError && memberByUuid) {
           memberData = memberByUuid
         } else {
@@ -94,7 +96,7 @@ export async function middleware(request: NextRequest) {
             .select("*")
             .eq("id", authUser.id)
             .single()
-            
+
           if (!idError && memberById) {
             memberData = memberById
           } else {
@@ -104,7 +106,7 @@ export async function middleware(request: NextRequest) {
               .select("*")
               .eq("email", authUser.email)
               .single()
-              
+
             if (!emailError && memberByEmail) {
               memberData = memberByEmail
             }
@@ -117,25 +119,19 @@ export async function middleware(request: NextRequest) {
             console.log("User does not have admin role:", memberData?.role || "no profile found")
             return NextResponse.redirect(new URL("/dashboard", request.url))
           }
-          
+
           console.log("Admin access granted for user:", authUser.email || authUser.id)
         }
-        
+
         // For dashboard routes, ensure we have member data
         if (request.nextUrl.pathname.startsWith("/dashboard")) {
           // If accessing settings but no member data, redirect to complete profile
-          if (
-            request.nextUrl.pathname.includes("/settings") && 
-            !memberData
-          ) {
+          if (request.nextUrl.pathname.includes("/settings") && !memberData) {
             return NextResponse.redirect(new URL("/dashboard/complete-profile", request.url))
           }
-          
+
           // If checking subscription status, ensure we have the data
-          if (
-            request.nextUrl.pathname.includes("/subscription") && 
-            (!memberData || !memberData.subscription_status)
-          ) {
+          if (request.nextUrl.pathname.includes("/subscription") && (!memberData || !memberData.subscription_status)) {
             // Allow access but the page will handle showing appropriate message
             console.log("User accessing subscription without status data")
           }
@@ -161,7 +157,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public (public files)
+     * - api/webhooks (webhook endpoints)
      */
-    "/((?!_next/static|_next/image|favicon.ico|public).*)",
+    "/((?!_next/static|_next/image|favicon.ico|public|api/webhooks).*)",
   ],
 }
