@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
   // Skip middleware for webhook endpoints - using exact path matching
-  if (request.nextUrl.pathname === "/api/webhooks/stripe") {
+  if (request.nextUrl.pathname.startsWith("/api/webhooks/")) {
     console.log("Skipping middleware for webhook endpoint")
     return NextResponse.next()
   }
