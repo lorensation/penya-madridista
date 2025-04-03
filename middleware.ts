@@ -2,8 +2,9 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
-  // Skip middleware for webhook endpoints
-  if (request.nextUrl.pathname.startsWith("/api/webhooks")) {
+  // Skip middleware for webhook endpoints - using exact path matching
+  if (request.nextUrl.pathname === "/api/webhooks/stripe") {
+    console.log("Skipping middleware for webhook endpoint")
     return NextResponse.next()
   }
 
@@ -19,7 +20,6 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        // Correctly typed getAll method
         getAll() {
           return request.cookies.getAll().map((cookie) => ({
             name: cookie.name,
@@ -157,8 +157,7 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public (public files)
-     * - api/webhooks (webhook endpoints)
      */
-    "/((?!_next/static|_next/image|favicon.ico|public|api/webhooks).*)",
+    "/((?!_next/static|_next/image|favicon.ico|public).*)",
   ],
 }
