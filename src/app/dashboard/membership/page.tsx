@@ -1,335 +1,300 @@
+
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { supabase } from "@/lib/supabase"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { CreditCard, CheckCircle, AlertTriangle, Calendar } from "lucide-react"
-import { cancelSubscription } from "@/app/actions/stripe"
-
-interface Profile {
-  id: string
-  subscription_status?: string
-  subscription_plan?: "annual" | "family" | null
-  subscription_updated_at?: string
-  subscription_id?: string
-  last_four?: string
-}
+import { createBillingPortalSession } from "@/app/actions/stripe"
+import { supabase } from "@/lib/supabase-client"
+import { CheckCircle, AlertCircle } from "lucide-react"
 
 export default function MembershipPage() {
   const router = useRouter()
-  const [profile, setProfile] = useState<Profile | null>(null)
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
-  const [cancelLoading, setCancelLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [cancelSuccess, setCancelSuccess] = useState(false)
+  const [membership, setMembership] = useState<any>(null)
+  const [user, setUser] = useState<any>(null)
+  const [managingSubscription, setManagingSubscription] = useState(false)
+
+  const success = searchParams?.get("success") === "true"
+  const canceled = searchParams?.get("canceled") === "true"
+  const errorParam = searchParams?.get("error")
 
   useEffect(() => {
-    const checkUser = async () => {
-      try {
-        const { data: userData } = await supabase.auth.getUser()
+    if (errorParam) {
+      if (errorParam === "no-customer") {
+        setError("No se encontró información de cliente en Stripe")
+      } else {
+        setError("Ocurrió un error al procesar tu solicitud")
+      }
+    }
+  }, [errorParam])
 
-        if (!userData.user) {
-          router.push("/login")
+  useEffect(() => {
+    async function loadUserAndMembership() {
+      try {
+        setLoading(true)
+        
+        // Get current user
+        const { data: userData, error: userError } = await supabase.auth.getUser()
+        
+        if (userError) {
+          console.error("Error fetching user:", userError)
+          setError("No se pudo cargar la información del usuario")
+          setLoading(false)
           return
         }
-
-        // Fetch user profile - try with user_uuid first (which is the correct column name)
-        const { data: profileData, error: profileError } = await supabase
-          .from("miembros")
-          .select("*")
-          .eq("user_uuid", userData.user.id)
-          .single()
-
-        if (profileError) {
-          console.log("Profile fetch error with user_uuid:", profileError)
-
-          // Try with id as fallback
-          const { data: profileByIdData, error: profileByIdError } = await supabase
-            .from("miembros")
-            .select("*")
-            .eq("id", userData.user.id)
-            .single()
-
-          if (profileByIdError) {
-            console.log("Profile fetch error with id:", profileByIdError)
-
-            // If user has email, try with that as last resort
-            if (userData.user.email) {
-              const { data: profileByEmailData, error: profileByEmailError } = await supabase
-                .from("miembros")
-                .select("*")
-                .eq("email", userData.user.email)
-                .single()
-
-              if (profileByEmailError) {
-                console.log("Profile fetch error with email:", profileByEmailError)
-                setProfile(null)
-              } else {
-                setProfile(profileByEmailData)
-              }
-            } else {
-              setProfile(null)
-            }
-          } else {
-            setProfile(profileByIdData)
-          }
-        } else {
-          setProfile(profileData)
+        
+        if (!userData.user) {
+          router.push("/login?redirect=/dashboard/membership")
+          return
         }
-
-        setLoading(false)
-      } catch (error: unknown) {
-        console.error("Error fetching user data:", error)
-        setError(error instanceof Error ? error.message : "Failed to load user data")
+        
+        setUser(userData.user)
+        
+        // Get membership data
+        try {
+          const { data: memberData, error: memberError } = await supabase
+            .from("miembros")
+            .select("*, subscriptions(*)")
+            .eq("user_uuid", userData.user.id)
+            .single()
+          
+          if (memberError) {
+            console.error("Error fetching membership:", memberError)
+            // Don't set error here, we'll show a fallback UI
+          } else {
+            setMembership(memberData)
+          }
+        } catch (err) {
+          console.error("Error in membership fetch:", err)
+          // Don't set error here, we'll show a fallback UI
+        }
+      } catch (err) {
+        console.error("Error in loadUserAndMembership:", err)
+        setError("Ocurrió un error al cargar los datos")
+      } finally {
         setLoading(false)
       }
     }
 
-    checkUser()
+    loadUserAndMembership()
   }, [router])
 
-  const handleCancelSubscription = async () => {
-    if (
-      !confirm("¿Estás seguro de que deseas cancelar tu membresía? Perderás acceso a todos los beneficios de socio.")
-    ) {
+  const handleManageSubscription = async () => {
+    if (!user || !membership?.stripe_customer_id) {
+      setError("No se encontró información de suscripción")
       return
     }
 
-    setCancelLoading(true)
-    setError(null)
-
     try {
-      if (!profile?.subscription_id) {
-        throw new Error("No hay una suscripción activa para cancelar")
+      setManagingSubscription(true)
+      const result = await createBillingPortalSession(membership.stripe_customer_id)
+      
+      if (result?.url) {
+        window.location.href = result.url
+      } else {
+        throw new Error("No se pudo crear la sesión del portal de facturación")
       }
-
-      // Call the cancelSubscription function without arguments as per its definition
-      const result = await cancelSubscription()
-
-      if (!result.success) {
-        throw new Error(result.error || "Error al cancelar la suscripción")
-      }
-
-      // Update local state
-      setProfile({
-        ...profile,
-        subscription_status: "cancelled",
-      })
-
-      setCancelSuccess(true)
-    } catch (error: unknown) {
-      console.error("Error cancelling subscription:", error)
-      setError(error instanceof Error ? error.message : "Failed to cancel subscription")
+    } catch (error) {
+      console.error("Error managing subscription:", error)
+      setError("No se pudo acceder al portal de facturación")
     } finally {
-      setCancelLoading(false)
+      setManagingSubscription(false)
     }
   }
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando...</p>
+          <p className="mt-4 text-gray-600">Cargando información de membresía...</p>
         </div>
       </div>
     )
   }
 
-  const subscriptionStatus = profile?.subscription_status || "inactive"
-  const subscriptionPlan = profile?.subscription_plan || null
-  const subscriptionUpdatedAt = profile?.subscription_updated_at
-    ? new Date(profile.subscription_updated_at).toLocaleDateString("es-ES", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-    : null
+  // Fallback UI when no membership data is available
+  if (!membership || !membership.subscriptions) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold">Membresía</h1>
+          <p className="text-gray-500">Gestiona tu membresía de la Peña Lorenzo Sanz</p>
+        </div>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <Card className="bg-gray-50 border-dashed">
+          <CardHeader>
+            <CardTitle>Información de Membresía</CardTitle>
+            <CardDescription>
+              Los ajustes de la membresía solo están disponibles a aquellos que dispongan de una
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                No tienes una membresía activa. Hazte socio para disfrutar de todos los beneficios.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+          <CardFooter className="flex justify-between">
+            <Button 
+              variant="outline" 
+              onClick={() => router.push("/dashboard")}
+              className="transition-colors hover:bg-primary hover:text-white"
+            >
+              Volver al Dashboard
+            </Button>
+            <Button 
+              onClick={() => router.push("/membership")}
+              className="transition-colors hover:bg-white hover:text-primary hover:border-primary"
+            >
+              Ver Planes de Membresía
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    )
+  }
+
+  const subscription = membership.subscriptions[0]
+  const isActive = subscription?.status === "active" || subscription?.status === "trialing"
+  const renewalDate = subscription?.current_period_end
+    ? new Date(subscription.current_period_end * 1000).toLocaleDateString("es-ES")
+    : "No disponible"
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-primary mb-2">Gestión de Membresía</h1>
-        <p className="text-gray-600">Administra tu suscripción y beneficios de socio</p>
+    <div className="space-y-6">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold">Membresía</h1>
+        <p className="text-gray-500">Gestiona tu membresía de la Peña Lorenzo Sanz</p>
       </div>
 
-      {error && (
-        <div className="flex justify-center w-full">
-          <Alert variant="destructive" className="mb-6 max-w-md">
-            <AlertDescription className="text-center">{error}</AlertDescription>
-          </Alert>
-        </div>
-      )}
-
-      {cancelSuccess && (
-        <Alert className="mb-6 bg-green-50 border-green-200">
+      {success && (
+        <Alert className="bg-green-50 border-green-200">
           <CheckCircle className="h-4 w-4 text-green-600" />
           <AlertDescription className="text-green-800">
-            Tu membresía ha sido cancelada correctamente. Seguirás teniendo acceso hasta el final del período de
-            facturación.
+            ¡Tu suscripción se ha procesado correctamente! Ya eres miembro oficial de la Peña Lorenzo Sanz.
           </AlertDescription>
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="md:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Estado de Membresía</CardTitle>
-              <CardDescription>Información sobre tu suscripción actual</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {subscriptionStatus === "active" ? (
-                <div className="space-y-6">
-                  <div className="flex items-center">
-                    <CheckCircle className="h-6 w-6 text-green-500 mr-2" />
-                    <div>
-                      <p className="font-medium text-green-600">Membresía Activa</p>
-                      <p className="text-sm text-gray-500">
-                        Tu membresía está activa y tienes acceso a todos los beneficios
-                      </p>
-                    </div>
-                  </div>
+      {canceled && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>El proceso de suscripción ha sido cancelado.</AlertDescription>
+        </Alert>
+      )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-b py-4">
-                    <div>
-                      <p className="text-sm text-gray-500">Plan de Membresía</p>
-                      <p className="font-medium">
-                        {subscriptionPlan === "annual" ? "Membresía Anual" : "Membresía Familiar"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Fecha de Activación</p>
-                      <p className="font-medium">{subscriptionUpdatedAt || "No disponible"}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Próxima Facturación</p>
-                      <p className="font-medium">
-                        {subscriptionUpdatedAt && profile?.subscription_updated_at
-                          ? new Date(
-                              new Date(profile.subscription_updated_at).setFullYear(
-                                new Date(profile.subscription_updated_at).getFullYear() + 1,
-                              ),
-                            ).toLocaleDateString("es-ES", {
-                              day: "numeric",
-                              month: "long",
-                              year: "numeric",
-                            })
-                          : "No disponible"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Método de Pago</p>
-                      <p className="font-medium flex items-center">
-                        <CreditCard className="h-4 w-4 mr-1" /> •••• •••• •••• {profile?.last_four || "****"}
-                      </p>
-                    </div>
-                  </div>
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-                  <div className="space-y-4">
-                    <h3 className="font-medium">Acciones</h3>
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      <Button
-                        variant="outline"
-                        className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                        onClick={handleCancelSubscription}
-                        disabled={cancelLoading}
-                      >
-                        {cancelLoading ? "Cancelando..." : "Cancelar Membresía"}
-                      </Button>
-                      <Button variant="outline">Actualizar Método de Pago</Button>
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      Al cancelar tu membresía, seguirás teniendo acceso hasta el final del período de facturación.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-                  <p className="text-gray-600 mb-4">
-                    No tienes una membresía activa. Para disfrutar de todos los beneficios, completa tu suscripción.
-                  </p>
-                  <Link href="/membership">
-                    <Button className="bg-primary hover:bg-secondary">Completar Suscripción</Button>
-                  </Link>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle>Estado de Membresía</CardTitle>
+            {isActive ? (
+              <Badge className="bg-green-500">Activa</Badge>
+            ) : (
+              <Badge variant="outline" className="text-red-500 border-red-200">
+                Inactiva
+              </Badge>
+            )}
+          </div>
+          <CardDescription>Detalles de tu membresía actual</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">Plan</h3>
+              <p className="text-lg font-semibold">{subscription?.plan?.name || "Plan Estándar"}</p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">Fecha de renovación</h3>
+              <p className="text-lg font-semibold">{renewalDate}</p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">Precio</h3>
+              <p className="text-lg font-semibold">
+                {subscription?.plan?.amount
+                  ? `${(subscription.plan.amount / 100).toFixed(2)}€ / ${
+                      subscription.plan.interval === "month" ? "mes" : "año"
+                    }`
+                  : "No disponible"}
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">Estado</h3>
+              <p className="text-lg font-semibold capitalize">
+                {subscription?.status === "active"
+                  ? "Activa"
+                  : subscription?.status === "trialing"
+                  ? "Periodo de prueba"
+                  : subscription?.status === "canceled"
+                  ? "Cancelada"
+                  : subscription?.status || "No disponible"}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="flex justify-end">
+          <Button 
+            onClick={handleManageSubscription} 
+            disabled={managingSubscription || !isActive}
+            className="transition-colors hover:bg-white hover:text-primary hover:border-primary"
+          >
+            {managingSubscription ? "Procesando..." : "Gestionar Suscripción"}
+          </Button>
+        </CardFooter>
+      </Card>
 
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Beneficios de Socio</CardTitle>
-              <CardDescription>Lo que incluye tu membresía</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-3">
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">Acceso a eventos exclusivos</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">Descuentos en viajes organizados</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">Participación en sorteos exclusivos</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">Contenido exclusivo en la web</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                  <span className="text-sm">Carnet oficial de socio</span>
-                </li>
-                {subscriptionPlan === "family" && (
-                  <>
-                    <li className="flex items-start">
-                      <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm">Válido para un menor y un adulto miembros de la familia</span>
-                    </li>
-                    <li className="flex items-start">
-                      <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm">Descuentos adicionales en eventos familiares</span>
-                    </li>
-                  </>
-                )}
-              </ul>
-
-              <div className="mt-6 pt-4 border-t">
-                <h3 className="font-medium mb-2">Próximos Eventos</h3>
-                {subscriptionStatus === "active" ? (
-                  <div className="space-y-3">
-                    <div className="flex items-start">
-                      <Calendar className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium">Cena Anual de Socios</p>
-                        <p className="text-xs text-gray-500">15 de diciembre, 2023</p>
-                      </div>
-                    </div>
-                    <Link href="/dashboard/events">
-                      <Button variant="outline" size="sm" className="w-full mt-2">
-                        Ver Todos los Eventos
-                      </Button>
-                    </Link>
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500">Activa tu membresía para ver eventos</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Beneficios de Membresía</CardTitle>
+          <CardDescription>Disfruta de estos beneficios exclusivos como miembro</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-2">
+            <li className="flex items-start">
+              <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+              <span>Acceso a eventos exclusivos organizados por la peña</span>
+            </li>
+            <li className="flex items-start">
+              <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+              <span>Descuentos en viajes organizados para ver partidos</span>
+            </li>
+            <li className="flex items-start">
+              <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+              <span>Participación en sorteos y promociones exclusivas</span>
+            </li>
+            <li className="flex items-start">
+              <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+              <span>Acceso al contenido exclusivo en nuestra web</span>
+            </li>
+            <li className="flex items-start">
+              <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+              <span>Carnet oficial de socio de la Peña Lorenzo Sanz</span>
+            </li>
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   )
 }

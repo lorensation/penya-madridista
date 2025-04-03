@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     const { data: member, error: memberError } = await supabase
       .from("miembros")
       .select("id")
-      .or(`user_id.eq.${userId},user_uuid.eq.${userId},auth_id.eq.${userId}`)
+      .or(`user_id.eq.${userId},user_uuid.eq.${userId},id.eq.${userId}`)
       .single()
 
     if (memberError) {

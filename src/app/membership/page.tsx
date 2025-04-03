@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -101,12 +102,12 @@ export default function Membership() {
             {membershipPlans.map((plan) => (
               <div
                 key={plan.id}
-                className={`bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transition-all ${
+                className={`bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transition-all flex flex-col h-full ${
                   plan.popular ? "border-2 border-secondary" : ""
                 } ${selectedPlan === plan.id ? "ring-2 ring-primary" : ""}`}
                 onClick={() => handleSelectPlan(plan.id)}
               >
-                <div className={`${plan.popular ? "bg-primary  text-white" : "bg-primary  text-white"} p-6 text-center relative`}>
+                <div className={`${plan.popular ? "bg-primary text-white" : "bg-primary text-white"} p-6 text-center relative`}>
                   {plan.popular && (
                     <div className="absolute top-0 right-0 bg-accent text-primary text-xs font-bold px-3 py-1 transform translate-y-2 rotate-45">
                       POPULAR
@@ -118,8 +119,8 @@ export default function Membership() {
                     <span className="text-sm font-normal">{plan.period}</span>
                   </p>
                 </div>
-                <div className="p-6">
-                  <ul className="space-y-4">
+                <div className="p-6 flex-grow flex flex-col">
+                  <ul className="space-y-4 mb-auto">
                     {plan.features.map((feature, index) => (
                       <li key={index} className="flex items-start">
                         <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
@@ -127,14 +128,14 @@ export default function Membership() {
                       </li>
                     ))}
                   </ul>
-                  <div className="mt-8">
+                  <div className="mt-8 pt-4">
                     <Button
                       className={`w-full ${
                         selectedPlan === plan.id
                           ? "bg-primary"
                           : plan.popular
-                            ? "bg-secondary hover:bg-primary"
-                            : "bg-primary hover:bg-secondary"
+                            ? "bg-gray-200 text-black hover:bg-primary hover:text-white"
+                            : "bg-gray-200 text-black hover:bg-primary hover:text-white"
                       }`}
                       onClick={() => handleSelectPlan(plan.id)}
                     >

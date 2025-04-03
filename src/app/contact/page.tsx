@@ -176,7 +176,7 @@ export default function Contact() {
                       className="mt-1 min-h-[150px]"
                     />
                   </div>
-                  <Button type="submit" className="w-full bg-primary hover:bg-secondary" disabled={loading}>
+                  <Button type="submit" className="w-full bg-primary hover:bg-secondary hover:text-black" disabled={loading}>
                     {loading ? "Enviando..." : "Enviar Mensaje"}
                   </Button>
                 </form>

@@ -34,15 +34,15 @@ interface Profile {
 const events: Event[] = [
   {
     id: 1,
-    title: "Cena Anual de Socios",
+    title: "Comida Anual de Socios",
     description:
-      "Cena de gala para celebrar el aniversario de la peña con la presencia de exjugadores del Real Madrid.",
+      "Comida para celebrar el establecimiento de la peña con la presencia de exjugadores del Real Madrid.",
     date: "2023-12-15",
     time: "20:00",
     location: "Hotel Meliá Castilla, Madrid",
     capacity: 150,
     available: 72,
-    image: "/placeholder.svg?height=200&width=400",
+    image: "/comida-socios-penya.jpg",
   },
   {
     id: 2,
@@ -54,7 +54,7 @@ const events: Event[] = [
     location: "París, Francia",
     capacity: 50,
     available: 8,
-    image: "/placeholder.svg?height=200&width=400",
+    image: "/psg-madrid-ucl.jpg",
   },
   {
     id: 3,
@@ -66,7 +66,7 @@ const events: Event[] = [
     location: "Sede de la Peña, Madrid",
     capacity: 80,
     available: 35,
-    image: "/placeholder.svg?height=200&width=400",
+    image: "/fernando-hierro.jpg",
   },
 ]
 

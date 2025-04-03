@@ -2,13 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import Image from "next/image"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { FileText, Video, Download, AlertTriangle } from "lucide-react"
+import { FileText, Video, Download, AlertTriangle, AlertCircle, CheckCircle } from "lucide-react"
 import type { Database } from "@/types/supabase"
 
 // Define types for our content
@@ -86,6 +85,7 @@ export default function ContentPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   // Initialize Supabase client
   const supabase = createClientComponentClient<Database>()
@@ -93,10 +93,31 @@ export default function ContentPage() {
   useEffect(() => {
     const checkUser = async () => {
       try {
+        // First check if user is authenticated
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+        
+        if (sessionError) {
+          console.error("Session error:", sessionError)
+          setLoading(false)
+          return router.push("/login")
+        }
+        
+        if (!sessionData.session) {
+          console.log("No active session found")
+          setLoading(false)
+          return router.push("/login")
+        }
+        
+        // User is authenticated, set state
+        setIsAuthenticated(true)
+        
+        // Now get the user data
         const { data: userData, error: userError } = await supabase.auth.getUser()
 
-        if (userError || !userData.user) {
-          router.push("/login")
+        if (userError) {
+          console.error("User fetch error:", userError)
+          setError("Error al obtener datos del usuario")
+          setLoading(false)
           return
         }
 
@@ -126,16 +147,24 @@ export default function ContentPage() {
     checkUser()
   }, [router, supabase])
 
-  const handleSubscribe = () => {
-    router.push("/membership")
-  }
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // If not authenticated, don't redirect, the useEffect will handle that
+  if (!isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-gray-600">Verificando sesión...</p>
         </div>
       </div>
     )
@@ -151,13 +180,122 @@ export default function ContentPage() {
             <AlertDescription className="text-red-800 text-center">{error}</AlertDescription>
           </Alert>
         </div>
-        <Button onClick={() => router.push("/dashboard")}>Volver al Dashboard</Button>
+        <Button 
+          onClick={() => router.push("/dashboard")}
+          className="transition-colors hover:bg-white hover:text-primary hover:border-primary"
+        >
+          Volver al Dashboard
+        </Button>
       </div>
     )
   }
 
   const subscriptionStatus = profile?.subscription_status || "inactive"
   const isSubscribed = subscriptionStatus === "active"
+
+  // Fallback UI for non-members
+  if (!isSubscribed) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold">Contenido Exclusivo</h1>
+          <p className="text-gray-500">Accede a contenido exclusivo disponible solo para socios</p>
+        </div>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <Card className="bg-gray-50 border-dashed">
+          <CardHeader>
+            <CardTitle>Contenido Premium</CardTitle>
+            <CardDescription>
+              El contenido exclusivo solo está disponible para miembros con suscripción activa
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                No tienes una membresía activa. Hazte socio para acceder a todo nuestro contenido exclusivo.
+              </AlertDescription>
+            </Alert>
+            
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold mb-3">¿Qué incluye nuestro contenido exclusivo?</h3>
+              <ul className="space-y-2">
+                <li className="flex items-start">
+                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                  <span>Entrevistas exclusivas con jugadores y leyendas del Real Madrid</span>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                  <span>Documentales sobre la historia del club y momentos históricos</span>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                  <span>Guías de viaje para visitar el Santiago Bernabéu y Madrid</span>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                  <span>Galerías de fotos históricas y material de archivo exclusivo</span>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                  <span>Análisis tácticos y contenido educativo sobre fútbol</span>
+                </li>
+              </ul>
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-between">
+            <Button 
+              variant="outline" 
+              onClick={() => router.push("/dashboard")}
+              className="transition-colors hover:bg-primary hover:text-white"
+            >
+              Volver al Dashboard
+            </Button>
+            <Button 
+              onClick={() => router.push("/membership")}
+              className="transition-colors hover:bg-white hover:text-primary hover:border-primary"
+            >
+              Ver Planes de Membresía
+            </Button>
+          </CardFooter>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Vista previa de contenido</CardTitle>
+            <CardDescription>Algunos ejemplos del contenido exclusivo disponible para miembros</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {exclusiveContent.slice(0, 3).map((content, index) => (
+                <div key={index} className="relative h-40 rounded-md overflow-hidden opacity-70 hover:opacity-60 transition-opacity">
+                  <Image 
+                    src={content.thumbnail} 
+                    alt={content.title} 
+                    fill 
+                    className="object-cover" 
+                  />
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <div className="text-white text-center p-4">
+                      <p className="font-medium">{content.title}</p>
+                      <p className="text-xs mt-1">Disponible con membresía</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -166,42 +304,13 @@ export default function ContentPage() {
         <p className="text-gray-600">Accede a contenido exclusivo disponible solo para socios</p>
       </div>
 
-      {!isSubscribed && (
-        <Alert className="mb-8 bg-yellow-50 border-yellow-200">
-          <AlertTriangle className="h-4 w-4 text-yellow-800" />
-          <AlertDescription className="text-yellow-800">
-            Para acceder al contenido exclusivo, necesitas tener una membresía activa.
-            <Link href="/membership" className="font-medium underline ml-1">
-              Completa tu suscripción
-            </Link>
-            .
-          </AlertDescription>
-        </Alert>
-      )}
-
       <Card className="p-4 border-black/5 mb-8">
-        {isSubscribed ? (
-          <CardHeader>
-            <CardTitle className="font-medium">Membresía Activa</CardTitle>
-            <CardDescription>
-              Tienes acceso completo a todo el contenido exclusivo de la Peña Madridista Lorenzo Sanz.
-            </CardDescription>
-          </CardHeader>
-        ) : (
-          <>
-            <CardHeader>
-              <CardTitle className="font-medium">Membresía Requerida</CardTitle>
-              <CardDescription>
-                Hazte socio para acceder a todo el contenido exclusivo de la Peña Madridista Lorenzo Sanz.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={handleSubscribe} className="w-full">
-                Suscribirse Ahora
-              </Button>
-            </CardContent>
-          </>
-        )}
+        <CardHeader>
+          <CardTitle className="font-medium">Membresía Activa</CardTitle>
+          <CardDescription>
+            Tienes acceso completo a todo el contenido exclusivo de la Peña Madridista Lorenzo Sanz.
+          </CardDescription>
+        </CardHeader>
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -246,14 +355,14 @@ export default function ContentPage() {
                   {content.type === "gallery" && `${content.images} imágenes`}
                 </span>
               </div>
-              <Button className="w-full" disabled={!isSubscribed}>
-                {isSubscribed
-                  ? content.type === "video"
-                    ? "Ver Video"
-                    : content.type === "pdf"
-                      ? "Descargar PDF"
-                      : "Ver Galería"
-                  : "Membresía Requerida"}
+              <Button 
+                className="w-full transition-colors hover:bg-white hover:text-primary hover:border-primary"
+              >
+                {content.type === "video"
+                  ? "Ver Video"
+                  : content.type === "pdf"
+                    ? "Descargar PDF"
+                    : "Ver Galería"}
               </Button>
             </CardContent>
           </Card>

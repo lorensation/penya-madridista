@@ -30,7 +30,7 @@ export function Header() {
           const { data: profileData } = await supabase
             .from("miembros")
             .select("name")
-            .eq("auth_id", data.user.id)
+            .eq("id", data.user.id)
             .single()
 
           setUser({

@@ -212,7 +212,7 @@ async function handleSuccessfulCheckout(session: Stripe.Checkout.Session, userId
           subscription_updated_at: new Date().toISOString(),
           stripe_customer_id: customerId,
         })
-        .or(`user_id.eq.${userId},user_uuid.eq.${userId},auth_id.eq.${userId},id.eq.${userId}`)
+        .or(`user_id.eq.${userId},user_uuid.eq.${userId},id.eq.${userId}`)
 
       if (error) {
         console.error("Error updating member subscription:", error)

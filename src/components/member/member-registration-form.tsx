@@ -75,7 +75,7 @@ export default function MemberRegistrationForm() {
   // Redirect if no user or session ID
   if (!user || !sessionId) {
     if (typeof window !== "undefined") {
-      router.push("/hazte-socio")
+      router.push("/membership")
     }
     return null
   }
