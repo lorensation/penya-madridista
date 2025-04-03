@@ -30,17 +30,32 @@ function SuccessContent() {
           return
         }
 
+        // First, fetch the session details from Stripe via our API
+        try {
+          const response = await fetch(`/api/checkout/session?session_id=${sessionId}`)
+          if (response.ok) {
+            const sessionData = await response.json()
+            console.log("Retrieved session data from Stripe:", sessionData)
+          }
+        } catch (stripeError) {
+          console.error("Error fetching Stripe session:", stripeError)
+          // Continue with the process even if this fails
+        }
+
         // Update the checkout session status
         await supabase
           .from("checkout_sessions")
-          .update({ status: "completed" })
+          .update({
+            status: "completed",
+            updated_at: new Date().toISOString(),
+          })
           .eq("session_id", sessionId)
           .eq("user_id", userData.user.id)
 
         // Update the user's subscription status in the profiles table
         const { data: checkoutData } = await supabase
           .from("checkout_sessions")
-          .select("plan_type")
+          .select("plan_type, subscription_id, customer_id, subscription_status")
           .eq("session_id", sessionId)
           .single()
 
@@ -57,9 +72,11 @@ function SuccessContent() {
             await supabase
               .from("miembros")
               .update({
-                subscription_status: "active",
+                subscription_status: checkoutData.subscription_status || "active",
                 subscription_plan: checkoutData.plan_type,
+                subscription_id: checkoutData.subscription_id,
                 subscription_updated_at: new Date().toISOString(),
+                stripe_customer_id: checkoutData.customer_id,
               })
               .eq("auth_id", userData.user.id)
           } else {
@@ -72,11 +89,7 @@ function SuccessContent() {
         setLoading(false)
       } catch (error: unknown) {
         console.error("Error updating subscription status:", error)
-        setError(
-          error instanceof Error 
-            ? error.message 
-            : "Failed to process subscription"
-        )
+        setError(error instanceof Error ? error.message : "Failed to process subscription")
         setLoading(false)
       }
     }

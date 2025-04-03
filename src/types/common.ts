@@ -84,6 +84,7 @@ export interface WebhookEvent {
 export interface MemberData {
   id?: string
   user_uuid?: string
+  auth_id?: string
   dni_pasaporte?: string
   name?: string
   apellido1?: string
@@ -102,6 +103,12 @@ export interface MemberData {
   provincia?: string
   pais?: string
   nacionalidad?: string
+  // Subscription related fields
+  subscription_status?: string
+  subscription_plan?: string
+  subscription_id?: string
+  subscription_updated_at?: string | Date
+  stripe_customer_id?: string
   [key: string]: unknown // Allow for additional properties
 }
 

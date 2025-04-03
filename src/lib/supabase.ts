@@ -154,6 +154,12 @@ export async function createMember(memberData: MemberData) {
     ...memberData,
     id: authUser.user.id,
     user_uuid: authUser.user.id,
+    auth_id: authUser.user.id, // Make sure auth_id is set too
+  }
+
+  // Set default subscription status if not provided
+  if (!memberDataWithIDs.subscription_status) {
+    memberDataWithIDs.subscription_status = "inactive"
   }
 
   // Convert string values to appropriate types based on schema
@@ -210,6 +216,30 @@ export async function createMember(memberData: MemberData) {
 
   if (error) {
     console.error("Error creating member:", error)
+  } else {
+    // If member was created successfully and we have subscription data,
+    // try to update the subscription status via the admin API
+    if (data && data.length > 0 && (memberDataWithIDs.subscription_id || memberDataWithIDs.stripe_customer_id)) {
+      try {
+        // Call the admin API to update subscription status
+        const response = await fetch("/api/admin/update-subscription", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: authUser.user.id,
+            // We don't need to pass subscriptionId as the API will find it
+          }),
+        })
+
+        if (!response.ok) {
+          console.error("Failed to update subscription via admin API:", await response.text())
+        }
+      } catch (subscriptionErr) {
+        console.error("Error calling subscription update API:", subscriptionErr)
+      }
+    }
   }
 
   return { data, error }

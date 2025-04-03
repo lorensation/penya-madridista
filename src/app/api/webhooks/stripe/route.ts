@@ -84,15 +84,19 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     }
 
     // If we still don't have a user ID, try to find it from the subscription
-    if (!userId && session.subscription) {
+    let subscriptionData = null
+    if (session.subscription) {
       const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
-      userId = subscription.metadata?.userId
-      console.log("Retrieved subscription metadata:", subscription.metadata)
+      subscriptionData = subscription
+
+      if (!userId) {
+        userId = subscription.metadata?.userId
+        console.log("Retrieved subscription metadata:", subscription.metadata)
+      }
 
       // If we found a user ID, update the subscription
       if (userId) {
         await updateSubscriptionStatus(subscription, userId)
-        return
       }
     }
 
@@ -101,6 +105,32 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // Instead of returning an error, we'll just log it and continue
       // This way the webhook won't be retried unnecessarily
       return
+    }
+
+    // Store the checkout session information in our database
+    const { getServiceSupabase } = await import("@/lib/supabase")
+    const supabase = getServiceSupabase()
+
+    // Store checkout session data
+    const { error: sessionError } = await supabase.from("checkout_sessions").upsert(
+      {
+        session_id: session.id,
+        user_id: userId,
+        customer_id: session.customer as string,
+        subscription_id: session.subscription as string,
+        status: session.status,
+        subscription_status: subscriptionData?.status || null,
+        plan_type: subscriptionData?.items.data[0]?.price.id || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "session_id",
+      },
+    )
+
+    if (sessionError) {
+      console.error("Error storing checkout session:", sessionError)
     }
 
     // Process the successful checkout

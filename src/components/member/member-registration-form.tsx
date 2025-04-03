@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { createMember } from "@/lib/supabase"
 import type { MemberData } from "@/types/common"
+import { supabase } from "@/lib/supabase"
 
 // Define a type for potential errors
 interface ErrorWithMessage {
@@ -64,6 +65,7 @@ export default function MemberRegistrationForm() {
     nacionalidad: "Española",
     id: user?.id || "",
     user_uuid: user?.id || "",
+    auth_id: user?.id || "",
   })
 
   const [loading, setLoading] = useState(false)
@@ -95,21 +97,90 @@ export default function MemberRegistrationForm() {
     })
   }
 
+  // Update the handleSubmit function to include retrieving and using Stripe data
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
 
     try {
+      // Get the session_id from the URL
+      const sessionId = searchParams.get("session_id")
+
       // Create member record in Supabase
-      const { error } = await createMember({
+      const memberDataToSave: MemberData = {
         ...formData,
         id: user.id,
         user_uuid: user.id,
-      })
+        auth_id: user.id,
+      }
+
+      // If we have a session_id, get the checkout session data and update subscription info
+      if (sessionId) {
+        try {
+          // Get checkout session data
+          const { data: checkoutData, error: checkoutError } = await supabase
+            .from("checkout_sessions")
+            .select("*")
+            .eq("session_id", sessionId)
+            .single()
+
+          if (!checkoutError && checkoutData) {
+            console.log("Found checkout session data:", checkoutData)
+
+            // Add subscription data to the member record
+            memberDataToSave.subscription_status = "active"
+            memberDataToSave.subscription_plan = checkoutData.plan_type
+            memberDataToSave.subscription_updated_at = new Date().toISOString()
+
+            // If we have a Stripe subscription ID in the checkout data
+            if (checkoutData.subscription_id) {
+              memberDataToSave.subscription_id = checkoutData.subscription_id
+            }
+
+            // If we have a Stripe customer ID in the checkout data
+            if (checkoutData.customer_id) {
+              memberDataToSave.stripe_customer_id = checkoutData.customer_id
+            }
+          } else {
+            console.log("No checkout data found for session ID:", sessionId)
+          }
+        } catch (checkoutErr) {
+          console.error("Error fetching checkout data:", checkoutErr)
+          // Continue with member creation even if checkout data fetch fails
+        }
+      }
+
+      const { error } = await createMember(memberDataToSave)
 
       if (error) {
         throw new Error(error.message)
+      }
+
+      // If we have a session_id, try to update the subscription status via the admin API
+      if (sessionId && user.id) {
+        try {
+          // Call the admin API to update subscription status
+          const response = await fetch("/api/admin/update-subscription", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              userId: user.id,
+              // We don't need to pass subscriptionId as the API will find it
+            }),
+          })
+
+          if (!response.ok) {
+            console.error("Failed to update subscription via admin API:", await response.text())
+          } else {
+            console.log("Successfully updated subscription via admin API")
+          }
+        } catch (subscriptionErr) {
+          console.error("Error calling subscription update API:", subscriptionErr)
+          // Continue with success flow even if this fails
+        }
       }
 
       setSuccess(true)
