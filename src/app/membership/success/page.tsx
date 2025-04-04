@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState } from "react"
@@ -12,90 +13,144 @@ function SuccessContent() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [redirectToProfile, setRedirectToProfile] = useState(false)
 
   useEffect(() => {
-    const updateSubscriptionStatus = async () => {
+    const processCheckoutSuccess = async () => {
       try {
         const sessionId = searchParams.get("session_id")
 
         if (!sessionId) {
-          router.push("/membership")
+          console.error("No session_id found in URL parameters")
+          setError("No session ID found. Please contact support.")
+          setLoading(false)
           return
         }
 
         // Get the user
-        const { data: userData } = await supabase.auth.getUser()
+        const { data: userData, error: userError } = await supabase.auth.getUser()
+        
+        if (userError) {
+          console.error("Error fetching user data:", userError)
+          setError("Failed to verify user. Please contact support.")
+          setLoading(false)
+          return
+        }
+        
         if (!userData.user) {
+          console.error("No user found in session")
           router.push("/login")
           return
         }
 
-        // First, fetch the session details from Stripe via our API
+        console.log("User authenticated:", userData.user.id)
+
+        // Fetch the session details from Stripe via our API
+        let sessionData
         try {
           const response = await fetch(`/api/checkout/session?session_id=${sessionId}`)
-          if (response.ok) {
-            const sessionData = await response.json()
-            console.log("Retrieved session data from Stripe:", sessionData)
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch session: ${response.statusText}`)
+          }
+          
+          sessionData = await response.json()
+          console.log("Retrieved session data from Stripe:", sessionData)
+          
+          if (!sessionData || !sessionData.session) {
+            throw new Error("Invalid session data returned from API")
           }
         } catch (stripeError) {
           console.error("Error fetching Stripe session:", stripeError)
-          // Continue with the process even if this fails
+          setError("Failed to verify payment status. Please contact support.")
+          setLoading(false)
+          return
         }
 
-        // Update the checkout session status
-        await supabase
-          .from("checkout_sessions")
-          .update({
-            status: "completed",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("session_id", sessionId)
-          .eq("user_id", userData.user.id)
+        // Check if the user already has a member profile
+        const { data: memberData, error: memberError } = await supabase
+          .from("miembros")
+          .select("id, auth_id")
+          .eq("auth_id", userData.user.id)
+          .single()
 
-        // Update the user's subscription status in the profiles table
-        const { data: checkoutData } = await supabase
+        if (memberError) {
+          // Only treat as an error if it's not the "no rows returned" error
+          if (memberError.code !== "PGRST116") {
+            console.error("Error checking member profile:", memberError)
+            setError("Failed to verify member status. Please contact support.")
+            setLoading(false)
+            return
+          }
+          
+          console.log("No member profile found, will redirect to complete profile")
+          setRedirectToProfile(true)
+          setLoading(false)
+          return
+        }
+
+        console.log("Member profile found:", memberData)
+
+        // Check if we have session data in our database
+        const { data: checkoutData, error: checkoutError } = await supabase
           .from("checkout_sessions")
           .select("plan_type, subscription_id, customer_id, subscription_status")
           .eq("session_id", sessionId)
           .single()
 
-        if (checkoutData) {
-          // Check if the user already has a member profile
-          const { data: memberData } = await supabase
-            .from("miembros")
-            .select("id, auth_id")
-            .eq("auth_id", userData.user.id)
-            .single()
-
-          if (memberData) {
-            // Update existing member record
-            await supabase
-              .from("miembros")
-              .update({
-                subscription_status: checkoutData.subscription_status || "active",
-                subscription_plan: checkoutData.plan_type,
-                subscription_id: checkoutData.subscription_id,
-                subscription_updated_at: new Date().toISOString(),
-                stripe_customer_id: checkoutData.customer_id,
-              })
-              .eq("auth_id", userData.user.id)
-          } else {
-            // If no member profile exists, redirect to the registration form
-            router.push(`/complete-profile?session_id=${sessionId}`)
-            return
-          }
+        if (checkoutError) {
+          console.error("Error fetching checkout session data:", checkoutError)
+          setError("Failed to retrieve subscription details. Please contact support.")
+          setLoading(false)
+          return
         }
 
+        if (!checkoutData) {
+          console.error("No checkout data found for session:", sessionId)
+          setError("Failed to retrieve subscription details. Please contact support.")
+          setLoading(false)
+          return
+        }
+
+        console.log("Checkout session data found:", checkoutData)
+
+        // Member profile exists, update it with subscription details
+        const { error: updateError } = await supabase
+          .from("miembros")
+          .update({
+            subscription_status: checkoutData.subscription_status || "active",
+            subscription_plan: checkoutData.plan_type,
+            subscription_id: checkoutData.subscription_id,
+            subscription_updated_at: new Date().toISOString(),
+            stripe_customer_id: checkoutData.customer_id,
+          })
+          .eq("auth_id", userData.user.id)
+
+        if (updateError) {
+          console.error("Error updating member profile:", updateError)
+          setError("Failed to update subscription details. Please contact support.")
+          setLoading(false)
+          return
+        }
+
+        console.log("Successfully updated member profile with subscription details")
         setLoading(false)
       } catch (error: unknown) {
-        console.error("Error updating subscription status:", error)
+        console.error("Error processing subscription:", error)
         setError(error instanceof Error ? error.message : "Failed to process subscription")
         setLoading(false)
       }
     }
 
-    updateSubscriptionStatus()
+    processCheckoutSuccess()
   }, [searchParams, router])
+
+  useEffect(() => {
+    if (redirectToProfile) {
+      const sessionId = searchParams.get("session_id")
+      router.push(`/complete-profile?session_id=${sessionId}`)
+    }
+  }, [redirectToProfile, router, searchParams])
 
   if (loading) {
     return (
