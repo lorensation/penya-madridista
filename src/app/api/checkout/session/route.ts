@@ -120,6 +120,7 @@ export async function GET(request: NextRequest) {
         subscription_id: subscriptionId,
         payment_status: session.payment_status,
         subscription_status: subscriptionStatus,
+        plan_type: existingSession?.plan_type || null,
       }
     })
   } catch (error) {

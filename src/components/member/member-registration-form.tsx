@@ -1,442 +1,314 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useAuth } from "@/context/AuthContext"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Checkbox } from "@/components/ui/checkbox"
-import { createMember } from "@/lib/supabase"
-import type { MemberData } from "@/types/common"
 import { supabase } from "@/lib/supabase"
+import { ProfileForm } from "@/components/profile-form"
+import { Loader2 } from "lucide-react"
 
-// Define a type for potential errors
-interface ErrorWithMessage {
-  message: string
+// Define types for checkout data
+interface CheckoutSessionData {
+  id: string
+  status: string
+  customer_id: string | null
+  subscription_id: string | null
+  payment_status: string
+  subscription_status: string | null
+  plan_type?: string
 }
 
-// Type guard to check if an error has a message property
-function isErrorWithMessage(error: unknown): error is ErrorWithMessage {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "message" in error &&
-    typeof (error as Record<string, unknown>).message === "string"
-  )
+// Import the ProfileFormValues type from the ProfileForm component
+// This avoids duplicating the schema definition
+type ProfileFormValues = {
+  name: string
+  apellido1: string
+  apellido2?: string
+  dni_pasaporte: string
+  telefono: string
+  fecha_nacimiento: string
+  direccion: string
+  direccion_extra?: string
+  poblacion: string
+  cp: string
+  provincia: string
+  pais: string
+  nacionalidad: string
+  es_socio_realmadrid: boolean
+  num_socio?: string
+  socio_carnet_madridista: boolean
+  num_carnet?: string
+  email_notifications: boolean
+  marketing_emails: boolean
 }
 
-// Function to extract error message from unknown error
-function getErrorMessage(error: unknown): string {
-  if (isErrorWithMessage(error)) {
-    return error.message
-  }
-  return String(error)
+// Define a type for the processed data as a separate type (not extending ProfileFormValues)
+// to avoid type conflicts with nullable fields
+interface ProcessedMemberData {
+  // Basic profile fields
+  name: string
+  apellido1: string
+  apellido2?: string
+  dni_pasaporte: string
+  telefono: string | null  // Can be null in processed data
+  fecha_nacimiento: string
+  direccion: string
+  direccion_extra?: string
+  poblacion: string
+  cp: string | null  // Can be null in processed data
+  provincia: string
+  pais: string
+  nacionalidad: string
+  es_socio_realmadrid: boolean
+  num_socio?: string | null  // Changed to optional AND nullable to match usage
+  socio_carnet_madridista: boolean
+  num_carnet?: string | null  // Changed to optional AND nullable to match usage
+  email_notifications: boolean
+  marketing_emails: boolean
+  
+  // Additional fields
+  id: string
+  email: string | undefined
+  created_at: string
+  
+  // Subscription fields
+  subscription_status?: string
+  subscription_plan?: string
+  subscription_id?: string
+  subscription_updated_at?: string
+  stripe_customer_id?: string
 }
 
 export default function MemberRegistrationForm() {
-  const { user } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get("session_id")
-
-  const [formData, setFormData] = useState<MemberData>({
-    dni_pasaporte: "",
-    name: "",
-    apellido1: "",
-    apellido2: "",
-    telefono: "",
-    email: user?.email || "",
-    fecha_nacimiento: "",
-    es_socio_realmadrid: false,
-    num_socio: "",
-    socio_carnet_madridista: false,
-    num_carnet: "",
-    direccion: "",
-    direccion_extra: "",
-    poblacion: "",
-    cp: "",
-    provincia: "",
-    pais: "España",
-    nacionalidad: "Española",
-    // Set the ID fields correctly
-    id: user?.id, // This links to auth.users(id)
-    user_uuid: user?.id, // This links to users(id)
-  })
-
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+  const [checkoutData, setCheckoutData] = useState<CheckoutSessionData | null>(null)
 
-  // Redirect if no user or session ID
-  if (!user || !sessionId) {
-    if (typeof window !== "undefined") {
-      router.push("/membership")
-    }
-    return null
-  }
+  useEffect(() => {
+    async function checkUserAndSession() {
+      try {
+        // Get the current user
+        const { data: userData, error: userError } = await supabase.auth.getUser()
+        
+        if (userError || !userData.user) {
+          console.error("Authentication error:", userError)
+          router.push("/login?redirect=/complete-profile" + (sessionId ? `?session_id=${sessionId}` : ""))
+          return
+        }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target
+        const userId = userData.user.id
 
-    // For numeric fields, ensure we're only accepting numbers
-    if (["telefono", "cp", "num_socio", "num_carnet"].includes(name) && value !== "") {
-      // Only allow numeric input for these fields
-      if (!/^\d*$/.test(value)) {
-        return // Ignore non-numeric input
+        // Check if the user already has a profile in the miembros table
+        const { data: memberData, error: memberError } = await supabase
+          .from("miembros")
+          .select("*")
+          .eq("id", userId)
+          .maybeSingle()
+
+        if (memberError && memberError.code !== "PGRST116") {
+          console.error("Error checking for existing profile:", memberError)
+          setError("Error checking for existing profile. Please try again.")
+          setLoading(false)
+          return
+        }
+
+        // If user already has a profile
+        if (memberData) {
+          // If there's a session_id, we need to update the profile with subscription info
+          if (sessionId) {
+            try {
+              // Fetch checkout session data
+              const response = await fetch(`/api/checkout/session?session_id=${sessionId}`)
+              if (!response.ok) {
+                throw new Error(`Failed to fetch session: ${response.statusText}`)
+              }
+              
+              const sessionData = await response.json()
+              setCheckoutData(sessionData.session)
+              
+              // Update the member profile with subscription details
+              if (sessionData.success) {
+                const { error: updateError } = await supabase
+                  .from("miembros")
+                  .update({
+                    subscription_status: sessionData.session.subscription_status || "active",
+                    subscription_plan: sessionData.session.plan_type,
+                    subscription_id: sessionData.session.subscription_id,
+                    subscription_updated_at: new Date().toISOString(),
+                    stripe_customer_id: sessionData.session.customer_id,
+                  })
+                  .eq("id", userId)
+
+                if (updateError) {
+                  console.error("Error updating subscription details:", updateError)
+                  setError("Failed to update subscription details. Please contact support.")
+                } else {
+                  // Redirect to dashboard after successful update
+                  router.push("/dashboard?subscription=success")
+                }
+              }
+            } catch (sessionError) {
+              console.error("Error processing session:", sessionError)
+              setError("Failed to process subscription information. Please contact support.")
+            }
+          } else {
+            // No session_id, just redirect to dashboard
+            router.push("/dashboard")
+          }
+        } else {
+          // No existing profile, continue with form
+          if (sessionId) {
+            // If there's a session_id, fetch the checkout data
+            try {
+              const response = await fetch(`/api/checkout/session?session_id=${sessionId}`)
+              if (!response.ok) {
+                throw new Error(`Failed to fetch session: ${response.statusText}`)
+              }
+              
+              const sessionData = await response.json()
+              setCheckoutData(sessionData.session)
+            } catch (sessionError) {
+              console.error("Error fetching session:", sessionError)
+              // Continue anyway, we'll just not have the checkout data
+            }
+          }
+          
+          setLoading(false)
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred"
+        console.error("Error in profile setup:", errorMessage)
+        setError("An unexpected error occurred. Please try again.")
+        setLoading(false)
       }
     }
 
-    setFormData({
-      ...formData,
-      [name]: type === "checkbox" ? checked : value,
-    })
-  }
+    checkUserAndSession()
+  }, [router, sessionId])
 
-  // Update the handleSubmit function to include retrieving and using Stripe data
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
-
+  const handleProfileSubmit = async (formData: ProfileFormValues) => {
     try {
-      // Get the session_id from the URL
-      const sessionId = searchParams.get("session_id")
-
-      // Create member record in Supabase
-      const memberDataToSave: MemberData = {
-        ...formData,
-        id: user.id, // This links to auth.users(id)
-        user_uuid: user.id, // This links to users(id)
+      setLoading(true)
+      
+      // Get the current user
+      const { data: userData } = await supabase.auth.getUser()
+      if (!userData.user) {
+        throw new Error("User not authenticated")
       }
 
-      // If we have a session_id, get the checkout session data and update subscription info
-      if (sessionId) {
-        try {
-          // Get checkout session data
-          const { data: checkoutData, error: checkoutError } = await supabase
-            .from("checkout_sessions")
-            .select("*")
-            .eq("session_id", sessionId)
-            .single()
-
-          if (!checkoutError && checkoutData) {
-            console.log("Found checkout session data:", checkoutData)
-
-            // Add subscription data to the member record
-            memberDataToSave.subscription_status = "active"
-            memberDataToSave.subscription_plan = checkoutData.plan_type
-            memberDataToSave.subscription_updated_at = new Date().toISOString()
-
-            // If we have a Stripe subscription ID in the checkout data
-            if (checkoutData.subscription_id) {
-              memberDataToSave.subscription_id = checkoutData.subscription_id
-            }
-
-            // If we have a Stripe customer ID in the checkout data
-            if (checkoutData.customer_id) {
-              memberDataToSave.stripe_customer_id = checkoutData.customer_id
-            }
-          } else {
-            console.log("No checkout data found for session ID:", sessionId)
-          }
-        } catch (checkoutErr) {
-          console.error("Error fetching checkout data:", checkoutErr)
-          // Continue with member creation even if checkout data fetch fails
-        }
+      // Prepare the member data with proper typing
+      const processedData: ProcessedMemberData = {
+        // Copy all the basic fields from formData
+        name: formData.name,
+        apellido1: formData.apellido1,
+        apellido2: formData.apellido2,
+        dni_pasaporte: formData.dni_pasaporte,
+        fecha_nacimiento: formData.fecha_nacimiento,
+        direccion: formData.direccion,
+        direccion_extra: formData.direccion_extra,
+        poblacion: formData.poblacion,
+        provincia: formData.provincia,
+        pais: formData.pais,
+        nacionalidad: formData.nacionalidad,
+        es_socio_realmadrid: formData.es_socio_realmadrid,
+        socio_carnet_madridista: formData.socio_carnet_madridista,
+        email_notifications: formData.email_notifications,
+        marketing_emails: formData.marketing_emails,
+        
+        // Handle fields that can be null
+        telefono: formData.telefono || null,
+        cp: formData.cp || null,
+        
+        // For optional fields that can also be null, use undefined instead of null
+        // when the condition isn't met (this fixes the type error)
+        num_socio: formData.es_socio_realmadrid ? formData.num_socio : undefined,
+        num_carnet: formData.socio_carnet_madridista ? formData.num_carnet : undefined,
+        
+        // Add user ID and email
+        id: userData.user.id,
+        email: userData.user.email,
+        created_at: new Date().toISOString(),
       }
 
-      const { error } = await createMember(memberDataToSave)
-
-      if (error) {
-        throw new Error(error.message)
+      // If we have checkout data, add subscription details
+      if (checkoutData) {
+        processedData.subscription_status = checkoutData.subscription_status || "active"
+        processedData.subscription_plan = checkoutData.plan_type
+        processedData.subscription_id = checkoutData.subscription_id ?? undefined
+        processedData.subscription_updated_at = new Date().toISOString()
+        processedData.stripe_customer_id = checkoutData.customer_id ?? undefined
       }
 
-      // If we have a session_id, try to update the subscription status via the admin API
-      if (sessionId && user.id) {
-        try {
-          // Call the admin API to update subscription status
-          const response = await fetch("/api/admin/update-subscription", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              userId: user.id,
-              // We don't need to pass subscriptionId as the API will find it
-            }),
-          })
+      // Insert the new member profile
+      const { error: insertError } = await supabase
+        .from("miembros")
+        .insert(processedData)
 
-          if (!response.ok) {
-            console.error("Failed to update subscription via admin API:", await response.text())
-          } else {
-            console.log("Successfully updated subscription via admin API")
-          }
-        } catch (subscriptionErr) {
-          console.error("Error calling subscription update API:", subscriptionErr)
-          // Continue with success flow even if this fails
-        }
+      if (insertError) {
+        console.error("Error creating profile:", insertError)
+        setError("Failed to create your profile. Please try again.")
+        setLoading(false)
+        return
       }
 
-      setSuccess(true)
-      setTimeout(() => {
-        router.push("/dashboard")
-      }, 3000)
-    } catch (err: unknown) {
-      setError(getErrorMessage(err) || "Ocurrió un error al registrar tus datos")
-      console.error(err)
-    } finally {
+      // Redirect to dashboard
+      router.push("/dashboard?profile=created")
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred"
+      console.error("Error submitting profile:", errorMessage)
+      setError("An error occurred while saving your profile. Please try again.")
       setLoading(false)
     }
   }
 
-  if (success) {
+  if (loading) {
     return (
-      <Card className="w-full max-w-3xl mx-auto">
-        <CardHeader>
-          <CardTitle>¡Registro completado!</CardTitle>
-          <CardDescription>
-            Tus datos han sido registrados correctamente. Ya eres miembro oficial de la Peña Madridista.
-          </CardDescription>
-        </CardHeader>
-        <CardFooter>
-          <Button asChild className="w-full">
-            <a href="/dashboard">Ir al panel de control</a>
-          </Button>
-        </CardFooter>
-      </Card>
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+          <p className="mt-4 text-gray-600">Cargando tu perfil...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
+          <div className="text-red-500 mx-auto h-12 w-12">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-red-600">Error</h2>
+          <p className="mt-2 text-center text-sm text-gray-600">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-6 w-full bg-primary text-white py-2 px-4 rounded hover:bg-secondary"
+          >
+            Intentar de nuevo
+          </button>
+        </div>
+      </div>
     )
   }
 
   return (
-    <Card className="w-full max-w-3xl mx-auto">
-      <CardHeader>
-        <CardTitle>Registro de Socio</CardTitle>
-        <CardDescription>
-          Completa tus datos para finalizar el registro como miembro de la Peña Madridista
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="dni_pasaporte">DNI/Pasaporte *</Label>
-              <Input
-                id="dni_pasaporte"
-                name="dni_pasaporte"
-                value={formData.dni_pasaporte}
-                onChange={handleChange}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="name">Nombre *</Label>
-              <Input id="name" name="name" value={formData.name} onChange={handleChange} required />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="apellido1">Primer Apellido *</Label>
-              <Input id="apellido1" name="apellido1" value={formData.apellido1} onChange={handleChange} required />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="apellido2">Segundo Apellido</Label>
-              <Input id="apellido2" name="apellido2" value={formData.apellido2} onChange={handleChange} />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="telefono">Teléfono *</Label>
-              <Input
-                id="telefono"
-                name="telefono"
-                value={formData.telefono?.toString() || ""}
-                onChange={handleChange}
-                required
-                type="tel"
-                pattern="[0-9]*"
-                inputMode="numeric"
-                placeholder="Solo números"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                readOnly
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="fecha_nacimiento">Fecha de Nacimiento *</Label>
-              <Input
-                id="fecha_nacimiento"
-                name="fecha_nacimiento"
-                type="date"
-                value={formData.fecha_nacimiento as string}
-                onChange={handleChange}
-                required
-              />
-            </div>
-
-            {/* Membership section */}
-            <div className="md:col-span-2 pt-4 border-t">
-              <h3 className="text-lg font-medium mb-4">Información de membresía</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2 flex items-center">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="es_socio_realmadrid"
-                      name="es_socio_realmadrid"
-                      checked={formData.es_socio_realmadrid}
-                      onCheckedChange={(checked) =>
-                        setFormData({
-                          ...formData,
-                          es_socio_realmadrid: checked as boolean,
-                        })
-                      }
-                    />
-                    <Label htmlFor="es_socio_realmadrid">¿Eres socio del Real Madrid?</Label>
-                  </div>
-                </div>
-
-                <div className="space-y-2 flex items-center">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="socio_carnet_madridista"
-                      name="socio_carnet_madridista"
-                      checked={formData.socio_carnet_madridista}
-                      onCheckedChange={(checked) =>
-                        setFormData({
-                          ...formData,
-                          socio_carnet_madridista: checked as boolean,
-                        })
-                      }
-                    />
-                    <Label htmlFor="socio_carnet_madridista">¿Tienes Carnet Madridista?</Label>
-                  </div>
-                </div>
-
-                {formData.es_socio_realmadrid && (
-                  <div className="space-y-2">
-                    <Label htmlFor="num_socio">Número de Socio Real Madrid *</Label>
-                    <Input
-                      id="num_socio"
-                      name="num_socio"
-                      value={formData.num_socio?.toString() || ""}
-                      onChange={handleChange}
-                      required={formData.es_socio_realmadrid}
-                      placeholder="Introduce tu número de socio"
-                      type="text"
-                      pattern="[0-9]*"
-                      inputMode="numeric"
-                    />
-                  </div>
-                )}
-
-                {formData.socio_carnet_madridista && (
-                  <div className="space-y-2">
-                    <Label htmlFor="num_carnet">Número de Carnet Madridista *</Label>
-                    <Input
-                      id="num_carnet"
-                      name="num_carnet"
-                      value={formData.num_carnet?.toString() || ""}
-                      onChange={handleChange}
-                      required={formData.socio_carnet_madridista}
-                      placeholder="Introduce tu número de Carnet Madridista"
-                      type="text"
-                      pattern="[0-9]*"
-                      inputMode="numeric"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Address section */}
-            <div className="md:col-span-2 pt-4 border-t">
-              <h3 className="text-lg font-medium mb-4">Dirección</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="direccion">Dirección *</Label>
-                  <Input id="direccion" name="direccion" value={formData.direccion} onChange={handleChange} required />
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="direccion_extra">Dirección (línea 2)</Label>
-                  <Input
-                    id="direccion_extra"
-                    name="direccion_extra"
-                    value={formData.direccion_extra}
-                    onChange={handleChange}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="poblacion">Población *</Label>
-                  <Input id="poblacion" name="poblacion" value={formData.poblacion} onChange={handleChange} required />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="cp">Código Postal *</Label>
-                  <Input
-                    id="cp"
-                    name="cp"
-                    value={formData.cp?.toString() || ""}
-                    onChange={handleChange}
-                    required
-                    type="text"
-                    pattern="[0-9]*"
-                    inputMode="numeric"
-                    placeholder="Solo números"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="provincia">Provincia *</Label>
-                  <Input id="provincia" name="provincia" value={formData.provincia} onChange={handleChange} required />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="pais">País *</Label>
-                  <Input id="pais" name="pais" value={formData.pais} onChange={handleChange} required />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="nacionalidad">Nacionalidad *</Label>
-                  <Input
-                    id="nacionalidad"
-                    name="nacionalidad"
-                    value={formData.nacionalidad}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-              </div>
-            </div>
+    <div className="container mx-auto py-10">
+      <div className="max-w-3xl mx-auto">
+        <h1 className="text-3xl font-bold mb-6 text-center">Completa tu Perfil de Socio</h1>
+        {checkoutData && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
+            <p className="text-green-700 font-medium">
+              ¡Tu pago ha sido procesado correctamente! Por favor, completa tu perfil para activar tu membresía.
+            </p>
           </div>
-
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Procesando..." : "Completar registro"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        )}
+        <ProfileForm onSubmit={handleProfileSubmit} />
+      </div>
+    </div>
   )
 }

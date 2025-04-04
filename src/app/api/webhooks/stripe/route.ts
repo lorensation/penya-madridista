@@ -106,7 +106,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     // Find the user associated with this subscription
     const { data: memberData, error: memberError } = await serviceRoleClient
       .from("miembros")
-      .select("auth_id")
+      .select("id")
       .eq("subscription_id", subscription.id)
       .single()
 
@@ -116,7 +116,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     }
 
     // Log the member data for debugging
-    console.log(`Updating subscription status for member with auth_id: ${memberData.auth_id}`)
+    console.log(`Updating subscription status for member with id: ${memberData.id}`)
 
     // Update the member's subscription status
     const { error: updateMemberError } = await serviceRoleClient
