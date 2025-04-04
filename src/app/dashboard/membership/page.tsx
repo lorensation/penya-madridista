@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -10,14 +9,37 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { createBillingPortalSession } from "@/app/actions/stripe"
 import { supabase } from "@/lib/supabase-client"
 import { CheckCircle, AlertCircle } from "lucide-react"
+import { User } from "@supabase/supabase-js"
+
+// Define types for subscription and membership data
+interface SubscriptionPlan {
+  name?: string
+  amount?: number
+  interval?: "month" | "year"
+}
+
+interface Subscription {
+  id: string
+  status?: "active" | "trialing" | "canceled" | "incomplete" | "past_due"
+  current_period_end?: number
+  plan?: SubscriptionPlan
+}
+
+interface Membership {
+  id: string
+  user_uuid: string
+  stripe_customer_id?: string
+  subscriptions: Subscription[]
+  // Add other membership fields as needed
+}
 
 export default function MembershipPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [membership, setMembership] = useState<any>(null)
-  const [user, setUser] = useState<any>(null)
+  const [membership, setMembership] = useState<Membership | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [managingSubscription, setManagingSubscription] = useState(false)
 
   const success = searchParams?.get("success") === "true"
@@ -68,7 +90,7 @@ export default function MembershipPage() {
             console.error("Error fetching membership:", memberError)
             // Don't set error here, we'll show a fallback UI
           } else {
-            setMembership(memberData)
+            setMembership(memberData as Membership)
           }
         } catch (err) {
           console.error("Error in membership fetch:", err)

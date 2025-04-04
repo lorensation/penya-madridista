@@ -91,60 +91,92 @@ export default function ContentPage() {
   const supabase = createClientComponentClient<Database>()
 
   useEffect(() => {
+    let isMounted = true; // Flag to prevent state updates after unmount
+    
     const checkUser = async () => {
       try {
-        // First check if user is authenticated
+        // First check if user is authenticated - using getSession instead of directly checking for user
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
         
         if (sessionError) {
           console.error("Session error:", sessionError)
-          setLoading(false)
-          return router.push("/login")
+          if (isMounted) {
+            setError("Error al verificar la sesión")
+            setLoading(false)
+          }
+          return
         }
         
         if (!sessionData.session) {
           console.log("No active session found")
-          setLoading(false)
-          return router.push("/login")
+          if (isMounted) {
+            setLoading(false)
+            router.push("/login")
+          }
+          return
         }
         
         // User is authenticated, set state
-        setIsAuthenticated(true)
-        
-        // Now get the user data
-        const { data: userData, error: userError } = await supabase.auth.getUser()
-
-        if (userError) {
-          console.error("User fetch error:", userError)
-          setError("Error al obtener datos del usuario")
-          setLoading(false)
-          return
+        if (isMounted) {
+          setIsAuthenticated(true)
         }
-
-        // Fetch user profile
+        
+        // Now get the user data using the session's user
+        const userId = sessionData.session.user.id;
+        
+        // Fetch user profile directly using the session's user ID
         const { data: profileData, error: profileError } = await supabase
           .from("miembros")
           .select("*")
-          .eq("auth_id", userData.user.id)
+          .eq("auth_id", userId)
           .single()
 
         if (profileError) {
           console.log("Profile fetch error:", profileError)
           // Don't throw error, just set profile to null
-          setProfile(null)
-        } else {
+          if (isMounted) {
+            setProfile(null)
+          }
+        } else if (isMounted) {
           setProfile(profileData as Profile)
         }
       } catch (err: unknown) {
         const errorMsg = err instanceof Error ? err.message : "Failed to load user data"
         console.error("Error fetching user data:", err)
-        setError(errorMsg)
+        if (isMounted) {
+          setError(errorMsg)
+        }
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
     checkUser()
+    
+    // Cleanup function to prevent state updates after component unmount
+    return () => {
+      isMounted = false;
+    }
+  }, [router, supabase])
+
+  // Add a listener for auth state changes
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          setIsAuthenticated(true)
+        } else if (event === 'SIGNED_OUT') {
+          setIsAuthenticated(false)
+          router.push('/login')
+        }
+      }
+    )
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [router, supabase])
 
   if (loading) {
@@ -158,13 +190,14 @@ export default function ContentPage() {
     )
   }
 
-  // If not authenticated, don't redirect, the useEffect will handle that
+  // If not authenticated, show loading while redirecting
   if (!isAuthenticated) {
+    router.push("/login")
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-gray-600">Verificando sesión...</p>
+          <p className="mt-4 text-gray-600">Redirigiendo al inicio de sesión...</p>
         </div>
       </div>
     )
@@ -259,7 +292,7 @@ export default function ContentPage() {
               Volver al Dashboard
             </Button>
             <Button 
-              onClick={() => router.push("/membership")}
+              onClick={() => router.push("/dashboard/membership")}
               className="transition-colors hover:bg-white hover:text-primary hover:border-primary"
             >
               Ver Planes de Membresía

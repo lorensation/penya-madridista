@@ -1,24 +1,77 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Users, Search, UserCheck, UserX, MoreHorizontal, ChevronLeft, ChevronRight } from "lucide-react"
+import { Users, Search, UserCheck, UserX, MoreHorizontal, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { supabase } from "@/lib/supabase-client"
 import type { UserProfile } from "@/types/common"
 
+// Add route segment config to mark this route as dynamic
+export const dynamic = 'force-dynamic'
+
 export default function AdminUsersPage() {
+  const router = useRouter()
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [authChecking, setAuthChecking] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
   const usersPerPage = 10
+
+  // Check if user is admin on client side
+  useEffect(() => {
+    async function checkAdminStatus() {
+      try {
+        // Get current user
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        
+        if (userError || !user) {
+          console.error("Authentication error:", userError)
+          router.push("/login?redirect=/admin/users")
+          return
+        }
+        
+        // Check if user has admin role
+        const { data: profile, error: profileError } = await supabase
+          .from('miembros')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        
+        if (profileError) {
+          console.error("Error fetching profile:", profileError)
+          router.push("/dashboard")
+          return
+        }
+        
+        if (profile?.role !== 'admin') {
+          console.log("Non-admin user attempting to access admin page")
+          router.push("/dashboard")
+          return
+        }
+        
+        setIsAdmin(true)
+        setAuthChecking(false)
+      } catch (err) {
+        console.error("Error checking admin status:", err)
+        router.push("/dashboard")
+      }
+    }
+    
+    checkAdminStatus()
+  }, [router])
 
   // Use useCallback to memoize the fetchUsers function
   const fetchUsers = useCallback(async () => {
+    if (!isAdmin || authChecking) return;
+    
     try {
       setLoading(true)
 
@@ -42,18 +95,20 @@ export default function AdminUsersPage() {
       }
 
       setUsers(filteredUsers)
-      setTotalPages(Math.ceil(filteredUsers.length / usersPerPage))
+      setTotalPages(Math.ceil(data.total / usersPerPage))
       setLoading(false)
     } catch (error) {
       console.error("Error fetching users:", error)
       setError(error instanceof Error ? error.message : "Failed to load users")
       setLoading(false)
     }
-  }, [currentPage, searchQuery, usersPerPage])
+  }, [currentPage, searchQuery, usersPerPage, isAdmin, authChecking])
 
   useEffect(() => {
-    fetchUsers()
-  }, [fetchUsers])
+    if (isAdmin && !authChecking) {
+      fetchUsers()
+    }
+  }, [fetchUsers, isAdmin, authChecking])
 
   const handleUpdateUserRole = async (userId: string, role: string) => {
     try {
@@ -83,6 +138,30 @@ export default function AdminUsersPage() {
       month: "long",
       year: "numeric",
     })
+  }
+
+  // Show loading state while checking authentication
+  if (authChecking) {
+    return (
+      <div className="container mx-auto py-10 flex justify-center items-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-gray-600">Verificando permisos de administrador...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // If not admin, this will redirect (handled in useEffect)
+  if (!isAdmin) {
+    return (
+      <div className="container mx-auto py-10">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>No tienes permisos para acceder a esta página</AlertDescription>
+        </Alert>
+      </div>
+    )
   }
 
   return (
@@ -241,4 +320,3 @@ export default function AdminUsersPage() {
     </div>
   )
 }
-
