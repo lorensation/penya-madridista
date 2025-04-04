@@ -159,7 +159,7 @@ export default function EventsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {events.map((event) => (
-          <Card key={event.id} className="overflow-hidden">
+          <Card key={event.id} className="overflow-hidden flex flex-col h-full">
             <div className="relative h-48">
               <Image src={event.image || "/placeholder.svg"} alt={event.title} fill className="object-cover" />
             </div>
@@ -167,7 +167,7 @@ export default function EventsPage() {
               <CardTitle>{event.title}</CardTitle>
               <CardDescription>{event.description}</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex flex-col flex-grow">
               <div className="space-y-3 mb-4">
                 <div className="flex items-start">
                   <Calendar className="h-4 w-4 text-primary mr-2 mt-0.5" />
@@ -194,7 +194,7 @@ export default function EventsPage() {
                   </span>
                 </div>
               </div>
-              <Button className="w-full bg-primary hover:bg-secondary" disabled={subscriptionStatus !== "active"}>
+              <Button className="w-full transition-all mt-auto bg-primary hover:bg-secondary" disabled={subscriptionStatus !== "active"}>
                 {subscriptionStatus === "active" ? "Reservar Plaza" : "Membresía Requerida"}
               </Button>
             </CardContent>

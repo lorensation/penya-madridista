@@ -196,7 +196,7 @@ export default function NewBlogPostPage() {
           </div>
 
           <div className="flex justify-end">
-            <Button type="submit" className="bg-primary hover:bg-secondary" disabled={saving}>
+            <Button type="submit" className="transition-all bg-black text-white hover:bg-white hover:text-primary hover:border hover:border-black" disabled={saving}>
               {saving ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>

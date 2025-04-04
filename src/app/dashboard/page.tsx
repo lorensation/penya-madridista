@@ -117,14 +117,14 @@ export default function Dashboard() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card>
+        <Card className="flex flex-col h-full">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium flex items-center">
               <CreditCard className="mr-2 h-5 w-5 text-primary" />
               Estado de Membresía
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col flex-grow">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Estado</p>
@@ -136,11 +136,6 @@ export default function Dashboard() {
                   )}
                 </p>
               </div>
-              <Link href="/dashboard/membership">
-                <Button variant="outline" size="sm" className="text-xs">
-                  Ver Detalles
-                </Button>
-              </Link>
             </div>
             {subscriptionStatus === "active" && subscriptionPlan && (
               <div className="mt-2">
@@ -150,23 +145,38 @@ export default function Dashboard() {
                 </p>
               </div>
             )}
+            <div className="mt-auto pt-4">
+              <Link href="/dashboard/membership" className="w-full block">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-xs w-full transition-all border-black hover:bg-primary hover:text-white hover:border hover:border-black"
+                >
+                  Ver Detalles
+                </Button>
+              </Link>
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex flex-col h-full">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium flex items-center">
               <Calendar className="mr-2 h-5 w-5 text-primary" />
               Próximos Eventos
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col flex-grow">
             <p className="text-sm text-gray-500">
               {subscriptionStatus === "active" ? "No hay eventos próximos" : "Activa tu membresía para ver eventos"}
             </p>
-            <div className="mt-4">
-              <Link href="/dashboard/events">
-                <Button variant="outline" size="sm" className="text-xs w-full">
+            <div className="mt-auto pt-4">
+              <Link href="/dashboard/events" className="w-full block">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-xs w-full transition-all border-black hover:bg-primary hover:text-white hover:border hover:border-black"
+                >
                   Ver Todos los Eventos
                 </Button>
               </Link>
@@ -174,22 +184,26 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex flex-col h-full">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium flex items-center">
               <FileText className="mr-2 h-5 w-5 text-primary" />
               Contenido Exclusivo
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col flex-grow">
             <p className="text-sm text-gray-500">
               {subscriptionStatus === "active"
                 ? "Accede a contenido exclusivo"
                 : "Activa tu membresía para ver contenido"}
             </p>
-            <div className="mt-4">
-              <Link href="/dashboard/content">
-                <Button variant="outline" size="sm" className="text-xs w-full">
+            <div className="mt-auto pt-4">
+              <Link href="/dashboard/content" className="w-full block">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-xs w-full transition-all border-black hover:bg-primary hover:text-white hover:border hover:border-black"
+                >
                   Ver Contenido
                 </Button>
               </Link>
@@ -197,18 +211,24 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex flex-col h-full">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium flex items-center">
               <Settings className="mr-2 h-5 w-5 text-primary" />
               Configuración
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-500">Gestiona tu perfil y preferencias</p>
-            <div className="mt-4">
-              <Link href="/dashboard/settings">
-                <Button variant="outline" size="sm" className="text-xs w-full">
+          <CardContent className="flex flex-col flex-grow">
+            <div className="min-h-[40px]"> {/* Fixed height container for consistent spacing */}
+              <p className="text-sm text-gray-500">Gestiona tu perfil y preferencias</p>
+            </div>
+            <div className="mt-auto pt-4">
+              <Link href="/dashboard/settings" className="w-full block">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-xs w-full transition-all border-black hover:bg-primary hover:text-white hover:border hover:border-black"
+                >
                   Editar Perfil
                 </Button>
               </Link>
@@ -246,7 +266,7 @@ export default function Dashboard() {
                 <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
                 <p className="text-gray-600 mb-4">Activa tu membresía para ver la actividad reciente</p>
                 <Link href="/membership">
-                  <Button className="bg-primary hover:bg-secondary">Completar Suscripción</Button>
+                  <Button className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black">Completar Suscripción</Button>
                 </Link>
               </div>
             )}
@@ -261,23 +281,23 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-2">
               <Link href="/blog">
-                <Button variant="outline" className="w-full justify-start">
+                <Button variant="outline" className="w-full justify-start transition-all hover:bg-black hover:text-white hover:border hover:border-black">
                   Blog
                 </Button>
               </Link>
               <Link href="/contact">
-                <Button variant="outline" className="w-full justify-start">
+                <Button variant="outline" className="w-full justify-start transition-all hover:bg-black hover:text-white hover:border hover:border-black">
                   Contacto
                 </Button>
               </Link>
               <Link href="/about">
-                <Button variant="outline" className="w-full justify-start">
+                <Button variant="outline" className="w-full justify-start transition-all hover:bg-black hover:text-white hover:border hover:border-black">
                   Sobre Nosotros
                 </Button>
               </Link>
               {subscriptionStatus === "active" && (
                 <Link href="/dashboard/membership">
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button variant="outline" className="w-full justify-start transition-all hover:bg-black hover:text-white hover:border hover:border-black">
                     Gestionar Membresía
                   </Button>
                 </Link>

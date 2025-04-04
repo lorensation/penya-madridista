@@ -267,7 +267,7 @@ export default function SettingsPage() {
                     <Input id="postalCode" name="postalCode" value={formData.postalCode} onChange={handleChange} />
                   </div>
                 </div>
-                <Button type="submit" className="bg-secondary text-primary hover:bg-primary hover:text-secondary" disabled={saving}>
+                <Button type="submit" className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black" disabled={saving}>
                   {saving ? "Guardando..." : "Guardar cambios"}
                 </Button>
               </form>
@@ -309,7 +309,7 @@ export default function SettingsPage() {
                     />
                   </div>
                 </div>
-                <Button type="submit" className="bg-secondary text-primary hover:bg-primary hover:text-secondary" disabled={saving}>
+                <Button type="submit" className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black" disabled={saving}>
                   {saving ? "Guardando..." : "Guardar Preferencias"}
                 </Button>
               </form>
@@ -333,7 +333,7 @@ export default function SettingsPage() {
                   </p>
                   <Button
                     variant="outline"
-                    className="mt-2 hover:bg-black hover:text-white"
+                    className="mt-2 transition-all bg-black text-white hover:bg-white hover:text-primary hover:border hover:border-black"
                     onClick={async () => {
                       try {
                         if (!user?.email) {
@@ -361,7 +361,7 @@ export default function SettingsPage() {
                   <p className="text-sm text-gray-500">Cierra todas las sesiones activas en otros dispositivos.</p>
                   <Button
                     variant="outline"
-                    className="mt-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                    className="mt-2 border-red-200 text-red-600 hover:bg-red-600 hover:text-white"
                     onClick={async () => {
                       try {
                         const { error } = await supabase.auth.signOut({ scope: "others" })

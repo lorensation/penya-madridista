@@ -1,13 +1,15 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
-import * as z from "zod"
-import { createBrowserSupabaseClient as createClient } from "@/lib/supabase-client"
-
-import { Button } from "@/components/ui/button"
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { createBrowserSupabaseClient as createClient } from "@/lib/supabase-client";
+import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Form,
   FormControl,
@@ -16,47 +18,31 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { useToast } from "@/components/ui/use-toast"
+} from "@/components/ui/form";
 
-// Define the form schema with Zod
+// Define the form schema
 const formSchema = z.object({
-  title: z.string().min(5, {
-    message: "Title must be at least 5 characters.",
-  }),
-  slug: z.string().min(5, {
-    message: "Slug must be at least 5 characters.",
-  }).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
-    message: "Slug must contain only lowercase letters, numbers, and hyphens.",
-  }),
-  excerpt: z.string().min(10, {
-    message: "Excerpt must be at least 10 characters.",
-  }).max(200, {
-    message: "Excerpt must not exceed 200 characters.",
-  }),
-  content: z.string().min(50, {
-    message: "Content must be at least 50 characters.",
-  }),
-  featured_image: z.string().url({
-    message: "Featured image must be a valid URL.",
-  }).optional().or(z.literal("")),
+  title: z.string().min(1, "Title is required"),
+  slug: z.string().min(1, "Slug is required"),
+  excerpt: z.string().optional(),
+  content: z.string().min(1, "Content is required"),
+  featured_image: z.string().optional(),
   published: z.boolean().default(false),
-})
+});
 
-type BlogPostFormValues = z.infer<typeof formSchema>
+// Define the form values type
+type BlogPostFormValues = z.infer<typeof formSchema>;
 
-// Define the props for the component
+// Define the component props
 interface BlogPostFormProps {
-  initialData?: BlogPostFormValues & { id: string }
+  initialData?: BlogPostFormValues & { id: string };
 }
 
 export function BlogPostForm({ initialData }: BlogPostFormProps) {
-  const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
-  const isEditing = !!initialData
-  const { toast } = useToast()
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const isEditing = !!initialData;
+  const { toast } = useToast();
 
   // Initialize the form with default values or initial data
   const form = useForm<BlogPostFormValues>({
@@ -69,19 +55,19 @@ export function BlogPostForm({ initialData }: BlogPostFormProps) {
       featured_image: "",
       published: false,
     },
-  })
+  });
 
   // Handle form submission
   async function onSubmit(values: BlogPostFormValues) {
-    setIsLoading(true)
+    setIsLoading(true);
 
     try {
-      const supabase = createClient()
+      const supabase = createClient();
       
       if (isEditing) {
-        // Update existing post
+        // Update existing post - changed from blog_posts to posts
         const { error } = await supabase
-          .from("blog_posts")
+          .from("posts")
           .update({
             title: values.title,
             slug: values.slug,
@@ -91,18 +77,18 @@ export function BlogPostForm({ initialData }: BlogPostFormProps) {
             published: values.published,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", initialData.id)
+          .eq("id", initialData.id);
 
-        if (error) throw error
+        if (error) throw error;
 
         toast({
           title: "Blog post updated",
           description: "Your blog post has been updated successfully.",
-        })
+        });
       } else {
-        // Create new post
+        // Create new post - changed from blog_posts to posts
         const { error } = await supabase
-          .from("blog_posts")
+          .from("posts")
           .insert({
             title: values.title,
             slug: values.slug,
@@ -112,28 +98,31 @@ export function BlogPostForm({ initialData }: BlogPostFormProps) {
             published: values.published,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-          })
+            // Add default values for required fields
+            author: "Peña Lorenzo Sanz Web", // Default author
+            category: "Blog", // Default category
+          });
 
-        if (error) throw error
+        if (error) throw error;
 
         toast({
           title: "Blog post created",
           description: "Your blog post has been created successfully.",
-        })
+        });
       }
 
       // Redirect to blog list
-      router.push("/admin/blog")
-      router.refresh()
+      router.push("/admin/blog");
+      router.refresh();
     } catch (error) {
-      console.error("Error saving blog post:", error)
+      console.error("Error saving blog post:", error);
       toast({
         variant: "destructive",
         title: "Something went wrong",
         description: error instanceof Error ? error.message : "Failed to save blog post. Please try again.",
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
@@ -143,9 +132,9 @@ export function BlogPostForm({ initialData }: BlogPostFormProps) {
       .toLowerCase()
       .replace(/[^\w\s-]/g, "") // Remove special characters
       .replace(/\s+/g, "-") // Replace spaces with hyphens
-      .replace(/-+/g, "-") // Replace multiple hyphens with a single hyphen
+      .replace(/-+/g, "-"); // Replace multiple hyphens with a single hyphen
     
-    form.setValue("slug", slug)
+    form.setValue("slug", slug);
   }
 
   return (
@@ -162,10 +151,10 @@ export function BlogPostForm({ initialData }: BlogPostFormProps) {
                   placeholder="Enter blog post title" 
                   {...field} 
                   onChange={(e) => {
-                    field.onChange(e)
+                    field.onChange(e);
                     // If creating a new post and slug is empty, generate it from title
                     if (!isEditing && !form.getValues("slug")) {
-                      generateSlug(e.target.value)
+                      generateSlug(e.target.value);
                     }
                   }}
                 />
@@ -298,5 +287,5 @@ export function BlogPostForm({ initialData }: BlogPostFormProps) {
         </div>
       </form>
     </Form>
-  )
+  );
 }

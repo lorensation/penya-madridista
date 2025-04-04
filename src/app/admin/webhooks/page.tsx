@@ -1,3 +1,4 @@
+///admin/webhooks/page.tsx
 "use client"
 
 import type React from "react"
@@ -46,7 +47,7 @@ export default function WebhooksSetupPage() {
         
         // Check if user has admin role
         const { data: profile, error: profileError } = await supabase
-          .from('profiles')
+          .from('miembros')
           .select('role')
           .eq('id', user.id)
           .single()

@@ -1,3 +1,4 @@
+import React from "react";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import { BlogPostForm } from "@/components/blog/blog-post-form";
@@ -7,8 +8,10 @@ import type { Metadata } from "next";
 async function getBlogPost(id: string) {
   try {
     const supabase = createServerSupabaseClient();
+    
+    // Using posts table
     const { data, error } = await supabase
-      .from("blog_posts")
+      .from("posts")
       .select("*")
       .eq("id", id)
       .single();
@@ -25,13 +28,15 @@ async function getBlogPost(id: string) {
   }
 }
 
-// Metadata generation function with Promise params
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}): Promise<Metadata> {
-  // Await the params Promise
+// Updated type for the page props to use Promise-based params for Next.js 15+
+type BlogEditProps = {
+  params: Promise<{
+    id: string
+  }>
+}
+
+export async function generateMetadata({ params }: BlogEditProps): Promise<Metadata> {
+  // Await the params Promise to get the actual params object
   const resolvedParams = await params;
   const post = await getBlogPost(resolvedParams.id);
 
@@ -48,14 +53,15 @@ export async function generateMetadata({
   };
 }
 
-// Page component with Promise params
-export default async function Page({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  // Await the params Promise
+export default async function Page({ params }: BlogEditProps) {
+  // Await the params Promise to get the actual params object
   const resolvedParams = await params;
+  const id = resolvedParams.id;
+  
+  if (!id) {
+    redirect("/admin/blog");
+  }
+  
   const supabase = createServerSupabaseClient();
   
   // Check if user is authenticated and is an admin
@@ -67,9 +73,9 @@ export default async function Page({
   
   // Check if user is an admin
   const { data: profile } = await supabase
-    .from("profiles")
+    .from("miembros")
     .select("role")
-    .eq("id", user.id)
+    .eq("user_uuid", user.id)
     .single();
   
   if (!profile || profile.role !== "admin") {
@@ -77,7 +83,7 @@ export default async function Page({
   }
   
   // Fetch the blog post to edit
-  const post = await getBlogPost(resolvedParams.id);
+  const post = await getBlogPost(id);
   
   if (!post) {
     redirect("/admin/blog");

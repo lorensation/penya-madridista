@@ -1,6 +1,18 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
+// Paths that should be accessible even in maintenance mode
+const ALLOWED_PATHS = [
+  '/login',
+  '/admin',
+  '/maintenance',
+  '/api',
+  '/_next',
+  '/favicon.ico',
+  '/logo.png',
+  '/public'
+]
+
 export async function middleware(request: NextRequest) {
   // Skip middleware for webhook endpoints - using exact path matching
   if (request.nextUrl.pathname.startsWith("/api/webhooks/")) {
@@ -42,6 +54,52 @@ export async function middleware(request: NextRequest) {
   // Refresh session if expired - required for Server Components
   const { data: authData } = await supabase.auth.getUser()
   const authUser = authData?.user || null
+
+  // Check for maintenance mode
+  try {
+    // Get site settings to check maintenance mode
+    const { data: settingsData } = await supabase
+      .from('site_settings')
+      .select('maintenance_mode')
+      .order('id', { ascending: false })
+      .limit(1)
+      .single()
+    
+    const maintenanceMode = settingsData?.maintenance_mode || false
+    
+    // If maintenance mode is enabled and the path is not in allowed paths
+    if (maintenanceMode) {
+      const path = request.nextUrl.pathname
+      
+      // Check if the path should be allowed regardless of maintenance mode
+      const isAllowedPath = ALLOWED_PATHS.some(allowedPath => path.startsWith(allowedPath))
+      
+      // If not an allowed path, check if user is admin
+      if (!isAllowedPath) {
+        let isAdmin = false
+        
+        // Only check admin status if user is authenticated
+        if (authUser) {
+          // Try to get member data to check admin role
+          const { data: memberData } = await supabase
+            .from("miembros")
+            .select("role")
+            .eq("user_uuid", authUser.id)
+            .single()
+          
+          isAdmin = memberData?.role === "admin"
+        }
+        
+        // If not admin, redirect to maintenance page
+        if (!isAdmin) {
+          return NextResponse.redirect(new URL('/maintenance', request.url))
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error checking maintenance mode:', error)
+    // In case of error, continue with normal middleware flow
+  }
 
   // If no authenticated user and trying to access protected routes, redirect to login
   if (

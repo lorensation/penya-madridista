@@ -2,13 +2,16 @@
 
 import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/supabase-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { FileText, Plus, Search, Edit, Trash2, Eye, MoreHorizontal, ChevronLeft, ChevronRight } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import type { BlogPost } from "@/types/common"
+import { Database } from "@/types/supabase"
+
+// Define the BlogPost type based on your Database type
+type BlogPost = Database['public']['Tables']['posts']['Row']
 
 export default function AdminBlogPage() {
   const [posts, setPosts] = useState<BlogPost[]>([])
@@ -17,66 +20,112 @@ export default function AdminBlogPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
   const postsPerPage = 10
 
-  // Use useCallback to memoize the fetchPosts function
+  // Fetch posts directly from Supabase
   const fetchPosts = useCallback(async () => {
     try {
-      setLoading(true)
-
-      let query = supabase.from("posts").select("*", { count: "exact" })
-
-      // Apply search filter if query exists
-      if (searchQuery) {
-        query = query.or(`title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`)
+      setLoading(true);
+      
+      // Calculate pagination
+      const from = (currentPage - 1) * postsPerPage;
+      const to = from + postsPerPage - 1;
+      
+      // Build query
+      let query = supabase
+        .from('posts')
+        .select('*');
+      
+      // Add search filter if provided
+      if (searchQuery.trim()) {
+        query = query.or(`title.ilike.%${searchQuery.trim()}%,content.ilike.%${searchQuery.trim()}%`);
       }
-
-      // Apply pagination
-      const from = (currentPage - 1) * postsPerPage
-      const to = from + postsPerPage - 1
-
-      const { data, count, error } = await query.order("created_at", { ascending: false }).range(from, to)
-
-      if (error) throw error
-
-      setPosts(data || [])
-      setTotalPages(Math.ceil((count || 0) / postsPerPage))
-      setLoading(false)
+      
+      // Execute query with pagination and ordering
+      const { data, count, error } = await query
+        .order('created_at', { ascending: false })
+        .range(from, to);
+      
+      if (error) {
+        throw error;
+      }
+      
+      console.log('Fetch results:', {
+        postsCount: data?.length || 0,
+        totalCount: count || 0,
+        page: currentPage,
+        limit: postsPerPage
+      });
+      
+      // Update state with the results
+      setPosts(data || []);
+      setTotalCount(count || 0);
+      setTotalPages(Math.ceil((count || 0) / postsPerPage));
+      setError(null);
+      
     } catch (error) {
-      console.error("Error fetching posts:", error)
-      setError(error instanceof Error ? error.message : "Failed to load posts")
-      setLoading(false)
+      console.error("Error fetching posts:", error);
+      setError(error instanceof Error ? error.message : "Failed to load posts");
+      setPosts([]);
+      setTotalCount(0);
+      setTotalPages(1);
+    } finally {
+      setLoading(false);
     }
-  }, [currentPage, searchQuery, postsPerPage])
+  }, [currentPage, searchQuery, postsPerPage]);
 
+  // Fetch posts on initial load and when page changes
   useEffect(() => {
-    fetchPosts()
-  }, [fetchPosts])
+    fetchPosts();
+  }, [currentPage, fetchPosts]);
+
+  // Add debounced search to improve performance
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      fetchPosts();
+      return;
+    }
+    
+    const timer = setTimeout(() => {
+      setCurrentPage(1); // Reset to first page when searching
+      fetchPosts();
+    }, 300); // 300ms debounce delay
+    
+    return () => clearTimeout(timer);
+  }, [searchQuery, fetchPosts]);
+
+  // Handle search input changes
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  }
 
   const handleDeletePost = async (postId: string) => {
     if (!confirm("¿Estás seguro de que deseas eliminar este artículo? Esta acción no se puede deshacer.")) {
-      return
+      return;
     }
 
     try {
-      const { error } = await supabase.from("posts").delete().eq("id", postId)
+      const { error } = await supabase.from("posts").delete().eq("id", postId);
 
-      if (error) throw error
+      if (error) throw error;
 
       // Refresh the posts list
-      fetchPosts()
+      fetchPosts();
     } catch (error) {
-      console.error("Error deleting post:", error)
-      setError(error instanceof Error ? error.message : "Failed to delete post")
+      console.error("Error deleting post:", error);
+      setError(error instanceof Error ? error.message : "Failed to delete post");
     }
   }
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "Sin fecha";
+    
     return new Date(dateString).toLocaleDateString("es-ES", {
       day: "numeric",
       month: "long",
       year: "numeric",
-    })
+    });
   }
 
   return (
@@ -87,7 +136,7 @@ export default function AdminBlogPage() {
           <p className="text-gray-600">Administra los artículos del blog de la Peña Lorenzo Sanz</p>
         </div>
         <Link href="/admin/blog/new">
-          <Button className="mt-4 md:mt-0 bg-primary hover:bg-secondary">
+          <Button className="mt-4 md:mt-0 w-full transition-all hover:bg-white hover:text-primary hover:border hover:border-black">
             <Plus className="mr-2 h-4 w-4" />
             Nuevo Artículo
           </Button>
@@ -108,7 +157,7 @@ export default function AdminBlogPage() {
               placeholder="Buscar artículos..."
               className="pl-10"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={handleSearchChange}
             />
           </div>
         </div>
@@ -127,7 +176,7 @@ export default function AdminBlogPage() {
                 : "No hay artículos publicados aún"}
             </p>
             <Link href="/admin/blog/new">
-              <Button className="bg-primary hover:bg-secondary">Crear Primer Artículo</Button>
+              <Button className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black">Crear Primer Artículo</Button>
             </Link>
           </div>
         ) : (
@@ -226,7 +275,7 @@ export default function AdminBlogPage() {
               <div className="flex items-center justify-between mt-6">
                 <div className="text-sm text-gray-500">
                   Mostrando {(currentPage - 1) * postsPerPage + 1} a{" "}
-                  {Math.min(currentPage * postsPerPage, totalPages * postsPerPage)} de {totalPages * postsPerPage}{" "}
+                  {Math.min(currentPage * postsPerPage, totalCount)} de {totalCount}{" "}
                   artículos
                 </div>
                 <div className="flex items-center space-x-2">
@@ -260,4 +309,3 @@ export default function AdminBlogPage() {
     </div>
   )
 }
-
