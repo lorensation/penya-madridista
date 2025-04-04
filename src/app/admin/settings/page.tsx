@@ -23,7 +23,7 @@ import {
   Mail, 
   CreditCard, 
   FileText, 
-  Image, 
+  Image as ImageIcon, 
   CheckCircle 
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -175,8 +175,8 @@ export default function SiteSettingsPage() {
       }
       
       if (data) {
-        setSettings(data)
-        setOriginalSettings(data)
+        setSettings(data as SiteSettings)
+        setOriginalSettings(data as SiteSettings)
       } else {
         setSettings(defaultSettings)
         setOriginalSettings(defaultSettings)
@@ -262,7 +262,7 @@ export default function SiteSettingsPage() {
   }
 
   // Handle input changes
-  const handleChange = (field: keyof SiteSettings, value: any) => {
+  const handleChange = <K extends keyof SiteSettings>(field: K, value: SiteSettings[K]) => {
     setSettings({
       ...settings,
       [field]: value
@@ -274,7 +274,7 @@ export default function SiteSettingsPage() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" aria-label="Cargando"></div>
           <p className="mt-4 text-gray-600">Verificando permisos de administrador...</p>
         </div>
       </div>
@@ -326,12 +326,12 @@ export default function SiteSettingsPage() {
           >
             {saving ? (
               <>
-                <div className="animate-spin mr-2 h-4 w-4 border-2 border-b-transparent rounded-full"></div>
+                <div className="animate-spin mr-2 h-4 w-4 border-2 border-b-transparent rounded-full" aria-hidden="true"></div>
                 Guardando...
               </>
             ) : (
               <>
-                <Save className="mr-2 h-4 w-4" />
+                <Save className="mr-2 h-4 w-4" aria-hidden="true" />
                 Guardar Cambios
               </>
             )}
@@ -341,14 +341,14 @@ export default function SiteSettingsPage() {
 
       {error && (
         <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
+          <AlertCircle className="h-4 w-4" aria-hidden="true" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {success && (
         <Alert className="mb-6 bg-green-50 border-green-200">
-          <CheckCircle className="h-4 w-4 text-green-600" />
+          <CheckCircle className="h-4 w-4 text-green-600" aria-hidden="true" />
           <AlertDescription className="text-green-800">{success}</AlertDescription>
         </Alert>
       )}
@@ -356,23 +356,23 @@ export default function SiteSettingsPage() {
       <Tabs defaultValue="general" className="w-full">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 mb-8">
           <TabsTrigger value="general" className="flex items-center gap-2">
-            <Globe className="h-4 w-4" />
+            <Globe className="h-4 w-4" aria-hidden="true" />
             <span>General</span>
           </TabsTrigger>
           <TabsTrigger value="appearance" className="flex items-center gap-2">
-            <Image className="h-4 w-4" />
+            <ImageIcon className="h-4 w-4" aria-hidden="true" />
             <span>Apariencia</span>
           </TabsTrigger>
           <TabsTrigger value="contact" className="flex items-center gap-2">
-            <Mail className="h-4 w-4" />
+            <Mail className="h-4 w-4" aria-hidden="true" />
             <span>Contacto</span>
           </TabsTrigger>
           <TabsTrigger value="subscriptions" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4" />
+            <CreditCard className="h-4 w-4" aria-hidden="true" />
             <span>Suscripciones</span>
           </TabsTrigger>
           <TabsTrigger value="legal" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
+            <FileText className="h-4 w-4" aria-hidden="true" />
             <span>Legal</span>
           </TabsTrigger>
         </TabsList>
@@ -539,11 +539,13 @@ export default function SiteSettingsPage() {
                         value={settings.primary_color} 
                         onChange={(e) => handleChange('primary_color', e.target.value)}
                         className="w-16 h-10 p-1"
+                        aria-label="Seleccionar color primario"
                       />
                       <Input 
                         value={settings.primary_color} 
                         onChange={(e) => handleChange('primary_color', e.target.value)}
                         className="flex-1"
+                        aria-label="Código de color primario"
                       />
                     </div>
                   </div>
@@ -557,11 +559,13 @@ export default function SiteSettingsPage() {
                         value={settings.secondary_color} 
                         onChange={(e) => handleChange('secondary_color', e.target.value)}
                         className="w-16 h-10 p-1"
+                        aria-label="Seleccionar color secundario"
                       />
                       <Input 
                         value={settings.secondary_color} 
                         onChange={(e) => handleChange('secondary_color', e.target.value)}
                         className="flex-1"
+                        aria-label="Código de color secundario"
                       />
                     </div>
                   </div>
