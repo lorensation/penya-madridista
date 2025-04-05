@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     // Get user details from Supabase
     const supabase = getServiceSupabase()
     const { data: userData, error: userError } = await supabase
-      .from("webusers")
+      .from("users")
       .select("email, name")
       .eq("id", userId)
       .single()
@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       billing_address_collection: "required",
+      client_reference_id: userId,
       customer_email: userData.email,
       line_items: [
         {
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
       // Add metadata to the session itself as well
       metadata: {
         userId,
+        price_id: priceId,
       },
     })
 

@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useEffect, useState } from "react"
@@ -68,10 +67,11 @@ function SuccessContent() {
         }
 
         // Check if the user already has a member profile
+        // Note: Using 'id' column instead of 'auth_id'
         const { data: memberData, error: memberError } = await supabase
           .from("miembros")
-          .select("id, auth_id")
-          .eq("auth_id", userData.user.id)
+          .select("id, user_uuid")
+          .eq("id", userData.user.id)  // Using 'id' instead of 'auth_id'
           .single()
 
         if (memberError) {
@@ -100,7 +100,14 @@ function SuccessContent() {
 
         if (checkoutError) {
           console.error("Error fetching checkout session data:", checkoutError)
-          setError("Failed to retrieve subscription details. Please contact support.")
+          
+          // If the error is "no rows returned", we need to wait for the webhook to process
+          if (checkoutError.code === "PGRST116") {
+            setError("Your payment is being processed. Please wait a moment and refresh the page.")
+          } else {
+            setError("Failed to retrieve subscription details. Please contact support.")
+          }
+          
           setLoading(false)
           return
         }
@@ -115,6 +122,7 @@ function SuccessContent() {
         console.log("Checkout session data found:", checkoutData)
 
         // Member profile exists, update it with subscription details
+        // Note: Using 'id' column instead of 'auth_id'
         const { error: updateError } = await supabase
           .from("miembros")
           .update({
@@ -124,7 +132,7 @@ function SuccessContent() {
             subscription_updated_at: new Date().toISOString(),
             stripe_customer_id: checkoutData.customer_id,
           })
-          .eq("auth_id", userData.user.id)
+          .eq("id", userData.user.id)  // Using 'id' instead of 'auth_id'
 
         if (updateError) {
           console.error("Error updating member profile:", updateError)

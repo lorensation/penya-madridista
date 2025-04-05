@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
 import { createClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
 import Stripe from "stripe"
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-02-24.acacia",
+  apiVersion: "2025-02-24.acacia", // Using the correct API version
 })
 
 // Create a service role client for admin operations that need to bypass RLS
@@ -32,7 +31,7 @@ export async function GET(request: NextRequest) {
 
     // Retrieve the session from Stripe
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ["subscription", "customer"],
+      expand: ["subscription", "customer", "line_items"],
     })
 
     if (!session) {
@@ -40,42 +39,53 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user from auth context or from the client_reference_id
-    const { data: authData } = await supabase.auth.getUser()
+    const { data: authData } = await serviceRoleClient.auth.getUser()
     const userId = authData.user?.id || session.client_reference_id
 
     if (!userId) {
       return NextResponse.json({ error: "User not authenticated" }, { status: 401 })
     }
 
-    // Verify that the user has permission to access this session
-    // First check if the session exists and belongs to this user
-    const { data: existingSession, error: sessionError } = await supabase
+    // Check if a checkout session record already exists
+    const { data: existingSession, error: checkError } = await serviceRoleClient
       .from("checkout_sessions")
       .select("*")
       .eq("session_id", sessionId)
-      .eq("user_id", userId)
-      .single()
+      .maybeSingle()
 
-    // If there's an error and it's not just "no rows returned"
-    if (sessionError && sessionError.code !== "PGRST116") {
-      console.error("Error verifying session ownership:", sessionError)
-      return NextResponse.json({ error: "Failed to verify session ownership" }, { status: 403 })
+    if (checkError && checkError.code !== "PGRST116") {
+      console.error("Error checking for existing checkout session:", checkError)
+      return NextResponse.json({ error: "Failed to check for existing session" }, { status: 500 })
     }
 
-    // If no session found for this user, they don't have permission
-    if (!existingSession && sessionError?.code === "PGRST116") {
-      console.error("User attempted to access a session they don't own")
-      return NextResponse.json({ error: "You don't have permission to access this session" }, { status: 403 })
+    // Extract plan type from metadata or line items
+    let planType = "unknown"
+    if (session.metadata && session.metadata.plan_type) {
+      planType = session.metadata.plan_type
+    } else if (session.line_items && session.line_items.data.length > 0) {
+      const lineItem = session.line_items.data[0]
+      if (lineItem.price && lineItem.price.product) {
+        const productId = typeof lineItem.price.product === 'string' 
+          ? lineItem.price.product 
+          : lineItem.price.product.id
+        
+        try {
+          const product = await stripe.products.retrieve(productId)
+          planType = product.name || productId
+        } catch (e) {
+          console.error("Error fetching product:", e)
+        }
+      }
     }
 
     // Safely extract subscription and customer IDs with null checks
     const subscriptionId = session.subscription && typeof session.subscription === 'object' 
       ? session.subscription.id 
-      : null
+      : (typeof session.subscription === 'string' ? session.subscription : null)
     
     const customerId = session.customer && typeof session.customer === 'object' 
       ? session.customer.id 
-      : null
+      : (typeof session.customer === 'string' ? session.customer : null)
     
     // Determine subscription status with null checks
     let subscriptionStatus = null
@@ -87,29 +97,63 @@ export async function GET(request: NextRequest) {
       subscriptionStatus = session.payment_status
     }
 
-    // Use the service role client to update the checkout_sessions table
-    // This bypasses RLS policies for this specific operation
-    const { error: updateError } = await serviceRoleClient
-      .from("checkout_sessions")
-      .update({
-        status: session.status,
-        updated_at: new Date().toISOString(),
-        subscription_id: subscriptionId,
-        customer_id: customerId,
-        subscription_status: subscriptionStatus,
-        payment_status: session.payment_status,
-        payment_intent: typeof session.payment_intent === 'string' ? session.payment_intent : null,
-      })
-      .eq("session_id", sessionId)
-      .eq("user_id", userId)
+    // Prepare the session data
+    const sessionData = {
+      session_id: sessionId,
+      user_id: userId,
+      status: session.status,
+      updated_at: new Date().toISOString(),
+      subscription_id: subscriptionId,
+      customer_id: customerId,
+      subscription_status: subscriptionStatus,
+      payment_status: session.payment_status,
+      payment_intent: typeof session.payment_intent === 'string' ? session.payment_intent : null,
+      plan_type: planType,
+      price_id: session.metadata?.price_id || null,
+    }
 
-    if (updateError) {
-      console.error("Error updating checkout session:", updateError)
-      return NextResponse.json({ error: "Failed to update checkout session" }, { status: 500 })
+    if (existingSession) {
+      // Update the existing record
+      const { error: updateError } = await serviceRoleClient
+        .from("checkout_sessions")
+        .update({
+          status: sessionData.status,
+          updated_at: sessionData.updated_at,
+          subscription_id: sessionData.subscription_id,
+          customer_id: sessionData.customer_id,
+          subscription_status: sessionData.subscription_status,
+          payment_status: sessionData.payment_status,
+          payment_intent: sessionData.payment_intent,
+          plan_type: sessionData.plan_type,
+        })
+        .eq("session_id", sessionId)
+        .eq("user_id", userId)
+
+      if (updateError) {
+        console.error("Error updating checkout session:", updateError)
+        return NextResponse.json({ error: "Failed to update checkout session" }, { status: 500 })
+      }
+      console.log(`Updated existing checkout session: ${sessionId}`)
+    } else {
+      // Create a new record if it doesn't exist
+      const insertData = {
+        ...sessionData,
+        created_at: new Date().toISOString(),
+      }
+
+      const { error: insertError } = await serviceRoleClient
+        .from("checkout_sessions")
+        .insert([insertData])
+
+      if (insertError) {
+        console.error("Error creating checkout session:", insertError)
+        return NextResponse.json({ error: "Failed to create checkout session record" }, { status: 500 })
+      }
+      console.log(`Created new checkout session record: ${sessionId}`)
     }
 
     // Log the successful update
-    console.log(`Successfully updated checkout session ${sessionId} for user ${userId}`)
+    console.log(`Successfully processed checkout session ${sessionId} for user ${userId}`)
 
     return NextResponse.json({
       success: true,
@@ -120,7 +164,7 @@ export async function GET(request: NextRequest) {
         subscription_id: subscriptionId,
         payment_status: session.payment_status,
         subscription_status: subscriptionStatus,
-        plan_type: existingSession?.plan_type || null,
+        plan_type: planType,
       }
     })
   } catch (error) {
