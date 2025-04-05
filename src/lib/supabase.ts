@@ -1,301 +1,129 @@
-import { createClient } from "@supabase/supabase-js"
-import { createBrowserClient } from "@supabase/ssr"
-import type { Database } from "@/types/supabase"
 import type { MemberData } from "@/types/common"
 
-// Environment variables are accessible in both client and server components
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// Re-export everything from the modular files
+export * from "./supabase/config"
+export * from "./supabase/client"
+export * from "./supabase/server"
+export * from "./supabase/admin"
+export * from "./supabase/auth-service"
+export * from "./supabase/user-service"
+export * from "./supabase/member-service"
 
-// For server-side operations that need more privileges
-const supabaseServiceKey = process.env.SUPABASE_WEBHOOK_SECRET
+// Import specific functions for backward compatibility
+import { createBrowserSupabaseClient } from "./supabase/client"
+import { createServerSupabaseClient } from "./supabase/server"
+import { createAdminSupabaseClient } from "./supabase/admin"
+import { 
+  signUp, 
+  signIn, 
+  signOut, 
+  resetPassword, 
+  getCurrentUser 
+} from "./supabase/auth-service"
+import { 
+  getUserProfile, 
+  updateUserProfile, 
+  checkMembershipStatus 
+} from "./supabase/user-service"
+import { 
+  createMember, 
+  getMember, 
+  updateMember 
+} from "./supabase/member-service"
 
-// Create a single client instance that can be used in browser environments
-// Use a singleton pattern to prevent multiple instances
-let browserInstance: ReturnType<typeof createBrowserClient<Database>> | null = null
+/**
+ * Legacy Supabase client instance for backward compatibility
+ * Automatically selects browser or server client based on environment
+ */
+export const supabase = typeof window !== "undefined" 
+  ? createBrowserSupabaseClient() 
+  : createServerSupabaseClient()
 
-export const createBrowserSupabaseClient = () => {
-  if (typeof window === "undefined") {
-    throw new Error("createBrowserSupabaseClient should only be used in browser environments")
-  }
+/**
+ * Legacy function to get admin Supabase client for backward compatibility
+ */
+export const getServiceSupabase = createAdminSupabaseClient
 
-  if (browserInstance) return browserInstance
+// Re-export all the original functions for backward compatibility
+// This ensures all existing code using these functions will continue to work
 
-  browserInstance = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
-  return browserInstance
+// Original auth functions
+export { 
+  signUp, 
+  signIn, 
+  signOut, 
+  resetPassword,
+  getCurrentUser
 }
 
-// For backward compatibility with existing code
-export const supabase =
-  typeof window !== "undefined" ? createBrowserSupabaseClient() : createClient<Database>(supabaseUrl, supabaseAnonKey)
-
-// For server-side operations that need admin privileges
-export const getServiceSupabase = () => {
-  if (!supabaseServiceKey) {
-    console.error("SUPABASE_WEBHOOK_SECRET is not defined - admin operations will fail")
-    throw new Error("Service role key is required for admin operations")
-  }
-
-  return createClient<Database>(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
+// Original profile functions
+export { 
+  getUserProfile, 
+  updateUserProfile,
+  checkMembershipStatus
 }
 
-// Auth related functions
-export async function signUp(email: string, password: string, name: string) {
-  const client =
-    typeof window !== "undefined" ? createBrowserSupabaseClient() : createClient<Database>(supabaseUrl, supabaseAnonKey)
-
-  const { data, error } = await client.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: name,
-      },
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
-    },
-  })
-
-  return { data, error }
+// Original member functions
+export { 
+  createMember, 
+  getMember, 
+  updateMember
 }
 
-export async function signIn(email: string, password: string) {
-  const client =
-    typeof window !== "undefined" ? createBrowserSupabaseClient() : createClient<Database>(supabaseUrl, supabaseAnonKey)
-
-  const { data, error } = await client.auth.signInWithPassword({
-    email,
-    password,
-  })
-
-  return { data, error }
+/**
+ * Creates appropriate Supabase client based on environment
+ * @returns Supabase client instance
+ */
+export function createSupabaseClient() {
+  return typeof window !== "undefined"
+    ? createBrowserSupabaseClient()
+    : createServerSupabaseClient()
 }
 
-export async function signOut() {
-  const client =
-    typeof window !== "undefined" ? createBrowserSupabaseClient() : createClient<Database>(supabaseUrl, supabaseAnonKey)
-
-  const { error } = await client.auth.signOut()
-  return { error }
+/**
+ * Gets the current authenticated user
+ * @returns Promise with user data and error if any
+ */
+export async function getAuthUser() {
+  return await getCurrentUser()
 }
 
-export async function resetPassword(email: string) {
-  const client =
-    typeof window !== "undefined" ? createBrowserSupabaseClient() : createClient<Database>(supabaseUrl, supabaseAnonKey)
-
-  const { data, error } = await client.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/reset-password`,
-  })
-
-  return { data, error }
+/**
+ * Utility to check if code is running in browser environment
+ * @returns boolean indicating if code is running in browser
+ */
+export function isClientSide(): boolean {
+  return typeof window !== "undefined"
 }
 
-// User profile functions
-export async function getUserProfile() {
-  const client =
-    typeof window !== "undefined" ? createBrowserSupabaseClient() : createClient<Database>(supabaseUrl, supabaseAnonKey)
-
-  // Get the auth user
-  const { data: authUser } = await client.auth.getUser()
-
-  if (!authUser?.user) {
-    return { data: null, error: new Error("User not found") }
-  }
-
-  // Get user from the users table
-  const { data, error } = await client.from("users").select("*").eq("id", authUser.user.id).single()
-
-  return { data, error }
+/**
+ * Utility to check if code is running in server environment
+ * @returns boolean indicating if code is running in server
+ */
+export function isServerSide(): boolean {
+  return typeof window === "undefined"
 }
 
-export async function updateUserProfile(updates: Record<string, unknown>) {
-  const client =
-    typeof window !== "undefined" ? createBrowserSupabaseClient() : createClient<Database>(supabaseUrl, supabaseAnonKey)
-
-  // Get the auth user
-  const { data: authUser } = await client.auth.getUser()
-
-  if (!authUser?.user) {
-    return { data: null, error: new Error("User not found") }
-  }
-
-  // Update user in the users table
-  const { data, error } = await client.from("users").update(updates).eq("id", authUser.user.id).select()
-
-  return { data: data?.[0] || null, error }
+/**
+ * Utility function to get the appropriate client based on context
+ * Useful for functions that need to work in both environments
+ */
+export function getClient() {
+  return isClientSide() 
+    ? createBrowserSupabaseClient() 
+    : createServerSupabaseClient()
 }
 
-// Member functions
-export async function createMember(memberData: MemberData) {
-  const client =
-    typeof window !== "undefined" ? createBrowserSupabaseClient() : createClient<Database>(supabaseUrl, supabaseAnonKey)
-
-  // Get the auth user
-  const { data: authUser } = await client.auth.getUser()
-
-  if (!authUser?.user) {
-    return { data: null, error: new Error("Auth user not found") }
-  }
-
-  // First update the users table to mark as member
-  const { error: userError } = await client.from("users").update({ is_member: true }).eq("id", authUser.user.id)
-
-  if (userError) {
-    console.error("Error updating user:", userError)
-    // Continue anyway to try creating the member record
-  }
-
-  // Ensure ID fields are set correctly
-  const memberDataWithIDs: MemberData = {
+/**
+ * Utility function to prepare member data for database operations
+ * @param memberData The member data to prepare
+ * @param userId The user ID to associate with the member
+ * @returns Prepared member data
+ */
+export function prepareMemberData(memberData: MemberData, userId: string): MemberData {
+  return {
     ...memberData,
-    id: authUser.user.id, // This links to auth.users(id)
-    user_uuid: authUser.user.id, // This links to users(id)
+    user_uuid: userId,
+    created_at: memberData.created_at || new Date().toISOString()
   }
-
-  // Set default subscription status if not provided
-  if (!memberDataWithIDs.subscription_status) {
-    memberDataWithIDs.subscription_status = "inactive"
-  }
-
-  // Convert string values to appropriate types based on schema
-  // For bigint columns, we need to ensure we're not sending empty strings or invalid values
-  if (memberDataWithIDs.telefono) {
-    if (typeof memberDataWithIDs.telefono === "string") {
-      const parsedValue = Number.parseInt(memberDataWithIDs.telefono as string, 10)
-      memberDataWithIDs.telefono = isNaN(parsedValue) ? null : parsedValue
-    }
-  } else {
-    // If telefono is empty or undefined, set it to null
-    memberDataWithIDs.telefono = null
-  }
-
-  if (memberDataWithIDs.cp) {
-    if (typeof memberDataWithIDs.cp === "string") {
-      const parsedValue = Number.parseInt(memberDataWithIDs.cp as string, 10)
-      memberDataWithIDs.cp = isNaN(parsedValue) ? null : parsedValue
-    }
-  } else {
-    // If cp is empty or undefined, set it to null
-    memberDataWithIDs.cp = null
-  }
-
-  if (memberDataWithIDs.num_socio) {
-    if (typeof memberDataWithIDs.num_socio === "string") {
-      const parsedValue = Number.parseInt(memberDataWithIDs.num_socio as string, 10)
-      memberDataWithIDs.num_socio = isNaN(parsedValue) ? null : parsedValue
-    }
-  } else {
-    // If num_socio is empty or undefined, set it to null
-    memberDataWithIDs.num_socio = null
-  }
-
-  if (memberDataWithIDs.num_carnet) {
-    if (typeof memberDataWithIDs.num_carnet === "string") {
-      const parsedValue = Number.parseInt(memberDataWithIDs.num_carnet as string, 10)
-      memberDataWithIDs.num_carnet = isNaN(parsedValue) ? null : parsedValue
-    }
-  } else {
-    // If num_carnet is empty or undefined, set it to null
-    memberDataWithIDs.num_carnet = null
-  }
-
-  // Format date correctly if it's a string
-  if (memberDataWithIDs.fecha_nacimiento && typeof memberDataWithIDs.fecha_nacimiento === "string") {
-    // Keep the date as is, Supabase will handle the conversion
-  }
-
-  console.log("Creating member with data:", memberDataWithIDs)
-
-  // Then create the member record
-  const { data, error } = await client.from("miembros").insert(memberDataWithIDs).select()
-
-  if (error) {
-    console.error("Error creating member:", error)
-  } else {
-    // If member was created successfully and we have subscription data,
-    // try to update the subscription status via the admin API
-    if (data && data.length > 0 && (memberDataWithIDs.subscription_id || memberDataWithIDs.stripe_customer_id)) {
-      try {
-        // Call the admin API to update subscription status
-        const response = await fetch("/api/admin/update-subscription", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userId: authUser.user.id,
-            // We don't need to pass subscriptionId as the API will find it
-          }),
-        })
-
-        if (!response.ok) {
-          console.error("Failed to update subscription via admin API:", await response.text())
-        }
-      } catch (subscriptionErr) {
-        console.error("Error calling subscription update API:", subscriptionErr)
-      }
-    }
-  }
-
-  return { data, error }
-}
-
-export async function getMember() {
-  const client =
-    typeof window !== "undefined" ? createBrowserSupabaseClient() : createClient<Database>(supabaseUrl, supabaseAnonKey)
-
-  // Get the auth user
-  const { data: authUser } = await client.auth.getUser()
-
-  if (!authUser?.user) {
-    return { data: null, error: new Error("User not found") }
-  }
-
-  // Get member by user_uuid
-  const { data, error } = await client.from("miembros").select("*").eq("user_uuid", authUser.user.id).single()
-
-  return { data, error }
-}
-
-export async function updateMember(updates: Partial<MemberData>) {
-  const client =
-    typeof window !== "undefined" ? createBrowserSupabaseClient() : createClient<Database>(supabaseUrl, supabaseAnonKey)
-
-  // Get the auth user
-  const { data: authUser } = await client.auth.getUser()
-
-  if (!authUser?.user) {
-    return { data: null, error: new Error("User not found") }
-  }
-
-  // Update member by user_uuid
-  const { data, error } = await client.from("miembros").update(updates).eq("user_uuid", authUser.user.id).select()
-
-  return { data: data?.[0] || null, error }
-}
-
-// Add a function to check if a user is a member
-export async function checkMembershipStatus() {
-  const client =
-    typeof window !== "undefined" ? createBrowserSupabaseClient() : createClient<Database>(supabaseUrl, supabaseAnonKey)
-
-  // Get the auth user
-  const { data: authUser } = await client.auth.getUser()
-
-  if (!authUser?.user) {
-    return { isMember: false, error: new Error("User not found") }
-  }
-
-  // Check membership status in users table
-  const { data, error } = await client.from("users").select("is_member").eq("id", authUser.user.id).single()
-
-  if (error) {
-    return { isMember: false, error }
-  }
-
-  return { isMember: data?.is_member || false, error: null }
 }
