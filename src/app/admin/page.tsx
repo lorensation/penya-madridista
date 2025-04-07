@@ -7,7 +7,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { FileText, Users, Settings, CreditCard, Webhook, AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { supabase } from "@/lib/supabase-client"
+import { supabase } from "@/lib/supabase"
 
 // Add route segment config to mark this route as dynamic
 export const dynamic = 'force-dynamic'

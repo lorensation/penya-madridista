@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { SiteSettings, defaultSettings } from "@/lib/site-settings"
-import { supabase } from "@/lib/supabase-client"
+import { supabase } from "@/lib/supabase"
 
 export function useSiteSettings() {
   const [settings, setSettings] = useState<SiteSettings>(defaultSettings)

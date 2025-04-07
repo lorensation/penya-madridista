@@ -1,7 +1,7 @@
 "use server"
 
 import { redirect } from "next/navigation"
-import { createServerSupabaseClient } from "@/lib/supabase-server"
+import { createServerSupabaseClient } from "@/lib/supabase"
 import type { ApiResponse } from "@/types/common"
 import type { User } from "@supabase/supabase-js"
 

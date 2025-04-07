@@ -1,7 +1,7 @@
 
 'use server'
 
-import { createServerActionClient } from "@/lib/supabase-server-actions"
+import { createServerSupabaseClient } from "@/lib/supabase"
 import { redirect } from "next/navigation"
 import { getBaseUrl } from "@/lib/utils"
 import Stripe from "stripe"
@@ -12,7 +12,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
 })
 
 export async function createCheckoutSession(priceId: string) {
-  const supabase = createServerActionClient()
+  const supabase = createServerSupabaseClient()
 
   const {
     data: { user },
@@ -49,7 +49,7 @@ export async function createCheckoutSession(priceId: string) {
 }
 
 export async function createBillingPortalSession(customerId?: string) {
-  const supabase = createServerActionClient()
+  const supabase = createServerSupabaseClient()
 
   const {
     data: { user },
@@ -96,7 +96,7 @@ export async function createBillingPortalSession(customerId?: string) {
 }
 
 export async function cancelSubscription() {
-  const supabase = createServerActionClient()
+  const supabase = createServerSupabaseClient()
 
   const {
     data: { user },

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { createBillingPortalSession } from "@/app/actions/stripe"
-import { supabase } from "@/lib/supabase-client"
+import { supabase } from "@/lib/supabase"
 import { CheckCircle, AlertCircle } from "lucide-react"
 import { User } from "@supabase/supabase-js"
 

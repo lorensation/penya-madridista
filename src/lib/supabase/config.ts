@@ -1,4 +1,4 @@
-import { Database } from "@/types/supabase"
+//import { Database } from "@/types/supabase"
 
 // Environment variables are accessible in both client and server components
 export const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!

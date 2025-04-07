@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { setupWebhooks } from "@/app/actions/setup-webhooks"
 import type { ApiResponse } from "@/types/common"
-import { supabase } from "@/lib/supabase-client"
+import { supabase } from "@/lib/supabase"
 import { AlertCircle } from "lucide-react"
 
 // Add route segment config to mark this route as dynamic

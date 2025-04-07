@@ -1,6 +1,6 @@
 "use server"
 
-import { createServerSupabaseClient } from "@/lib/supabase-server"
+import { createServerSupabaseClient } from "@/lib/supabase"
 import type { ApiResponse } from "@/types/common"
 
 export async function subscribeToNewsletter(formData: FormData): Promise<ApiResponse> {

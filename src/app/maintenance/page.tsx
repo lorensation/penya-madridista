@@ -1,6 +1,6 @@
 import Image from "next/image"
 import { Wrench, Clock, AlertTriangle } from "lucide-react"
-import { createServerSupabaseClient } from "@/lib/supabase-server"
+import { createServerSupabaseClient } from "@/lib/supabase"
 
 // Add route segment config to mark this route as dynamic
 export const dynamic = 'force-dynamic'

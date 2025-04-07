@@ -1,5 +1,5 @@
 import React from "react";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createServerSupabaseClient } from "@/lib/supabase";
 import { redirect } from "next/navigation";
 import { BlogPostForm } from "@/components/blog/blog-post-form";
 import type { Metadata } from "next";

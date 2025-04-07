@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
-import { createBrowserSupabaseClient as createClient } from "@/lib/supabase-client"
+import { createBrowserSupabaseClient as createClient } from "@/lib/supabase"
 
 const formSchema = z.object({
   name: z.string().min(2, {

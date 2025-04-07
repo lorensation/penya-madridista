@@ -38,7 +38,7 @@ import {
   FileText,
   Edit,
 } from "lucide-react"
-import { supabase } from "@/lib/supabase-client"
+import { supabase } from "@/lib/supabase"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 
