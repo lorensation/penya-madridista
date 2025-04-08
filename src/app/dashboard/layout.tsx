@@ -1,11 +1,12 @@
 "use client"
 
 import type React from "react"
-
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
+import { useMobile } from "@/hooks/use-mobile"
+import { useNavbarMenu } from "@/hooks/use-navbar-menu"
 
 export default function DashboardLayout({
   children,
@@ -15,6 +16,9 @@ export default function DashboardLayout({
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [authenticated, setAuthenticated] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const isMobile = useMobile()
+  const { isOpen: isNavbarMenuOpen } = useNavbarMenu()
 
   useEffect(() => {
     const checkUser = async () => {
@@ -55,11 +59,20 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <DashboardSidebar />
-      <div className="pt-16 pl-16 transition-all duration-300">
-        <div className="container mx-auto px-4 py-8">{children}</div>
-      </div>
+      <DashboardSidebar onStateChange={setIsSidebarOpen} />
+      <main 
+        className={`transition-all duration-300 ${
+          isMobile 
+            ? (!isSidebarOpen && !isNavbarMenuOpen) 
+              ? "pt-20 pb-8 px-4 mx-auto max-w-3xl" // Center content on mobile when sidebar is closed
+              : "pt-20 pb-8 px-4" 
+            : isSidebarOpen
+              ? "pt-16 pl-64 pr-4 pb-8" // Full sidebar on desktop
+              : "pt-16 pl-16 pr-4 pb-8" // Icon sidebar on desktop
+        }`}
+      >
+        {children}
+      </main>
     </div>
   )
 }
-

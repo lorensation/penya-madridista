@@ -7,9 +7,12 @@ import { usePathname } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { ProfileDropdown } from "@/components/profile-dropdown"
+import { useNavbarMenu } from "@/hooks/use-navbar-menu"
 
 export function Header() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  // Use the shared navbar menu state
+  const { isOpen: isMenuOpen, toggle: toggleMenu, setIsOpen } = useNavbarMenu()
+  
   interface User {
     id: string
     email?: string
@@ -28,7 +31,7 @@ export function Header() {
         if (data.user) {
           // Get profile info if user exists
           const { data: profileData } = await supabase
-            .from("miembros")
+            .from("users")
             .select("name")
             .eq("id", data.user.id)
             .single()
@@ -52,12 +55,8 @@ export function Header() {
     getUser()
   }, [])
 
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen)
-  }
-
   const closeMenu = () => {
-    setIsMenuOpen(false)
+    setIsOpen(false)
   }
 
   const isActive = (path: string) => {
@@ -189,9 +188,9 @@ export function Header() {
                 Hazte Socio
               </Link>
               <Link
-                href="/contacto"
+                href="/contact"
                 className={`text-sm font-medium transition-colors hover:text-primary ${
-                  isActive("/contacto") ? "text-primary" : "text-gray-600"
+                  isActive("/contact") ? "text-primary" : "text-gray-600"
                 }`}
                 onClick={closeMenu}
               >

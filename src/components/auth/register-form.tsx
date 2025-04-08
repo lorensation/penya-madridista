@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
-import { createBrowserSupabaseClient as createClient } from "@/lib/supabase"
+import { createBrowserSupabaseClient } from "@/lib/supabase"
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -52,7 +52,7 @@ export function RegisterForm() {
     setIsLoading(true)
 
     try {
-      const supabase = createClient()
+      const supabase = createBrowserSupabaseClient()
       
       // Register the user
       const { error } = await supabase.auth.signUp({

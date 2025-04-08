@@ -76,7 +76,7 @@ const exclusiveContent: ContentItem[] = [
     url: "/content/galleries/fotos-historicas"
   },
   {
-    id: 5,
+    id: 6,
     title: "Entrevista exclusiva con Lorenzo Sanz",
     description: "Lorenzo Sanz hijo nos cuenta como su padre revolucionó el ámbito de la gestión deportiva y otros temas.",
     type: "video",

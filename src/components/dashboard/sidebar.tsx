@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useMobile } from "@/hooks/use-mobile"
+import { useNavbarMenu } from "@/hooks/use-navbar-menu"
 import {
   Home,
   CreditCard,
@@ -12,16 +13,33 @@ import {
   Settings,
   LogOut,
   Menu,
-  X,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react"
 
-export function DashboardSidebar() {
+interface DashboardSidebarProps {
+  onStateChange?: (isOpen: boolean) => void
+}
+
+export function DashboardSidebar({ onStateChange }: DashboardSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(true) // Default to collapsed/hidden
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const pathname = usePathname()
   const isMobile = useMobile()
+  
+  // Get the navbar menu state
+  const { isOpen: isNavbarMenuOpen } = useNavbarMenu()
+
+  // Notify parent component about sidebar state changes
+  useEffect(() => {
+    if (onStateChange) {
+      if (isMobile) {
+        onStateChange(isMobileOpen)
+      } else {
+        onStateChange(!isCollapsed)
+      }
+    }
+  }, [isMobile, isMobileOpen, isCollapsed, onStateChange])
 
   // Reset mobile menu state when screen size changes
   useEffect(() => {
@@ -91,27 +109,27 @@ export function DashboardSidebar() {
 
   return (
     <>
-      {/* Mobile overlay */}
+      {/* Mobile overlay - only when expanded */}
       {isMobile && isMobileOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-40" />}
 
-      {/* Mobile toggle button */}
-      {isMobile && (
+      {/* Mobile toggle button - only visible when sidebar is NOT open AND navbar menu is NOT open */}
+      {isMobile && !isMobileOpen && !isNavbarMenuOpen && (
         <button
           data-sidebar-toggle
-          className="fixed top-20 left-4 z-50 p-2 rounded-md bg-primary text-white shadow-md"
+          className="fixed z-50 p-2 rounded-md bg-primary text-white shadow-md top-20 left-4"
           onClick={toggleMobileMenu}
-          aria-label={isMobileOpen ? "Cerrar menú" : "Abrir menú"}
+          aria-label="Expandir menú"
         >
-          {isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          <Menu className="h-5 w-5" />
         </button>
       )}
 
-      {/* Desktop toggle button - positioned differently based on sidebar state */}
+      {/* Desktop toggle button */}
       {!isMobile && (
         <button
           data-sidebar-toggle
           className={`fixed z-50 p-2 rounded-md bg-primary text-white shadow-md ${
-            isCollapsed ? "top-20 left-4" : "hidden" // Hide when expanded as it's inside the header
+            isCollapsed ? "top-20 left-4" : "hidden"
           }`}
           onClick={toggleCollapse}
           aria-label="Expandir menú"
@@ -127,25 +145,23 @@ export function DashboardSidebar() {
           isMobile
             ? isMobileOpen
               ? "w-64 translate-x-0"
-              : "-translate-x-full w-0"
+              : "w-0 -translate-x-100"
             : isCollapsed
               ? "w-0 overflow-hidden"
-              : "w-54"
+              : "w-64"
         }`}
       >
         {/* Sidebar header with toggle button on the right */}
         <div className="flex items-center justify-between p-4 border-b border-white/10">
           <h2 className="text-lg font-bold">Panel de Socio</h2>
-          {!isMobile && (
-            <button
-              data-sidebar-toggle
-              className="p-1 rounded-md text-white hover:bg-white/10"
-              onClick={toggleCollapse}
-              aria-label="Colapsar menú"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-          )}
+          <button
+            data-sidebar-toggle
+            className="p-1 rounded-md text-white hover:bg-white/10"
+            onClick={isMobile ? toggleMobileMenu : toggleCollapse}
+            aria-label="Colapsar menú"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Navigation */}
@@ -160,6 +176,7 @@ export function DashboardSidebar() {
                       ? "bg-secondary text-black font-medium"
                       : "bg-black text-white hover:bg-secondary hover:text-black"
                   }`}
+                  onClick={() => isMobile && setIsMobileOpen(false)}
                 >
                   <span className="mr-3">{item.icon}</span>
                   <span>{item.name}</span>
@@ -174,6 +191,7 @@ export function DashboardSidebar() {
           <Link
             href="/dashboard/logout"
             className="flex items-center rounded-md px-3 py-2 text-red-300 hover:bg-secondary hover:text-red-500 transition-colors"
+            onClick={() => isMobile && setIsMobileOpen(false)}
           >
             <LogOut className="mr-3 h-5 w-5" />
             <span>Cerrar Sesión</span>
@@ -181,8 +199,8 @@ export function DashboardSidebar() {
         </div>
       </div>
 
-      {/* Icons-only sidebar (visible when collapsed on desktop) - completely separate component */}
-      {!isMobile && isCollapsed && (
+      {/* Icons-only sidebar for desktop (visible when collapsed) */}
+      {(!isMobile && isCollapsed) && (
         <div className="fixed top-16 bottom-0 left-0 z-30 w-16 bg-primary flex flex-col items-center py-8 overflow-y-auto">
           {/* Start navigation items below the toggle button */}
           <ul className="space-y-6 w-full mt-8">
@@ -198,6 +216,7 @@ export function DashboardSidebar() {
                   title={item.name}
                 >
                   {item.icon}
+                  {/* Remove the text span to only show icons */}
                 </Link>
               </li>
             ))}
@@ -209,11 +228,18 @@ export function DashboardSidebar() {
               title="Cerrar Sesión"
             >
               <LogOut className="h-5 w-5" />
+              {/* Remove the text span to only show icon */}
             </Link>
           </div>
+        </div>
+      )}
+
+      {/* Mobile collapsed sidebar - only shows toggle button, no icons */}
+      {(isMobile && !isMobileOpen) && (
+        <div className="fixed top-16 bottom-0 left-0 z-30 w-0 bg-primary overflow-hidden">
+          {/* This is intentionally empty - we only want the toggle button for mobile */}
         </div>
       )}
     </>
   )
 }
-

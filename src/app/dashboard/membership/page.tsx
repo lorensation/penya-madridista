@@ -107,7 +107,7 @@ export default function MembershipPage() {
     }
 
     loadUserAndMembership()
-  }, [router])
+  }, [router, supabase])
 
   const handleManageSubscription = async () => {
     if (!user || !membership?.stripe_customer_id) {
