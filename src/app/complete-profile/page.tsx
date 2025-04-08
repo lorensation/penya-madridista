@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { supabase } from "@/lib/supabase"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { ProfileForm } from "@/components/profile-form"
 import { Loader2 } from "lucide-react"
 import { Suspense } from "react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
 
 // Define types for checkout data
 interface CheckoutSessionData {
@@ -16,6 +18,7 @@ interface CheckoutSessionData {
   payment_status: string
   subscription_status: string | null
   plan_type?: string
+  last_four?: string | null
 }
 
 // Define types for form values
@@ -48,19 +51,19 @@ interface ProcessedMemberData {
   apellido1: string
   apellido2?: string
   dni_pasaporte: string
-  telefono: string | null
+  telefono: number | null  // Changed to number to match DB
   fecha_nacimiento: string
   direccion: string
   direccion_extra?: string
   poblacion: string
-  cp: string | null
+  cp: number | null  // Changed to number to match DB
   provincia: string
   pais: string
   nacionalidad: string
   es_socio_realmadrid: boolean
-  socio_carnet_madridista: boolean  // Added this missing property
-  num_socio?: string
-  num_carnet?: string
+  socio_carnet_madridista: boolean
+  num_socio?: number | null  // Changed to number to match DB
+  num_carnet?: number | null  // Changed to number to match DB
   email_notifications: boolean
   marketing_emails: boolean
   
@@ -76,6 +79,7 @@ interface ProcessedMemberData {
   subscription_id?: string
   subscription_updated_at?: string
   stripe_customer_id?: string
+  last_four?: string | null
 }
 
 // Loading component
@@ -94,9 +98,14 @@ function CompleteProfileContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get("session_id")
+  const userId = searchParams.get("userId")
+  
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [checkoutData, setCheckoutData] = useState<CheckoutSessionData | null>(null)
+  const [authError, setAuthError] = useState<boolean>(false)
+
+  const supabase = createBrowserSupabaseClient()
 
   useEffect(() => {
     async function checkUserAndSession() {
@@ -106,17 +115,26 @@ function CompleteProfileContent() {
         
         if (userError || !userData.user) {
           console.error("Authentication error:", userError)
-          router.push("/login?redirect=/complete-profile" + (sessionId ? `?session_id=${sessionId}` : ""))
+          setAuthError(true)
+          setLoading(false)
           return
         }
 
-        const userId = userData.user.id
+        // If userId is provided in URL and doesn't match current user, show auth error
+        if (userId && userData.user.id !== userId) {
+          console.error("User ID mismatch:", userId, userData.user.id)
+          setAuthError(true)
+          setLoading(false)
+          return
+        }
+
+        const currentUserId = userData.user.id
 
         // Check if the user already has a profile in the miembros table
         const { data: memberData, error: memberError } = await supabase
           .from("miembros")
           .select("*")
-          .eq("id", userId)  // Using 'id' instead of 'auth_id'
+          .eq("id", currentUserId)
           .maybeSingle()
 
         if (memberError && memberError.code !== "PGRST116") {
@@ -133,26 +151,35 @@ function CompleteProfileContent() {
           // If there's a session_id, we need to update the profile with subscription info
           if (sessionId) {
             try {
-              // Fetch checkout session data
-              const response = await fetch(`/api/checkout/session?session_id=${sessionId}`)
+              // Verify the checkout session
+              const response = await fetch("/api/verify-checkout-session", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ sessionId }),
+              })
+              
               if (!response.ok) {
-                throw new Error(`Failed to fetch session: ${response.statusText}`)
+                const errorData = await response.json()
+                throw new Error(errorData.error || "Failed to verify checkout session")
               }
               
               const sessionData = await response.json()
               
               // Update the member profile with subscription details
-              if (sessionData.success) {
+              if (sessionData.status === "complete") {
                 const { error: updateError } = await supabase
                   .from("miembros")
                   .update({
-                    subscription_status: sessionData.session.subscription_status || "active",
-                    subscription_plan: sessionData.session.plan_type,
-                    subscription_id: sessionData.session.subscription_id,
+                    subscription_status: "active",
+                    subscription_plan: sessionData.plan,
+                    subscription_id: sessionData.subscriptionId,
                     subscription_updated_at: new Date().toISOString(),
-                    stripe_customer_id: sessionData.session.customer_id,
+                    stripe_customer_id: sessionData.customerId,
+                    last_four: sessionData.lastFour
                   })
-                  .eq("id", userId)
+                  .eq("id", currentUserId)
 
                 if (updateError) {
                   console.error("Error updating subscription details:", updateError)
@@ -161,10 +188,14 @@ function CompleteProfileContent() {
                   // Redirect to dashboard after successful update
                   router.push("/dashboard?subscription=success")
                 }
+              } else {
+                setError("Payment not completed. Please try again or contact support.")
+                setLoading(false)
               }
             } catch (sessionError) {
               console.error("Error processing session:", sessionError)
               setError("Failed to process subscription information. Please contact support.")
+              setLoading(false)
             }
           } else {
             // No session_id, just redirect to dashboard
@@ -173,17 +204,40 @@ function CompleteProfileContent() {
         } else {
           // No existing profile, continue with form
           if (sessionId) {
-            // If there's a session_id, fetch the checkout data
+            // If there's a session_id, verify the checkout session
             try {
-              const response = await fetch(`/api/checkout/session?session_id=${sessionId}`)
+              const response = await fetch("/api/verify-checkout-session", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ sessionId }),
+              })
+              
               if (!response.ok) {
-                throw new Error(`Failed to fetch session: ${response.statusText}`)
+                const errorData = await response.json()
+                throw new Error(errorData.error || "Failed to verify checkout session")
               }
               
               const sessionData = await response.json()
-              setCheckoutData(sessionData.session)
+              
+              if (sessionData.status === "complete") {
+                setCheckoutData({
+                  id: sessionId,
+                  status: "complete",
+                  customer_id: sessionData.customerId,
+                  subscription_id: sessionData.subscriptionId,
+                  payment_status: "paid",
+                  subscription_status: "active",
+                  plan_type: sessionData.plan,
+                  last_four: sessionData.lastFour
+                })
+              } else {
+                console.warn("Payment not completed:", sessionData.status)
+                // Continue anyway, we'll just not have the checkout data
+              }
             } catch (sessionError) {
-              console.error("Error fetching session:", sessionError)
+              console.error("Error verifying session:", sessionError)
               // Continue anyway, we'll just not have the checkout data
             }
           }
@@ -199,7 +253,7 @@ function CompleteProfileContent() {
     }
 
     checkUserAndSession()
-  }, [router, sessionId])
+  }, [router, sessionId, userId])
 
   const handleProfileSubmit = async (formData: ProfileFormValues) => {
     try {
@@ -230,11 +284,11 @@ function CompleteProfileContent() {
         email_notifications: formData.email_notifications,
         marketing_emails: formData.marketing_emails,
         
-        // Handle fields that can be null
-        telefono: formData.telefono || null,
-        cp: formData.cp || null,
-        num_socio: formData.es_socio_realmadrid ? formData.num_socio : undefined,
-        num_carnet: formData.socio_carnet_madridista ? formData.num_carnet : undefined,
+        // Handle fields that need to be converted to numbers
+        telefono: formData.telefono ? parseInt(formData.telefono, 10) || null : null,
+        cp: formData.cp ? parseInt(formData.cp, 10) || null : null,
+        num_socio: formData.es_socio_realmadrid && formData.num_socio ? parseInt(formData.num_socio, 10) || null : null,
+        num_carnet: formData.socio_carnet_madridista && formData.num_carnet ? parseInt(formData.num_carnet, 10) || null : null,
         
         // Add user ID and email
         id: userData.user.id,  // This is the auth.uid() which maps to miembros.id
@@ -250,6 +304,7 @@ function CompleteProfileContent() {
         processedData.subscription_id = checkoutData.subscription_id ?? undefined
         processedData.subscription_updated_at = new Date().toISOString()
         processedData.stripe_customer_id = checkoutData.customer_id ?? undefined
+        processedData.last_four = checkoutData.last_four
       }
 
       // Insert the new member profile
@@ -285,6 +340,30 @@ function CompleteProfileContent() {
     )
   }
 
+  if (authError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
+          <div className="text-red-500 mx-auto h-12 w-12">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-red-600">Error de Autenticación</h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Necesitas iniciar sesión para completar tu perfil.
+          </p>
+          <Button 
+            onClick={() => router.push(`/login?returnUrl=${encodeURIComponent(`/complete-profile?session_id=${sessionId || ''}&userId=${userId || ''}`)}`)}
+            className="mt-6 w-full"
+          >
+            Iniciar Sesión
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   if (error) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -312,11 +391,11 @@ function CompleteProfileContent() {
       <div className="max-w-3xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-center">Completa tu Perfil de Socio</h1>
         {checkoutData && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
-            <p className="text-green-700 font-medium">
+          <Alert className="mb-6 bg-green-50 border-green-200">
+            <AlertDescription className="text-green-700 font-medium">
               ¡Tu pago ha sido procesado correctamente! Por favor, completa tu perfil para activar tu membresía.
-            </p>
-          </div>
+            </AlertDescription>
+          </Alert>
         )}
         <ProfileForm onSubmit={handleProfileSubmit} />
       </div>
