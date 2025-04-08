@@ -79,18 +79,17 @@ export default function EventsPage() {
   useEffect(() => {
     const checkUser = async () => {
       try {
-        const { data: userData } = await supabase.auth.getUser()
+        const { data: userData, error: userError } = await supabase.auth.getUser()
 
         if (!userData.user) {
-          router.push("/login")
-          return
+          console.log("Auth User fetch error: ", userError)
         }
 
         // Fetch user profile
         const { data: profileData, error: profileError } = await supabase
           .from("miembros")
           .select("*")
-          .eq("auth_id", userData.user.id)
+          .eq("id", userData.user?.id || "")
           .single()
 
         if (profileError) {

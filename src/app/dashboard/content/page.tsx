@@ -3,12 +3,11 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { FileText, Video, Download, AlertTriangle, AlertCircle, CheckCircle } from "lucide-react"
-import type { Database } from "@/types/supabase"
+import { createBrowserSupabaseClient } from "@/lib/supabase"
 
 // Define types for our content
 interface ContentItem {
@@ -21,9 +20,9 @@ interface ContentItem {
   pages?: number
   images?: number
   thumbnail: string
+  url: string 
 }
 
-// Mock content data
 const exclusiveContent: ContentItem[] = [
   {
     id: 1,
@@ -32,7 +31,8 @@ const exclusiveContent: ContentItem[] = [
     type: "video",
     date: "2023-11-10",
     duration: "45 min",
-    thumbnail: "/placeholder.svg?height=200&width=400",
+    thumbnail: "/fernandosanz-charla.jpg",
+    url: "https://youtu.be/7hREq-thSEU?si=_ctHiXIRb-5Fso56"
   },
   {
     id: 2,
@@ -42,7 +42,8 @@ const exclusiveContent: ContentItem[] = [
     type: "video",
     date: "2023-10-15",
     duration: "60 min",
-    thumbnail: "/placeholder.svg?height=200&width=400",
+    thumbnail: "/reportaje-movistar.jpg",
+    url: "https://youtu.be/jBbeZ5s04EI?si=Qdm0-UCOlbNw9XSF"
   },
   {
     id: 3,
@@ -50,8 +51,9 @@ const exclusiveContent: ContentItem[] = [
     description: "Todo lo que necesitas saber para disfrutar al máximo de tu visita al estadio Santiago Bernabéu.",
     type: "pdf",
     date: "2023-09-20",
-    pages: 25,
-    thumbnail: "/placeholder.svg?height=200&width=400",
+    pages: 5,
+    thumbnail: "/santiagobernabeu.jpg",
+    url: "https://www.esmadrid.com/informacion-turistica/estadio-santiago-bernabeu"
   },
   {
     id: 4,
@@ -60,7 +62,8 @@ const exclusiveContent: ContentItem[] = [
     type: "pdf",
     date: "2023-08-05",
     pages: 120,
-    thumbnail: "/placeholder.svg?height=200&width=400",
+    thumbnail: "/Logo-Penya-LS.jpg",
+    url: "/content/pdfs/historia-ilustrada"
   },
   {
     id: 5,
@@ -69,7 +72,18 @@ const exclusiveContent: ContentItem[] = [
     type: "gallery",
     date: "2023-07-12",
     images: 45,
-    thumbnail: "/placeholder.svg?height=200&width=400",
+    thumbnail: "/lorenzosanz-bufanda.jpg",
+    url: "/content/galleries/fotos-historicas"
+  },
+  {
+    id: 5,
+    title: "Entrevista exclusiva con Lorenzo Sanz",
+    description: "Lorenzo Sanz hijo nos cuenta como su padre revolucionó el ámbito de la gestión deportiva y otros temas.",
+    type: "video",
+    date: "2025-03-08",
+    duration: "100 min",
+    thumbnail: "/LorenzoSanzjr-lagalerna.jpg",
+    url: "/content/galleries/fotos-historicas"
   },
 ]
 
@@ -88,7 +102,7 @@ export default function ContentPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   // Initialize Supabase client
-  const supabase = createClientComponentClient<Database>()
+  const supabase = createBrowserSupabaseClient()
 
   useEffect(() => {
     let isMounted = true; // Flag to prevent state updates after unmount
@@ -128,7 +142,7 @@ export default function ContentPage() {
         const { data: profileData, error: profileError } = await supabase
           .from("miembros")
           .select("*")
-          .eq("auth_id", userId)
+          .eq("id", userId)
           .single()
 
         if (profileError) {
@@ -346,9 +360,10 @@ export default function ContentPage() {
         </CardHeader>
       </Card>
 
+      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {exclusiveContent.map((content) => (
-          <Card key={content.id} className="overflow-hidden">
+          <Card key={content.id} className="overflow-hidden flex flex-col h-full">
             <div className="relative h-48">
               <Image src={content.thumbnail || "/placeholder.svg"} alt={content.title} fill className="object-cover" />
               {content.type === "video" && (
@@ -380,16 +395,17 @@ export default function ContentPage() {
               <CardTitle className="text-lg">{content.title}</CardTitle>
               <CardDescription>{content.description}</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-sm text-gray-500">
-                  {content.type === "video" && `Duración: ${content.duration}`}
-                  {content.type === "pdf" && `${content.pages} páginas`}
-                  {content.type === "gallery" && `${content.images} imágenes`}
-                </span>
+            <CardContent className="flex-grow">
+              <div className="text-sm text-gray-500">
+                {content.type === "video" && `Duración: ${content.duration}`}
+                {content.type === "pdf" && `${content.pages} páginas`}
+                {content.type === "gallery" && `${content.images} imágenes`}
               </div>
+            </CardContent>
+            <CardFooter className="mt-auto pt-4">
               <Button 
-                className="w-full transition-colors hover:bg-white hover:text-primary hover:border-primary"
+                className="w-full transition-colors hover:bg-white hover:text-primary hover:border hover:border-black"
+                onClick={() => router.push(content.url)}
               >
                 {content.type === "video"
                   ? "Ver Video"
@@ -397,7 +413,7 @@ export default function ContentPage() {
                     ? "Descargar PDF"
                     : "Ver Galería"}
               </Button>
-            </CardContent>
+            </CardFooter>
           </Card>
         ))}
       </div>

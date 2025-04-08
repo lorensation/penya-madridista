@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { createBillingPortalSession } from "@/app/actions/stripe"
-import { supabase } from "@/lib/supabase"
+import { createBrowserSupabaseClient } from "@/lib/supabase"
 import { CheckCircle, AlertCircle } from "lucide-react"
 import { User } from "@supabase/supabase-js"
 
@@ -41,6 +41,8 @@ export default function MembershipPage() {
   const [membership, setMembership] = useState<Membership | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [managingSubscription, setManagingSubscription] = useState(false)
+
+  const supabase = createBrowserSupabaseClient()
 
   const success = searchParams?.get("success") === "true"
   const canceled = searchParams?.get("canceled") === "true"
@@ -82,8 +84,8 @@ export default function MembershipPage() {
         try {
           const { data: memberData, error: memberError } = await supabase
             .from("miembros")
-            .select("*, subscriptions(*)")
-            .eq("user_uuid", userData.user.id)
+            .select("*")
+            .eq("id", userData.user.id)
             .single()
           
           if (memberError) {
