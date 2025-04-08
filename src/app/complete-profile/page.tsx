@@ -253,7 +253,7 @@ function CompleteProfileContent() {
     }
 
     checkUserAndSession()
-  }, [router, sessionId, userId])
+  }, [router, sessionId, userId, supabase])
 
   const handleProfileSubmit = async (formData: ProfileFormValues) => {
     try {

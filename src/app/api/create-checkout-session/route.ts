@@ -31,6 +31,8 @@ export async function POST(request: NextRequest) {
       .select("email, name")
       .eq("id", userId)
       .single()
+    
+      if (userError) console.log("Error while fetching userData from miembros: ", userError) 
 
     // If user doesn't have a profile yet, use the auth user data
     const userEmail = userData?.email || authUser.user.email
@@ -65,6 +67,7 @@ export async function POST(request: NextRequest) {
       // Add metadata to the session itself as well
       metadata: {
         userId,
+        userName,
         price_id: priceId,
       },
     })
