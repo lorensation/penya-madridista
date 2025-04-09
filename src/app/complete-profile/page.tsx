@@ -51,28 +51,28 @@ interface ProcessedMemberData {
   apellido1: string
   apellido2?: string
   dni_pasaporte: string
-  telefono: number | null  // Changed to number to match DB
+  telefono: number | null // Changed to number to match DB
   fecha_nacimiento: string
   direccion: string
   direccion_extra?: string
   poblacion: string
-  cp: number | null  // Changed to number to match DB
+  cp: number | null // Changed to number to match DB
   provincia: string
   pais: string
   nacionalidad: string
   es_socio_realmadrid: boolean
   socio_carnet_madridista: boolean
-  num_socio?: number | null  // Changed to number to match DB
-  num_carnet?: number | null  // Changed to number to match DB
+  num_socio?: number | null // Changed to number to match DB
+  num_carnet?: number | null // Changed to number to match DB
   email_notifications: boolean
   marketing_emails: boolean
-  
+
   // User identification fields
   id: string
   user_uuid: string
   email: string | undefined
   created_at: string
-  
+
   // Subscription fields
   subscription_status?: string
   subscription_plan?: string
@@ -99,7 +99,7 @@ function CompleteProfileContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get("session_id")
   const userId = searchParams.get("userId")
-  
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [checkoutData, setCheckoutData] = useState<CheckoutSessionData | null>(null)
@@ -112,7 +112,7 @@ function CompleteProfileContent() {
       try {
         // Get the current user
         const { data: userData, error: userError } = await supabase.auth.getUser()
-        
+
         if (userError || !userData.user) {
           console.error("Authentication error:", userError)
           setAuthError(true)
@@ -147,7 +147,7 @@ function CompleteProfileContent() {
         // If user already has a profile
         if (memberData) {
           console.log("User already has a profile, redirecting to dashboard")
-          
+
           // If there's a session_id, we need to update the profile with subscription info
           if (sessionId) {
             try {
@@ -156,17 +156,65 @@ function CompleteProfileContent() {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
+                  "x-user-id": currentUserId, // Add the user ID in the headers
                 },
-                body: JSON.stringify({ sessionId }),
+                body: JSON.stringify({
+                  sessionId,
+                  userId: currentUserId, // Also include it in the body for redundancy
+                }),
               })
-              
+
               if (!response.ok) {
                 const errorData = await response.json()
+                console.error("Checkout session verification failed:", errorData)
+
+                // If the error is about missing user ID but we have the user ID, retry with explicit user ID
+                if (errorData.error === "User ID not found in session" && currentUserId) {
+                  setError("Retrying checkout verification with explicit user ID...")
+
+                  try {
+                    const retryResponse = await fetch("/api/verify-checkout-session", {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                      },
+                      body: JSON.stringify({
+                        sessionId,
+                        userId: currentUserId,
+                        retry: true,
+                      }),
+                    })
+
+                    if (retryResponse.ok) {
+                      const sessionData = await retryResponse.json()
+                      // Continue with the successful response
+                      if (sessionData.status === "complete") {
+                        setCheckoutData({
+                          id: sessionId,
+                          status: "complete",
+                          customer_id: sessionData.customerId,
+                          subscription_id: sessionData.subscriptionId,
+                          payment_status: "paid",
+                          subscription_status: "active",
+                          plan_type: sessionData.plan,
+                          last_four: sessionData.lastFour,
+                        })
+                        setLoading(false)
+                        return
+                      }
+                    } else {
+                      throw new Error("Retry failed: " + (await retryResponse.json()).error || "Unknown error")
+                    }
+                  } catch (retryError) {
+                    console.error("Retry error:", retryError)
+                  }
+                }
+
                 throw new Error(errorData.error || "Failed to verify checkout session")
               }
-              
+
               const sessionData = await response.json()
-              
+
               // Update the member profile with subscription details
               if (sessionData.status === "complete") {
                 const { error: updateError } = await supabase
@@ -177,7 +225,7 @@ function CompleteProfileContent() {
                     subscription_id: sessionData.subscriptionId,
                     subscription_updated_at: new Date().toISOString(),
                     stripe_customer_id: sessionData.customerId,
-                    last_four: sessionData.lastFour
+                    last_four: sessionData.lastFour,
                   })
                   .eq("id", currentUserId)
 
@@ -210,17 +258,65 @@ function CompleteProfileContent() {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
+                  "x-user-id": currentUserId, // Add the user ID in the headers
                 },
-                body: JSON.stringify({ sessionId }),
+                body: JSON.stringify({
+                  sessionId,
+                  userId: currentUserId, // Also include it in the body for redundancy
+                }),
               })
-              
+
               if (!response.ok) {
                 const errorData = await response.json()
+                console.error("Checkout session verification failed:", errorData)
+
+                // If the error is about missing user ID but we have the user ID, retry with explicit user ID
+                if (errorData.error === "User ID not found in session" && currentUserId) {
+                  setError("Retrying checkout verification with explicit user ID...")
+
+                  try {
+                    const retryResponse = await fetch("/api/verify-checkout-session", {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                      },
+                      body: JSON.stringify({
+                        sessionId,
+                        userId: currentUserId,
+                        retry: true,
+                      }),
+                    })
+
+                    if (retryResponse.ok) {
+                      const sessionData = await retryResponse.json()
+                      // Continue with the successful response
+                      if (sessionData.status === "complete") {
+                        setCheckoutData({
+                          id: sessionId,
+                          status: "complete",
+                          customer_id: sessionData.customerId,
+                          subscription_id: sessionData.subscriptionId,
+                          payment_status: "paid",
+                          subscription_status: "active",
+                          plan_type: sessionData.plan,
+                          last_four: sessionData.lastFour,
+                        })
+                        setLoading(false)
+                        return
+                      }
+                    } else {
+                      throw new Error("Retry failed: " + (await retryResponse.json()).error || "Unknown error")
+                    }
+                  } catch (retryError) {
+                    console.error("Retry error:", retryError)
+                  }
+                }
+
                 throw new Error(errorData.error || "Failed to verify checkout session")
               }
-              
+
               const sessionData = await response.json()
-              
+
               if (sessionData.status === "complete") {
                 setCheckoutData({
                   id: sessionId,
@@ -230,7 +326,7 @@ function CompleteProfileContent() {
                   payment_status: "paid",
                   subscription_status: "active",
                   plan_type: sessionData.plan,
-                  last_four: sessionData.lastFour
+                  last_four: sessionData.lastFour,
                 })
               } else {
                 console.warn("Payment not completed:", sessionData.status)
@@ -241,7 +337,7 @@ function CompleteProfileContent() {
               // Continue anyway, we'll just not have the checkout data
             }
           }
-          
+
           setLoading(false)
         }
       } catch (error) {
@@ -258,7 +354,7 @@ function CompleteProfileContent() {
   const handleProfileSubmit = async (formData: ProfileFormValues) => {
     try {
       setLoading(true)
-      
+
       // Get the current user
       const { data: userData } = await supabase.auth.getUser()
       if (!userData.user) {
@@ -283,16 +379,20 @@ function CompleteProfileContent() {
         socio_carnet_madridista: formData.socio_carnet_madridista,
         email_notifications: formData.email_notifications,
         marketing_emails: formData.marketing_emails,
-        
+
         // Handle fields that need to be converted to numbers
-        telefono: formData.telefono ? parseInt(formData.telefono, 10) || null : null,
-        cp: formData.cp ? parseInt(formData.cp, 10) || null : null,
-        num_socio: formData.es_socio_realmadrid && formData.num_socio ? parseInt(formData.num_socio, 10) || null : null,
-        num_carnet: formData.socio_carnet_madridista && formData.num_carnet ? parseInt(formData.num_carnet, 10) || null : null,
-        
+        telefono: formData.telefono ? Number.parseInt(formData.telefono, 10) || null : null,
+        cp: formData.cp ? Number.parseInt(formData.cp, 10) || null : null,
+        num_socio:
+          formData.es_socio_realmadrid && formData.num_socio ? Number.parseInt(formData.num_socio, 10) || null : null,
+        num_carnet:
+          formData.socio_carnet_madridista && formData.num_carnet
+            ? Number.parseInt(formData.num_carnet, 10) || null
+            : null,
+
         // Add user ID and email
-        id: userData.user.id,  // This is the auth.uid() which maps to miembros.id
-        user_uuid: userData.user.id,  // This is for the public.users table
+        id: userData.user.id, // This is the auth.uid() which maps to miembros.id
+        user_uuid: userData.user.id, // This is for the public.users table
         email: userData.user.email,
         created_at: new Date().toISOString(),
       }
@@ -308,9 +408,7 @@ function CompleteProfileContent() {
       }
 
       // Insert the new member profile
-      const { error: insertError } = await supabase
-        .from("miembros")
-        .insert(processedData)
+      const { error: insertError } = await supabase.from("miembros").insert(processedData)
 
       if (insertError) {
         console.error("Error creating profile:", insertError)
@@ -346,15 +444,22 @@ function CompleteProfileContent() {
         <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
           <div className="text-red-500 mx-auto h-12 w-12">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           </div>
           <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-red-600">Error de Autenticación</h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Necesitas iniciar sesión para completar tu perfil.
-          </p>
-          <Button 
-            onClick={() => router.push(`/login?returnUrl=${encodeURIComponent(`/complete-profile?session_id=${sessionId || ''}&userId=${userId || ''}`)}`)}
+          <p className="mt-2 text-center text-sm text-gray-600">Necesitas iniciar sesión para completar tu perfil.</p>
+          <Button
+            onClick={() =>
+              router.push(
+                `/login?returnUrl=${encodeURIComponent(`/complete-profile?session_id=${sessionId || ""}&userId=${userId || ""}`)}`,
+              )
+            }
             className="mt-6 w-full"
           >
             Iniciar Sesión
@@ -370,7 +475,12 @@ function CompleteProfileContent() {
         <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
           <div className="text-red-500 mx-auto h-12 w-12">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           </div>
           <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-red-600">Error</h2>

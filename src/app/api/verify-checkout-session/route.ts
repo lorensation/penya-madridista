@@ -14,9 +14,9 @@ const serviceRoleClient = createClient<Database>(
   {
     auth: {
       autoRefreshToken: false,
-      persistSession: false
-    }
-  }
+      persistSession: false,
+    },
+  },
 )
 
 export async function POST(request: NextRequest) {
@@ -31,36 +31,59 @@ export async function POST(request: NextRequest) {
 
     // Retrieve the checkout session from Stripe
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ['subscription', 'customer', 'line_items']
+      expand: ["subscription", "customer", "line_items"],
     })
 
     if (!session) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 })
     }
 
-    // Get the user ID from the session metadata
-    const userId = session.metadata?.userId || session.client_reference_id
+    // Get the user ID from the session metadata, client_reference_id, or from the request body
+    let userId = session.metadata?.userId || session.client_reference_id || request.headers.get("x-user-id")
+
+    // If userId is still not found, try to extract it from the request body
+    if (!userId) {
+      try {
+        const requestBody = await request.clone().json()
+        userId = requestBody.userId
+      } catch (e) {
+        // Ignore parsing errors
+      }
+    }
 
     if (!userId) {
       console.error("User ID missing in session:", {
         sessionId,
         metadata: session.metadata,
-        clientReferenceId: session.client_reference_id
+        clientReferenceId: session.client_reference_id,
       })
-      return NextResponse.json({ error: "User ID not found in session" }, { status: 400 })
+
+      // Return a more detailed error response
+      return NextResponse.json(
+        {
+          error: "User ID not found in session",
+          session: {
+            id: session.id,
+            hasMetadata: !!session.metadata,
+            hasClientReferenceId: !!session.client_reference_id,
+          },
+          status: "incomplete",
+        },
+        { status: 400 },
+      )
     }
 
     // Get the subscription details
     const subscription = session.subscription as Stripe.Subscription
     const customer = session.customer as Stripe.Customer
-    
+
     // Get payment method details to extract last four digits
     let lastFour = null
     if (subscription && subscription.default_payment_method) {
       const paymentMethod = await stripe.paymentMethods.retrieve(
-        typeof subscription.default_payment_method === 'string' 
-          ? subscription.default_payment_method 
-          : subscription.default_payment_method.id
+        typeof subscription.default_payment_method === "string"
+          ? subscription.default_payment_method
+          : subscription.default_payment_method.id,
       )
       lastFour = paymentMethod.card?.last4
     }
@@ -68,7 +91,7 @@ export async function POST(request: NextRequest) {
     // Determine the subscription plan based on the price ID
     const lineItems = session.line_items?.data || []
     const priceId = lineItems[0]?.price?.id || session.metadata?.price_id
-    
+
     let plan = null
     if (priceId === process.env.NEXT_PUBLIC_STRIPE_ANNUAL_PRICE_ID) {
       plan = "annual"
@@ -84,13 +107,13 @@ export async function POST(request: NextRequest) {
       .select("*")
       .eq("metadata->stripe_session_id", sessionId)
       .limit(1)
-    
+
     if (findError) {
       console.error("Error finding checkout session:", findError)
     }
-    
+
     const checkoutSession = checkoutSessions && checkoutSessions.length > 0 ? checkoutSessions[0] : null
-    
+
     if (checkoutSession) {
       // Update the existing checkout session
       const { error: updateError } = await serviceRoleClient
@@ -107,8 +130,8 @@ export async function POST(request: NextRequest) {
             payment_status: session.payment_status,
             subscription_status: subscription?.status || "active",
             last_four: lastFour,
-            plan
-          }
+            plan,
+          },
         })
         .eq("session_id", checkoutSession.session_id)
 
@@ -119,9 +142,8 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // Create a new checkout session record
-      const { error: insertError } = await serviceRoleClient
-        .from("checkout_sessions")
-        .insert([{
+      const { error: insertError } = await serviceRoleClient.from("checkout_sessions").insert([
+        {
           user_id: userId,
           status: session.payment_status,
           subscription_id: subscription?.id,
@@ -134,9 +156,10 @@ export async function POST(request: NextRequest) {
             payment_status: session.payment_status,
             subscription_status: subscription?.status || "active",
             last_four: lastFour,
-            plan
-          }
-        }])
+            plan,
+          },
+        },
+      ])
 
       if (insertError) {
         console.error("Error creating checkout session:", insertError)
@@ -151,7 +174,7 @@ export async function POST(request: NextRequest) {
       subscriptionId: subscription?.id,
       customerId: customer?.id,
       lastFour,
-      userId // Include userId in the response for debugging
+      userId, // Include userId in the response for debugging
     })
   } catch (error: unknown) {
     console.error("Error verifying checkout session:", error)
