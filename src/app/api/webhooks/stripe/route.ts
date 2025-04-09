@@ -81,20 +81,14 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       subscriptionData = subscription
     }
 
-    // Check if a checkout session record already exists
-    const { data: existingSession, error: checkError } = await serviceRoleClient
-      .from("checkout_sessions")
-      .select("*")
-      .eq("session_id", session.id)
-      .maybeSingle()
-
-    if (checkError && checkError.code !== "PGRST116") {
-      console.error("Error checking for existing checkout session:", checkError)
-      return
-    }
-
     // Extract the plan type from metadata or line items
     let planType = "unknown"
+    let priceId = null
+    
+    if (session.metadata && session.metadata.price_id) {
+      priceId = session.metadata.price_id
+    }
+    
     if (session.metadata && session.metadata.plan_type) {
       planType = session.metadata.plan_type
     } else if (session.line_items) {
@@ -104,13 +98,34 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         if (lineItems.data.length > 0 && lineItems.data[0].price) {
           const price = await stripe.prices.retrieve(lineItems.data[0].price.id)
           planType = price.nickname || price.id
+          priceId = lineItems.data[0].price.id
         }
       } catch (e) {
         console.error("Error fetching line items:", e)
       }
     }
 
-    if (existingSession) {
+    // Prepare metadata to store
+    const metadataObj = {
+      plan_type: planType,
+      payment_status: session.payment_status,
+      payment_intent: session.payment_intent || null,
+      ...session.metadata
+    }
+
+    // Check if a checkout session record already exists with the Stripe session ID
+    // We'll use a custom query to match the Stripe session ID with our UUID
+    const { data: existingSessions, error: checkError } = await serviceRoleClient
+      .from("checkout_sessions")
+      .select("*")
+      .eq("metadata->stripe_session_id", session.id)
+
+    if (checkError) {
+      console.error("Error checking for existing checkout session:", checkError)
+      return
+    }
+
+    if (existingSessions && existingSessions.length > 0) {
       // Update the existing record
       const { error: updateError } = await serviceRoleClient
         .from("checkout_sessions")
@@ -119,18 +134,20 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           updated_at: new Date().toISOString(),
           subscription_id: session.subscription as string || null,
           customer_id: session.customer as string || null,
-          subscription_status: subscriptionData ? subscriptionData.status : "active",
-          payment_status: session.payment_status,
-          payment_intent: session.payment_intent as string || null,
-          plan_type: planType,
+          price_id: priceId,
+          metadata: {
+            ...existingSessions[0].metadata,
+            ...metadataObj,
+            subscription_status: subscriptionData ? subscriptionData.status : "active"
+          }
         })
-        .eq("session_id", session.id)
+        .eq("session_id", existingSessions[0].session_id)
 
       if (updateError) {
         console.error("Error updating checkout session:", updateError)
         return
       }
-      console.log(`Updated existing checkout session: ${session.id}`)
+      console.log(`Updated existing checkout session for Stripe session: ${session.id}`)
     } else {
       // Create a new record if it doesn't exist
       // Only proceed if we have a user_id (client_reference_id)
@@ -140,18 +157,18 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       }
 
       const sessionData = {
-        session_id: session.id,
         user_id: session.client_reference_id,
         status: session.status,
         updated_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
         subscription_id: session.subscription as string || null,
         customer_id: session.customer as string || null,
-        subscription_status: subscriptionData ? subscriptionData.status : "active",
-        payment_status: session.payment_status,
-        payment_intent: session.payment_intent as string || null,
-        plan_type: planType,
-        price_id: session.metadata?.price_id || null,
+        price_id: priceId,
+        metadata: {
+          stripe_session_id: session.id, // Store the Stripe session ID in metadata
+          ...metadataObj,
+          subscription_status: subscriptionData ? subscriptionData.status : "active"
+        }
       }
 
       const { error: insertError } = await serviceRoleClient
@@ -162,7 +179,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         console.error("Error creating checkout session:", insertError)
         return
       }
-      console.log(`Created new checkout session record: ${session.id}`)
+      console.log(`Created new checkout session record for Stripe session: ${session.id}`)
     }
 
     // We don't update the miembros table here because the user might need to complete their profile first
@@ -176,7 +193,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   try {
     // Find the user associated with this subscription
-    // Note: Using 'id' column instead of 'auth_id'
     const { data: memberData, error: memberError } = await serviceRoleClient
       .from("miembros")
       .select("id, user_uuid")
@@ -190,7 +206,6 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
     if (memberData) {
       // Update the member's subscription status
-      // Note: Using 'id' column instead of 'auth_id'
       const { error: updateMemberError } = await serviceRoleClient
         .from("miembros")
         .update({
@@ -211,7 +226,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     // Also update any related checkout sessions
     const { data: checkoutSessions, error: sessionsError } = await serviceRoleClient
       .from("checkout_sessions")
-      .select("id, session_id")
+      .select("*")
       .eq("subscription_id", subscription.id)
 
     if (sessionsError) {
@@ -220,19 +235,25 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     }
 
     if (checkoutSessions && checkoutSessions.length > 0) {
-      const { error: updateSessionError } = await serviceRoleClient
-        .from("checkout_sessions")
-        .update({
-          subscription_status: subscription.status,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("subscription_id", subscription.id)
-      
-      if (updateSessionError) {
-        console.error("Error updating checkout sessions:", updateSessionError)
-      } else {
-        console.log(`Updated ${checkoutSessions.length} checkout sessions for subscription ${subscription.id}`)
+      // Update each session individually to properly handle the metadata
+      for (const session of checkoutSessions) {
+        const { error: updateSessionError } = await serviceRoleClient
+          .from("checkout_sessions")
+          .update({
+            updated_at: new Date().toISOString(),
+            metadata: {
+              ...session.metadata,
+              subscription_status: subscription.status
+            }
+          })
+          .eq("session_id", session.session_id)
+        
+        if (updateSessionError) {
+          console.error(`Error updating checkout session ${session.session_id}:`, updateSessionError)
+        }
       }
+      
+      console.log(`Updated ${checkoutSessions.length} checkout sessions for subscription ${subscription.id}`)
     } else {
       console.log(`No checkout sessions found with subscription_id ${subscription.id}`)
     }
@@ -246,7 +267,6 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   try {
     // Find the user associated with this subscription
-    // Note: Using 'id' column instead of 'auth_id'
     const { data: memberData, error: memberError } = await serviceRoleClient
       .from("miembros")
       .select("id, user_uuid")
@@ -260,7 +280,6 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
     if (memberData) {
       // Update the member's subscription status to canceled
-      // Note: Using 'id' column instead of 'auth_id'
       const { error: updateMemberError } = await serviceRoleClient
         .from("miembros")
         .update({
@@ -281,7 +300,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     // Also update any related checkout sessions
     const { data: checkoutSessions, error: sessionsError } = await serviceRoleClient
       .from("checkout_sessions")
-      .select("id, session_id")
+      .select("*")
       .eq("subscription_id", subscription.id)
 
     if (sessionsError) {
@@ -290,19 +309,25 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     }
 
     if (checkoutSessions && checkoutSessions.length > 0) {
-      const { error: updateSessionError } = await serviceRoleClient
-        .from("checkout_sessions")
-        .update({
-          subscription_status: "canceled",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("subscription_id", subscription.id)
-      
-      if (updateSessionError) {
-        console.error("Error updating checkout sessions for canceled subscription:", updateSessionError)
-      } else {
-        console.log(`Updated ${checkoutSessions.length} checkout sessions for subscription ${subscription.id}`)
+      // Update each session individually to properly handle the metadata
+      for (const session of checkoutSessions) {
+        const { error: updateSessionError } = await serviceRoleClient
+          .from("checkout_sessions")
+          .update({
+            updated_at: new Date().toISOString(),
+            metadata: {
+              ...session.metadata,
+              subscription_status: "canceled"
+            }
+          })
+          .eq("session_id", session.session_id)
+        
+        if (updateSessionError) {
+          console.error(`Error updating checkout session ${session.session_id}:`, updateSessionError)
+        }
       }
+      
+      console.log(`Updated ${checkoutSessions.length} checkout sessions for subscription ${subscription.id}`)
     } else {
       console.log(`No checkout sessions found with subscription_id ${subscription.id}`)
     }
@@ -317,7 +342,6 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   try {
     if (invoice.subscription) {
       // Find members with this subscription that are in past_due status
-      // Note: Using 'id' column instead of 'auth_id'
       const { data: memberData, error: memberError } = await serviceRoleClient
         .from("miembros")
         .select("id, user_uuid")
@@ -332,7 +356,6 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 
       if (memberData) {
         // Update the subscription status to active
-        // Note: Using 'id' column instead of 'auth_id'
         const { error: updateError } = await serviceRoleClient
           .from("miembros")
           .update({
@@ -349,6 +372,43 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       } else {
         console.log(`No past_due member found with subscription_id ${invoice.subscription}`)
       }
+
+      // Also update any related checkout sessions
+      const { data: checkoutSessions, error: sessionsError } = await serviceRoleClient
+        .from("checkout_sessions")
+        .select("*")
+        .eq("subscription_id", invoice.subscription as string)
+
+      if (sessionsError) {
+        console.error("Error finding checkout sessions for invoice payment success:", sessionsError)
+        return
+      }
+
+      if (checkoutSessions && checkoutSessions.length > 0) {
+        // Update each session individually to properly handle the metadata
+        for (const session of checkoutSessions) {
+          if (session.metadata?.subscription_status === "past_due") {
+            const { error: updateSessionError } = await serviceRoleClient
+              .from("checkout_sessions")
+              .update({
+                updated_at: new Date().toISOString(),
+                metadata: {
+                  ...session.metadata,
+                  subscription_status: "active",
+                  last_invoice_paid: invoice.id,
+                  last_payment_date: new Date().toISOString()
+                }
+              })
+              .eq("session_id", session.session_id)
+            
+            if (updateSessionError) {
+              console.error(`Error updating checkout session ${session.session_id}:`, updateSessionError)
+            }
+          }
+        }
+        
+        console.log(`Updated checkout sessions for subscription ${invoice.subscription} after successful payment`)
+      }
     }
     console.log(`Successfully processed invoice.payment_succeeded for invoice ${invoice.id}`)
   } catch (error) {
@@ -360,7 +420,6 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   try {
     if (invoice.subscription) {
       // Find members with this subscription
-      // Note: Using 'id' column instead of 'auth_id'
       const { data: memberData, error: memberError } = await serviceRoleClient
         .from("miembros")
         .select("id, user_uuid")
@@ -374,7 +433,6 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 
       if (memberData) {
         // Update the subscription status to past_due
-        // Note: Using 'id' column instead of 'auth_id'
         const { error: updateError } = await serviceRoleClient
           .from("miembros")
           .update({
@@ -390,6 +448,41 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
         }
       } else {
         console.log(`No member found with subscription_id ${invoice.subscription}`)
+      }
+
+      // Also update any related checkout sessions
+      const { data: checkoutSessions, error: sessionsError } = await serviceRoleClient
+        .from("checkout_sessions")
+        .select("*")
+        .eq("subscription_id", invoice.subscription as string)
+
+      if (sessionsError) {
+        console.error("Error finding checkout sessions for invoice payment failure:", sessionsError)
+        return
+      }
+
+      if (checkoutSessions && checkoutSessions.length > 0) {
+        // Update each session individually to properly handle the metadata
+        for (const session of checkoutSessions) {
+          const { error: updateSessionError } = await serviceRoleClient
+            .from("checkout_sessions")
+            .update({
+              updated_at: new Date().toISOString(),
+              metadata: {
+                ...session.metadata,
+                subscription_status: "past_due",
+                last_invoice_failed: invoice.id,
+                last_payment_failure_date: new Date().toISOString()
+              }
+            })
+            .eq("session_id", session.session_id)
+          
+          if (updateSessionError) {
+            console.error(`Error updating checkout session ${session.session_id}:`, updateSessionError)
+          }
+        }
+        
+        console.log(`Updated checkout sessions for subscription ${invoice.subscription} after failed payment`)
       }
     }
     console.log(`Successfully processed invoice.payment_failed for invoice ${invoice.id}`)

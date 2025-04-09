@@ -32,11 +32,11 @@ export async function POST(request: NextRequest) {
       .eq("id", userId)
       .single()
     
-      if (userError) console.log("Error while fetching userData from miembros: ", userError) 
+    if (userError) console.log("Error while fetching userData from miembros: ", userError) 
 
     // If user doesn't have a profile yet, use the auth user data
     const userEmail = userData?.email || authUser.user.email
-    const userName = userData?.name || authUser.user.user_metadata?.name || ''
+    //const userName = userData?.name || authUser.user.user_metadata?.name || ''
     
     if (!userEmail) {
       return NextResponse.json({ error: "User email not found" }, { status: 404 })
@@ -67,7 +67,6 @@ export async function POST(request: NextRequest) {
       // Add metadata to the session itself as well
       metadata: {
         userId,
-        userName,
         price_id: priceId,
       },
     })

@@ -1,10 +1,23 @@
 import { type NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
-import { getServiceSupabase } from "@/lib/supabase"
+import { createClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/supabase"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-02-24.acacia",
 })
+
+// Create a service role client for admin operations that need to bypass RLS
+const serviceRoleClient = createClient<Database>(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+)
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,6 +26,8 @@ export async function POST(request: NextRequest) {
     if (!sessionId) {
       return NextResponse.json({ error: "Missing session ID" }, { status: 400 })
     }
+
+    console.log(`Processing checkout session: ${sessionId}`)
 
     // Retrieve the checkout session from Stripe
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
@@ -27,6 +42,11 @@ export async function POST(request: NextRequest) {
     const userId = session.metadata?.userId || session.client_reference_id
 
     if (!userId) {
+      console.error("User ID missing in session:", {
+        sessionId,
+        metadata: session.metadata,
+        clientReferenceId: session.client_reference_id
+      })
       return NextResponse.json({ error: "User ID not found in session" }, { status: 400 })
     }
 
@@ -54,23 +74,75 @@ export async function POST(request: NextRequest) {
       plan = "annual"
     } else if (priceId === process.env.NEXT_PUBLIC_STRIPE_FAMILY_PRICE_ID) {
       plan = "family"
+    } else {
+      console.log(`Unknown price ID: ${priceId}, defaulting to null plan`)
     }
 
-    // Update the checkout session in your database
-    const supabase = getServiceSupabase()
-    const { error: updateError } = await supabase
+    // Find the checkout session in our database by looking for the Stripe session ID in metadata
+    const { data: checkoutSessions, error: findError } = await serviceRoleClient
       .from("checkout_sessions")
-      .update({
-        status: session.payment_status,
-        subscription_id: subscription?.id,
-        customer_id: customer?.id,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", sessionId)
+      .select("*")
+      .eq("metadata->stripe_session_id", sessionId)
+      .limit(1)
+    
+    if (findError) {
+      console.error("Error finding checkout session:", findError)
+    }
+    
+    const checkoutSession = checkoutSessions && checkoutSessions.length > 0 ? checkoutSessions[0] : null
+    
+    if (checkoutSession) {
+      // Update the existing checkout session
+      const { error: updateError } = await serviceRoleClient
+        .from("checkout_sessions")
+        .update({
+          status: session.payment_status,
+          subscription_id: subscription?.id,
+          customer_id: customer?.id,
+          price_id: priceId,
+          updated_at: new Date().toISOString(),
+          metadata: {
+            ...checkoutSession.metadata,
+            stripe_session_id: sessionId,
+            payment_status: session.payment_status,
+            subscription_status: subscription?.status || "active",
+            last_four: lastFour,
+            plan
+          }
+        })
+        .eq("session_id", checkoutSession.session_id)
 
-    if (updateError) {
-      console.error("Error updating checkout session:", updateError)
-      // Continue anyway since we have the Stripe data
+      if (updateError) {
+        console.error("Error updating checkout session:", updateError)
+      } else {
+        console.log(`Successfully updated checkout session ${checkoutSession.session_id} in database`)
+      }
+    } else {
+      // Create a new checkout session record
+      const { error: insertError } = await serviceRoleClient
+        .from("checkout_sessions")
+        .insert([{
+          user_id: userId,
+          status: session.payment_status,
+          subscription_id: subscription?.id,
+          customer_id: customer?.id,
+          price_id: priceId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          metadata: {
+            stripe_session_id: sessionId,
+            payment_status: session.payment_status,
+            subscription_status: subscription?.status || "active",
+            last_four: lastFour,
+            plan
+          }
+        }])
+
+      if (insertError) {
+        console.error("Error creating checkout session:", insertError)
+      } else {
+        console.log(`Successfully created checkout session for Stripe session ${sessionId} in database`)
+      }
     }
 
     return NextResponse.json({
@@ -78,7 +150,8 @@ export async function POST(request: NextRequest) {
       plan,
       subscriptionId: subscription?.id,
       customerId: customer?.id,
-      lastFour
+      lastFour,
+      userId // Include userId in the response for debugging
     })
   } catch (error: unknown) {
     console.error("Error verifying checkout session:", error)
