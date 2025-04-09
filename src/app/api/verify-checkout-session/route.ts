@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
         const requestBody = await request.clone().json()
         userId = requestBody.userId
       } catch (e) {
-        // Ignore parsing errors
+        console.log("Logging e in requestBody: ", e)
       }
     }
 
