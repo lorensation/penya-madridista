@@ -47,7 +47,7 @@ function SuccessContent() {
         // Fetch the session details from Stripe via our API
         let sessionData
         try {
-          const response = await fetch(`/api/checkout/session?session_id=${sessionId}`)
+          const response = await fetch(`/api/verify-checkout-session?session_id=${sessionId}`)
           
           if (!response.ok) {
             throw new Error(`Failed to fetch session: ${response.statusText}`)
@@ -156,7 +156,8 @@ function SuccessContent() {
   useEffect(() => {
     if (redirectToProfile) {
       const sessionId = searchParams.get("session_id")
-      router.push(`/complete-profile?session_id=${sessionId}`)
+      const userId = searchParams.get("userId")
+      router.push(`/complete-profile?session_id=${sessionId}&userId=${userId}`)
     }
   }, [redirectToProfile, router, searchParams])
 

@@ -196,7 +196,7 @@ function CompleteProfileContent() {
                           subscription_id: sessionData.subscriptionId,
                           payment_status: "paid",
                           subscription_status: "active",
-                          plan_type: sessionData.plan,
+                          //plan_type: sessionData.plan,
                           last_four: sessionData.lastFour,
                         })
                         setLoading(false)
@@ -298,7 +298,7 @@ function CompleteProfileContent() {
                           subscription_id: sessionData.subscriptionId,
                           payment_status: "paid",
                           subscription_status: "active",
-                          plan_type: sessionData.plan,
+                          //plan_type: sessionData.plan,
                           last_four: sessionData.lastFour,
                         })
                         setLoading(false)
@@ -325,7 +325,7 @@ function CompleteProfileContent() {
                   subscription_id: sessionData.subscriptionId,
                   payment_status: "paid",
                   subscription_status: "active",
-                  plan_type: sessionData.plan,
+                  //plan_type: sessionData.plan,
                   last_four: sessionData.lastFour,
                 })
               } else {

@@ -8,7 +8,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 export async function POST(request: NextRequest) {
   try {
-    const { priceId, userId, planType } = await request.json()
+    const { priceId, userId } = await request.json()
 
     if (!priceId || !userId) {
       return NextResponse.json({ error: "Missing required parameters" }, { status: 400 })
@@ -68,7 +68,6 @@ export async function POST(request: NextRequest) {
       metadata: {
         userId: userId, // Ensure userId is in metadata
         price_id: priceId,
-        plan_type: planType,
       },
     })
 
