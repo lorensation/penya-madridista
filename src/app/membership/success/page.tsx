@@ -153,7 +153,7 @@ function SuccessContent() {
     }
 
     processCheckoutSuccess()
-  }, [searchParams, router])
+  }, [searchParams, router, supabase])
 
   useEffect(() => {
     const redirectToProfileAsync = async () => {
@@ -173,7 +173,7 @@ function SuccessContent() {
     }
 
     redirectToProfileAsync()
-  }, [redirectToProfile, router, searchParams])
+  }, [redirectToProfile, router, searchParams, supabase])
 
   if (loading) {
     return (

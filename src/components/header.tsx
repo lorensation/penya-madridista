@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { supabase } from "@/lib/supabase"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { ProfileDropdown } from "@/components/profile-dropdown"
 import { useNavbarMenu } from "@/hooks/use-navbar-menu"
@@ -22,8 +22,10 @@ export function Header() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const pathname = usePathname()
+  const [supabase] = useState(() => createBrowserSupabaseClient())
 
   useEffect(() => {
+    // Function to fetch user data
     async function getUser() {
       try {
         const { data } = await supabase.auth.getUser()
@@ -52,8 +54,26 @@ export function Header() {
       }
     }
 
+    // Initial fetch
     getUser()
-  }, [])
+
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        // User logged in, fetch their data
+        getUser()
+      } else {
+        // User logged out
+        setUser(null)
+        setLoading(false)
+      }
+    })
+
+    // Clean up subscription when component unmounts
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [supabase])
 
   const closeMenu = () => {
     setIsOpen(false)
