@@ -1,5 +1,4 @@
-
-'use server'
+"use server"
 
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { redirect } from "next/navigation"
@@ -49,50 +48,83 @@ export async function createCheckoutSession(priceId: string) {
 }
 
 export async function createBillingPortalSession(customerId?: string) {
-  const supabase = createServerSupabaseClient()
+  try {
+    const supabase = createServerSupabaseClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
-  if (!user) {
-    return redirect("/login")
-  }
-
-  let stripeCustomerId = customerId;
-
-  // If no customer ID was provided, retrieve it from Supabase
-  if (!stripeCustomerId) {
-    // Retrieve customer ID from Supabase
-    const { data: profile } = await supabase
-      .from("miembros")
-      .select("stripe_customer_id")
-      .eq("user_uuid", user.id)
-      .single()
-
-    if (!profile?.stripe_customer_id) {
-      return redirect("/dashboard/membership?error=no-customer")
+    if (authError) {
+      console.error("Authentication error:", authError)
+      return redirect("/login?redirect=/dashboard/membership")
     }
-    
-    stripeCustomerId = profile.stripe_customer_id;
+
+    if (!user) {
+      console.log("No user found in session")
+      return redirect("/login?redirect=/dashboard/membership")
+    }
+
+    let stripeCustomerId = customerId;
+
+    // If no customer ID was provided, retrieve it from Supabase
+    if (!stripeCustomerId) {
+      console.log("No customer ID provided, fetching from database for user:", user.id)
+      
+      // Retrieve customer ID from Supabase
+      const { data: profile, error: profileError } = await supabase
+        .from("miembros")
+        .select("stripe_customer_id")
+        .eq("id", user.id)
+        .single()
+
+      if (profileError) {
+        console.error("Error fetching profile:", profileError)
+        return redirect("/dashboard/membership?error=profile-fetch-failed")
+      }
+
+      if (!profile) {
+        console.log("No profile found for user")
+        return redirect("/dashboard/membership?error=no-profile")
+      }
+
+      if (!profile.stripe_customer_id) {
+        console.log("No Stripe customer ID found in profile")
+        return redirect("/dashboard/membership?error=no-customer")
+      }
+      
+      stripeCustomerId = profile.stripe_customer_id;
+      console.log("Retrieved customer ID:", stripeCustomerId)
+    }
+
+    // Ensure stripeCustomerId is a string before using it
+    if (!stripeCustomerId || typeof stripeCustomerId !== 'string') {
+      console.error("Invalid customer ID:", stripeCustomerId)
+      return redirect("/dashboard/membership?error=invalid-customer")
+    }
+
+    // Create a billing portal session
+    try {
+      const session = await stripe.billingPortal.sessions.create({
+        customer: stripeCustomerId,
+        return_url: `${getBaseUrl()}/dashboard/membership`,
+      })
+
+      if (session.url) {
+        return { url: session.url }
+      } else {
+        console.error("No URL in session response")
+        return redirect("/dashboard/membership?error=no-session-url")
+      }
+    } catch (stripeError: any) {
+      console.error("Stripe error:", stripeError.message)
+      return redirect(`/dashboard/membership?error=stripe-error&message=${encodeURIComponent(stripeError.message)}`)
+    }
+  } catch (error) {
+    console.error("Unexpected error in createBillingPortalSession:", error)
+    return redirect("/dashboard/membership?error=unexpected")
   }
-
-  // Ensure stripeCustomerId is a string before using it
-  if (!stripeCustomerId) {
-    return redirect("/dashboard/membership?error=invalid-customer")
-  }
-
-  // Create a billing portal session
-  const session = await stripe.billingPortal.sessions.create({
-    customer: stripeCustomerId,
-    return_url: `${getBaseUrl()}/dashboard/membership`,
-  })
-
-  if (session.url) {
-    return { url: session.url }
-  }
-
-  return redirect("/dashboard/membership?error=true")
 }
 
 export async function cancelSubscription() {
@@ -113,11 +145,11 @@ export async function cancelSubscription() {
     // Retrieve customer ID and subscription ID from Supabase
     const { data: profile } = await supabase
       .from("miembros")
-      .select("stripe_customer_id, stripe_subscription_id")
-      .eq("user_uuid", user.id)
+      .select("subscription_id")
+      .eq("id", user.id)
       .single()
 
-    if (!profile?.stripe_subscription_id) {
+    if (!profile?.subscription_id) {
       return {
         success: false,
         error: "No active subscription found"
@@ -125,7 +157,7 @@ export async function cancelSubscription() {
     }
 
     // Cancel the subscription at period end
-    await stripe.subscriptions.update(profile.stripe_subscription_id, {
+    await stripe.subscriptions.update(profile.subscription_id, {
         cancel_at_period_end: true
     })
 

@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -11,25 +12,16 @@ import { createBrowserSupabaseClient } from "@/lib/supabase"
 import { CheckCircle, AlertCircle } from "lucide-react"
 import { User } from "@supabase/supabase-js"
 
-// Define types for subscription and membership data
-interface SubscriptionPlan {
-  name?: string
-  amount?: number
-  interval?: "month" | "year"
-}
-
-interface Subscription {
-  id: string
-  status?: "active" | "trialing" | "canceled" | "incomplete" | "past_due"
-  current_period_end?: number
-  plan?: SubscriptionPlan
-}
-
+// Define types for membership data
 interface Membership {
-  id: string
-  user_uuid: string
-  stripe_customer_id?: string
-  subscriptions: Subscription[]
+  id: string;
+  user_uuid: string;
+  stripe_customer_id?: string;
+  subscription_status?: "active" | "trialing" | "canceled" | "incomplete" | "past_due" | "inactive";
+  subscription_plan?: string;
+  subscription_id?: string;
+  subscription_updated_at?: string;
+  last_four?: string;
   // Add other membership fields as needed
 }
 
@@ -82,21 +74,27 @@ export default function MembershipPage() {
         
         // Get membership data
         try {
+          console.log("Fetching membership for user ID:", userData.user.id)
+          
           const { data: memberData, error: memberError } = await supabase
             .from("miembros")
             .select("*")
-            .eq("id", userData.user.id)
+            .eq("user_uuid", userData.user.id)
             .single()
           
           if (memberError) {
             console.error("Error fetching membership:", memberError)
-            // Don't set error here, we'll show a fallback UI
-          } else {
+            setError("No se pudo encontrar información de membresía")
+          } else if (memberData) {
+            console.log("Found membership data:", memberData)
             setMembership(memberData as Membership)
+          } else {
+            console.log("No membership data found")
+            setError("No se encontró información de membresía")
           }
         } catch (err) {
           console.error("Error in membership fetch:", err)
-          // Don't set error here, we'll show a fallback UI
+          setError("Ocurrió un error al cargar los datos de membresía")
         }
       } catch (err) {
         console.error("Error in loadUserAndMembership:", err)
@@ -143,8 +141,8 @@ export default function MembershipPage() {
     )
   }
 
-  // Fallback UI when no membership data is available
-  if (!membership || !membership.subscriptions) {
+  // Fallback UI when no membership data is available or subscription is inactive
+  if (!membership || !membership.subscription_id || membership.subscription_status === "inactive") {
     return (
       <div className="space-y-6">
         <div className="text-center">
@@ -194,11 +192,17 @@ export default function MembershipPage() {
     )
   }
 
-  const subscription = membership.subscriptions[0]
-  const isActive = subscription?.status === "active" || subscription?.status === "trialing"
-  const renewalDate = subscription?.current_period_end
-    ? new Date(subscription.current_period_end * 1000).toLocaleDateString("es-ES")
-    : "No disponible"
+  const isActive = membership.subscription_status === "active" || membership.subscription_status === "trialing"
+  
+  // Calculate renewal date from subscription_updated_at if available
+  let renewalDate = "No disponible"
+  if (membership.subscription_updated_at) {
+    // Assuming subscription is monthly, add 30 days to the updated_at date
+    const updatedAtDate = new Date(membership.subscription_updated_at)
+    const renewalDateObj = new Date(updatedAtDate)
+    renewalDateObj.setDate(renewalDateObj.getDate() + 30)
+    renewalDate = renewalDateObj.toLocaleDateString("es-ES")
+  }
 
   return (
     <div className="space-y-6">
@@ -248,32 +252,28 @@ export default function MembershipPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <h3 className="text-sm font-medium text-gray-500">Plan</h3>
-              <p className="text-lg font-semibold">{subscription?.plan?.name || "Plan Estándar"}</p>
+              <p className="text-lg font-semibold">{membership.subscription_plan || "Plan Estándar"}</p>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500">Fecha de renovación</h3>
               <p className="text-lg font-semibold">{renewalDate}</p>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-500">Precio</h3>
+              <h3 className="text-sm font-medium text-gray-500">Método de pago</h3>
               <p className="text-lg font-semibold">
-                {subscription?.plan?.amount
-                  ? `${(subscription.plan.amount / 100).toFixed(2)}€ / ${
-                      subscription.plan.interval === "month" ? "mes" : "año"
-                    }`
-                  : "No disponible"}
+                {membership.last_four ? `Tarjeta terminada en ${membership.last_four}` : "No disponible"}
               </p>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500">Estado</h3>
               <p className="text-lg font-semibold capitalize">
-                {subscription?.status === "active"
+                {membership.subscription_status === "active"
                   ? "Activa"
-                  : subscription?.status === "trialing"
+                  : membership.subscription_status === "trialing"
                   ? "Periodo de prueba"
-                  : subscription?.status === "canceled"
+                  : membership.subscription_status === "canceled"
                   ? "Cancelada"
-                  : subscription?.status || "No disponible"}
+                  : membership.subscription_status || "No disponible"}
               </p>
             </div>
           </div>
@@ -282,7 +282,7 @@ export default function MembershipPage() {
           <Button 
             onClick={handleManageSubscription} 
             disabled={managingSubscription || !isActive}
-            className="transition-colors hover:bg-white hover:text-primary hover:border-primary"
+            className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
           >
             {managingSubscription ? "Procesando..." : "Gestionar Suscripción"}
           </Button>

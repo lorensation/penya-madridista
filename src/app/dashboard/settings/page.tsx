@@ -1,11 +1,10 @@
-
 "use client"
 
 import type React from "react"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase"
+import { createBrowserSupabaseClient } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -37,6 +36,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  const supabase = createBrowserSupabaseClient()
 
   const [formData, setFormData] = useState<FormData>({
     name: "",
@@ -72,7 +73,7 @@ export default function SettingsPage() {
         const { data: memberData, error } = await supabase
           .from("miembros")
           .select("*")
-          .eq("user_uuid", userData.user.id)
+          .eq("id", userData.user.id)
           .single()
 
         if (error) {
@@ -148,7 +149,7 @@ export default function SettingsPage() {
           cp: formData.postalCode ? Number.parseInt(formData.postalCode, 10) : null,
           updated_at: new Date().toISOString(),
         })
-        .eq("user_uuid", user.id)
+        .eq("id", user.id)
 
       if (profileError) throw profileError
 
@@ -180,7 +181,7 @@ export default function SettingsPage() {
           marketing_emails: formData.marketingEmails,
           updated_at: new Date().toISOString(),
         })
-        .eq("user_uuid", user.id)
+        .eq("id", user.id)
 
       if (preferencesError) throw preferencesError
 
