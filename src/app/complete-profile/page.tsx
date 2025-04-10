@@ -233,6 +233,20 @@ function CompleteProfileContent() {
                   console.error("Error updating subscription details:", updateError)
                   setError("Failed to update subscription details. Please contact support.")
                 } else {
+                  // Make sure the user is marked as a member in the users table
+                  const { error: userUpdateError } = await supabase
+                    .from("users")
+                    .update({
+                      is_member: true,
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq("id", currentUserId)
+                  
+                  if (userUpdateError) {
+                    console.error("Error updating user membership status:", userUpdateError)
+                    // Continue anyway, this is not critical
+                  }
+                  
                   // Redirect to dashboard after successful update
                   router.push("/dashboard?subscription=success")
                 }
@@ -247,6 +261,25 @@ function CompleteProfileContent() {
             }
           } else {
             // No session_id, just redirect to dashboard
+            // But first, ensure the user is marked as a member in the users table
+            try {
+              const { error: userUpdateError } = await supabase
+                .from("users")
+                .update({
+                  is_member: true,
+                  updated_at: new Date().toISOString()
+                })
+                .eq("id", currentUserId)
+              
+              if (userUpdateError) {
+                console.error("Error updating user membership status:", userUpdateError)
+                // Continue anyway, this is not critical
+              }
+            } catch (updateError) {
+              console.error("Error ensuring user membership status:", updateError)
+              // Continue anyway, this is not critical
+            }
+            
             router.push("/dashboard")
           }
         } else {
@@ -415,6 +448,21 @@ function CompleteProfileContent() {
         setError("Failed to create your profile. Please try again.")
         setLoading(false)
         return
+      }
+
+      // IMPORTANT: Update the users table to mark the user as a member
+      const { error: userUpdateError } = await supabase
+        .from("users")
+        .update({
+          is_member: true,
+          name: formData.name, // Also update the name to keep it in sync
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", userData.user.id)
+
+      if (userUpdateError) {
+        console.error("Error updating user membership status:", userUpdateError)
+        // We'll continue even if this fails, as the member profile was created successfully
       }
 
       // Redirect to dashboard

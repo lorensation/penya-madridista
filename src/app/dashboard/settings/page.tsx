@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { createBrowserSupabaseClient } from "@/lib/supabase"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -97,8 +97,19 @@ export default function SettingsPage() {
           email: userData.user.email || "",
         }))
 
-        // Try to get user data from the users table
-        try {
+        // Check if user is a member directly from auth metadata or custom claims
+        // This is the first check for membership status
+        let membershipStatus = false;
+        
+        // Check if user has a role or subscription_status in auth metadata
+        if (userData.user.app_metadata?.role === 'member' || 
+            userData.user.app_metadata?.subscription_status === 'active' ||
+            userData.user.user_metadata?.is_member === true) {
+          membershipStatus = true;
+        }
+
+        // If not determined from auth, check the users table
+        if (!membershipStatus) {
           const { data: publicUserData, error: publicUserError } = await supabase
             .from("users")
             .select("*")
@@ -120,34 +131,88 @@ export default function SettingsPage() {
               if (insertError) {
                 console.error("Error creating user record:", insertError)
               }
-              
-              setIsMember(false)
             } else {
               console.error("Error fetching user data:", publicUserError)
             }
-          } else {
+          } else if (publicUserData) {
             // Update form with user data
             setFormData(prevData => ({
               ...prevData,
               name: userData.user.user_metadata?.name || publicUserData.name || "",
             }))
             
-            setIsMember(publicUserData.is_member || false)
-            
-            // If the user is a member, try to get member data
-            if (publicUserData.is_member) {
-              await loadMemberData(userData.user.id)
-            }
+            // Check membership status from users table
+            membershipStatus = publicUserData.is_member === true;
           }
-        } catch (userDataError) {
-          console.error("Error in user data fetch:", userDataError)
-          // Not throwing here, we'll just use the basic auth user data
+        }
+
+        // Set the membership status
+        setIsMember(membershipStatus)
+        
+        // If the user is a member, try to get member-specific data
+        if (membershipStatus) {
+          // First check if member exists in miembros table
+          const memberExists = await checkMemberExists(userData.user.id)
+          
+          if (memberExists) {
+            await loadMemberData(userData.user.id)
+          } else {
+            // If the user is marked as a member but doesn't have a record in miembros table,
+            // we should create one
+            await createMemberRecord(userData.user.id, userData.user.email || "", userData.user.user_metadata?.name || "")
+            // Then load the newly created data
+            await loadMemberData(userData.user.id)
+          }
         }
       } catch (error) {
         console.error("Error in loadUserData:", error)
         setError("No se pudo cargar la información del usuario. Por favor, inténtalo de nuevo más tarde.")
       } finally {
         setLoading(false)
+      }
+    }
+
+    async function checkMemberExists(userId: string): Promise<boolean> {
+      // Check by user_uuid
+      const { data: memberData, error: memberError } = await supabase
+        .from("miembros")
+        .select("id")
+        .eq("user_uuid", userId)
+        .single()
+
+      if (!memberError && memberData) {
+        return true
+      }
+
+      // Check by id
+      const { data: memberDataById, error: memberErrorById } = await supabase
+        .from("miembros")
+        .select("id")
+        .eq("id", userId)
+        .single()
+
+      return !memberErrorById && memberDataById !== null
+    }
+
+    async function createMemberRecord(userId: string, email: string, name: string) {
+      try {
+        const { error: createError } = await supabase
+          .from("miembros")
+          .insert({
+            user_uuid: userId,
+            id: userId, // Using the same ID for both fields for compatibility
+            email: email,
+            name: name,
+            email_notifications: true,
+            marketing_emails: true,
+            updated_at: new Date().toISOString(),
+          })
+
+        if (createError) {
+          console.error("Error creating member record:", createError)
+        }
+      } catch (error) {
+        console.error("Error in createMemberRecord:", error)
       }
     }
 
