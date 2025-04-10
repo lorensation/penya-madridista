@@ -23,6 +23,21 @@ interface Membership {
   // Add other membership fields as needed
 }
 
+// Import these types from your stripe.ts file or define them here
+/*interface PortalSessionError {
+  error: string;
+  message: string;
+  url?: never;
+}
+
+interface PortalSessionSuccess {
+  url: string;
+  error?: never;
+  message?: never;
+}
+
+type PortalSessionResponse = PortalSessionSuccess | PortalSessionError;*/
+
 export default function MembershipPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -72,7 +87,7 @@ export default function MembershipPage() {
           console.log("Fetching membership for user ID:", userData.user.id)
           
           // Try to find by user_uuid first
-          let { data: memberData, error: memberError } = await supabase
+          const { data: memberData, error: memberError } = await supabase
             .from("miembros")
             .select("*")
             .eq("user_uuid", userData.user.id)
@@ -94,15 +109,10 @@ export default function MembershipPage() {
               return
             }
             
-            memberData = memberDataById
-          }
-          
-          if (memberData) {
+            setMembership(memberDataById as Membership)
+          } else {
             console.log("Found membership data:", memberData)
             setMembership(memberData as Membership)
-          } else {
-            console.log("No membership data found")
-            setError("No se encontró información de membresía")
           }
         } catch (err) {
           console.error("Error in membership fetch:", err)
@@ -132,9 +142,12 @@ export default function MembershipPage() {
       // This avoids authentication issues with server actions
       const result = await createBillingPortalSession(membership.stripe_customer_id)
       
-      if (result?.url) {
-        window.location.href = result.url
-      } else if (result?.error) {
+      // Type guard to check if we have a success response with URL
+      if ('url' in result) {
+        window.location.href = result.url ?? "/dashboard/membership"
+      } 
+      // Type guard to check if we have an error response
+      else if ('error' in result) {
         console.error("Error from server action:", result.error, result.message)
         
         // Handle specific error cases
@@ -302,7 +315,7 @@ export default function MembershipPage() {
         <Alert className="bg-green-50 border-green-200">
           <CheckCircle className="h-4 w-4 text-green-600" />
           <AlertDescription className="text-green-800">
-            ¡Tu suscripción se ha procesado correctamente! Ya eres miembro oficial de la Peña Lorenzo Sanz.
+            ¡Tu suscripci��n se ha procesado correctamente! Ya eres miembro oficial de la Peña Lorenzo Sanz.
           </AlertDescription>
         </Alert>
       )}

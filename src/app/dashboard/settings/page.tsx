@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createBrowserSupabaseClient } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -24,6 +24,25 @@ interface FormData {
   postalCode: string
   emailNotifications: boolean
   marketingEmails: boolean
+}
+
+// Define a proper interface for member data
+interface MemberData {
+  id?: string
+  user_uuid?: string
+  name?: string
+  telefono?: number | null
+  direccion?: string
+  poblacion?: string
+  cp?: number | null
+  email_notifications?: boolean
+  marketing_emails?: boolean
+  updated_at?: string
+  role?: string
+  subscription_status?: string
+  subscription_id?: string
+  stripe_customer_id?: string
+  [key: string]: unknown // For any other properties that might exist
 }
 
 export default function SettingsPage() {
@@ -164,7 +183,7 @@ export default function SettingsPage() {
       }
     }
 
-    function updateFormWithMemberData(memberData: any) {
+    function updateFormWithMemberData(memberData: MemberData) {
       setFormData(prevData => ({
         ...prevData,
         name: prevData.name || memberData.name || "",

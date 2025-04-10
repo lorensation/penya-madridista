@@ -1,3 +1,4 @@
+
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
@@ -80,14 +81,18 @@ export async function middleware(request: NextRequest) {
         
         // Only check admin status if user is authenticated
         if (authUser) {
-          // Try to get member data to check admin role
-          const { data: memberData } = await supabase
-            .from("miembros")
-            .select("role")
-            .eq("user_uuid", authUser.id)
-            .single()
-          
-          isAdmin = memberData?.role === "admin"
+          try {
+            // Try to get member data to check admin role
+            const { data: memberData } = await supabase
+              .from("miembros")
+              .select("role")
+              .eq("id", authUser.id)
+              .single()
+            
+            isAdmin = memberData?.role === "admin"
+          } catch (error) {
+            console.error('Error checking admin status:', error)
+          }
         }
         
         // If not admin, redirect to maintenance page
@@ -138,17 +143,23 @@ export async function middleware(request: NextRequest) {
         // Try to get member data using multiple methods
         let memberData = null
 
-        // 1. Try by user_uuid first
-        const { data: memberByUuid, error: uuidError } = await supabase
-          .from("miembros")
-          .select("*")
-          .eq("user_uuid", authUser.id)
-          .single()
+        // Try different approaches to find the member record
+        // First try by email as it's most likely to match
+        if (authUser.email) {
+          const { data: memberByEmail, error: emailError } = await supabase
+            .from("miembros")
+            .select("*")
+            .eq("email", authUser.email)
+            .single()
 
-        if (!uuidError && memberByUuid) {
-          memberData = memberByUuid
-        } else {
-          // 2. Try by id
+          if (!emailError && memberByEmail) {
+            memberData = memberByEmail
+            console.log("Found member by email:", authUser.email)
+          }
+        }
+
+        // If not found by email, try by ID
+        if (!memberData) {
           const { data: memberById, error: idError } = await supabase
             .from("miembros")
             .select("*")
@@ -157,17 +168,7 @@ export async function middleware(request: NextRequest) {
 
           if (!idError && memberById) {
             memberData = memberById
-          } else {
-            // 3. Try by email as last resort
-            const { data: memberByEmail, error: emailError } = await supabase
-              .from("miembros")
-              .select("*")
-              .eq("email", authUser.email)
-              .single()
-
-            if (!emailError && memberByEmail) {
-              memberData = memberByEmail
-            }
+            console.log("Found member by id:", authUser.id)
           }
         }
 

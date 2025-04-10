@@ -75,7 +75,7 @@ export default function Dashboard() {
     }
 
     checkUser()
-  }, [router])
+  }, [router, supabase])
 
   if (loading) {
     return (

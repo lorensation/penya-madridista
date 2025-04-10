@@ -10,6 +10,27 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-02-24.acacia",
 })
 
+// Define proper error types
+interface PortalSessionError {
+  error: string;
+  message: string;
+  url?: never; // Ensure url doesn't exist on error type
+}
+
+interface PortalSessionSuccess {
+  url: string;
+  error?: never; // Ensure error doesn't exist on success type
+  message?: never; // Ensure message doesn't exist on success type
+}
+
+type PortalSessionResponse = PortalSessionSuccess | PortalSessionError;
+
+type SubscriptionResponse = {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
 export async function createCheckoutSession(priceId: string) {
   try {
     const supabase = createServerSupabaseClient()
@@ -54,7 +75,7 @@ export async function createCheckoutSession(priceId: string) {
   }
 }
 
-export async function createBillingPortalSession(customerIdParam?: string) {
+export async function createBillingPortalSession(customerIdParam?: string): Promise<PortalSessionResponse> {
   try {
     // Use the customer ID passed from the client directly
     // This avoids authentication issues with server actions
@@ -85,17 +106,27 @@ export async function createBillingPortalSession(customerIdParam?: string) {
         console.error("No URL in session response")
         return { error: "no-session-url", message: "No URL in session response" }
       }
-    } catch (stripeError: any) {
-      console.error("Stripe error:", stripeError.message)
-      return { error: "stripe-error", message: stripeError.message }
+    } catch (stripeError: unknown) {
+      // Handle Stripe errors properly without using StripeError type
+      let errorMessage = 'Unknown Stripe error';
+      
+      if (stripeError instanceof Error) {
+        errorMessage = stripeError.message;
+      } else if (typeof stripeError === 'object' && stripeError !== null && 'message' in stripeError) {
+        errorMessage = String((stripeError as { message: unknown }).message);
+      }
+      
+      console.error("Stripe error:", errorMessage)
+      return { error: "stripe-error", message: errorMessage }
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
     console.error("Unexpected error in createBillingPortalSession:", error)
-    return { error: "unexpected", message: error?.message || "An unexpected error occurred" }
+    return { error: "unexpected", message: errorMessage }
   }
 }
 
-export async function cancelSubscription(subscriptionId: string) {
+export async function cancelSubscription(subscriptionId: string): Promise<SubscriptionResponse> {
   try {
     if (!subscriptionId) {
       return {
@@ -113,11 +144,12 @@ export async function cancelSubscription(subscriptionId: string) {
       success: true,
       message: "Subscription will be canceled at the end of the billing period"
     }
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error("Error canceling subscription:", error)
     return {
       success: false,
-      error: "Failed to cancel subscription"
+      error: `Failed to cancel subscription: ${errorMessage}`
     }
   }
 }
