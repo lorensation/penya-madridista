@@ -6,16 +6,14 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createBrowserSupabaseClient } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Switch } from "@/components/ui/switch"
 import type { UserProfile } from "@/types/common"
-//import type { Database } from "@/types/supabase"
-
-//type Member = Database["public"]["Tables"]["miembros"]["Row"]
+import Link from "next/link"
 
 interface FormData {
   name: string
@@ -31,7 +29,7 @@ interface FormData {
 export default function SettingsPage() {
   const router = useRouter()
   const [user, setUser] = useState<UserProfile | null>(null)
-  //const [member, setMember] = useState<Member | null>(null)
+  const [isMember, setIsMember] = useState<boolean>(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -53,8 +51,12 @@ export default function SettingsPage() {
   useEffect(() => {
     async function loadUserData() {
       try {
-        // Get the current user
-        const { data: userData } = await supabase.auth.getUser()
+        // Get the current user from auth
+        const { data: userData, error: userError } = await supabase.auth.getUser()
+
+        if (userError) {
+          throw userError
+        }
 
         if (!userData?.user) {
           router.push("/login")
@@ -69,39 +71,114 @@ export default function SettingsPage() {
 
         setUser(userProfile)
 
-        // Get the member data using user_uuid
-        const { data: memberData, error } = await supabase
-          .from("miembros")
-          .select("*")
-          .eq("id", userData.user.id)
-          .single()
+        // Set basic form data from auth user
+        setFormData(prevData => ({
+          ...prevData,
+          name: userData.user.user_metadata?.name || "",
+          email: userData.user.email || "",
+        }))
 
-        if (error) {
-          console.error("Error fetching member data:", error)
-          setError(error.message || "Failed to load profile data")
-        } else if (memberData) {
-          //setMember(memberData)
-          setFormData({
-            name: userData.user.user_metadata?.name || memberData.name || "",
-            email: userData.user.email || "",
-            phone: memberData.telefono?.toString() || "",
-            address: memberData.direccion || "",
-            city: memberData.poblacion || "",
-            postalCode: memberData.cp?.toString() || "",
-            emailNotifications: memberData.email_notifications !== false,
-            marketingEmails: memberData.marketing_emails !== false,
-          })
+        // Try to get user data from the users table
+        try {
+          const { data: publicUserData, error: publicUserError } = await supabase
+            .from("users")
+            .select("*")
+            .eq("id", userData.user.id)
+            .single()
+
+          if (publicUserError) {
+            // If the user doesn't exist in the users table, create a basic record
+            if (publicUserError.code === "PGRST116") {
+              const { error: insertError } = await supabase
+                .from("users")
+                .insert({
+                  id: userData.user.id,
+                  email: userData.user.email,
+                  name: userData.user.user_metadata?.name || "",
+                  is_member: false
+                })
+              
+              if (insertError) {
+                console.error("Error creating user record:", insertError)
+              }
+              
+              setIsMember(false)
+            } else {
+              console.error("Error fetching user data:", publicUserError)
+            }
+          } else {
+            // Update form with user data
+            setFormData(prevData => ({
+              ...prevData,
+              name: userData.user.user_metadata?.name || publicUserData.name || "",
+            }))
+            
+            setIsMember(publicUserData.is_member || false)
+            
+            // If the user is a member, try to get member data
+            if (publicUserData.is_member) {
+              await loadMemberData(userData.user.id)
+            }
+          }
+        } catch (userDataError) {
+          console.error("Error in user data fetch:", userDataError)
+          // Not throwing here, we'll just use the basic auth user data
         }
       } catch (error) {
         console.error("Error in loadUserData:", error)
-        setError(error instanceof Error ? error.message : "Failed to load user data")
+        setError("No se pudo cargar la información del usuario. Por favor, inténtalo de nuevo más tarde.")
       } finally {
         setLoading(false)
       }
     }
 
+    async function loadMemberData(userId: string) {
+      try {
+        // Try to get member data using user_uuid
+        const { data: memberData, error: memberError } = await supabase
+          .from("miembros")
+          .select("*")
+          .eq("user_uuid", userId)
+          .single()
+
+        if (memberError) {
+          // Try with id instead
+          const { data: memberDataById, error: memberErrorById } = await supabase
+            .from("miembros")
+            .select("*")
+            .eq("id", userId)
+            .single()
+            
+          if (memberErrorById) {
+            console.error("Error fetching member data:", memberErrorById)
+            // Not throwing here, we'll just use the basic user data
+          } else if (memberDataById) {
+            updateFormWithMemberData(memberDataById)
+          }
+        } else if (memberData) {
+          updateFormWithMemberData(memberData)
+        }
+      } catch (memberError) {
+        console.error("Error in member data fetch:", memberError)
+        // Not throwing here, we'll just use the basic user data
+      }
+    }
+
+    function updateFormWithMemberData(memberData: any) {
+      setFormData(prevData => ({
+        ...prevData,
+        name: prevData.name || memberData.name || "",
+        phone: memberData.telefono?.toString() || "",
+        address: memberData.direccion || "",
+        city: memberData.poblacion || "",
+        postalCode: memberData.cp?.toString() || "",
+        emailNotifications: memberData.email_notifications !== false,
+        marketingEmails: memberData.marketing_emails !== false,
+      }))
+    }
+
     loadUserData()
-  }, [router])
+  }, [router, supabase])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
@@ -126,7 +203,7 @@ export default function SettingsPage() {
 
     try {
       if (!user) {
-        throw new Error("User not found")
+        throw new Error("Usuario no encontrado")
       }
 
       // Update user metadata
@@ -138,25 +215,68 @@ export default function SettingsPage() {
 
       if (updateError) throw updateError
 
-      // Update profile
-      const { error: profileError } = await supabase
-        .from("miembros")
-        .update({
-          name: formData.name,
-          telefono: formData.phone ? Number.parseInt(formData.phone, 10) : null,
-          direccion: formData.address,
-          poblacion: formData.city,
-          cp: formData.postalCode ? Number.parseInt(formData.postalCode, 10) : null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", user.id)
+      // Update user in the users table
+      try {
+        const { error: userUpdateError } = await supabase
+          .from("users")
+          .update({
+            name: formData.name,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", user.id)
 
-      if (profileError) throw profileError
+        if (userUpdateError) {
+          console.error("Error updating user table:", userUpdateError)
+        }
+      } catch (userUpdateError) {
+        console.error("Error in user update:", userUpdateError)
+        // Continue even if this fails
+      }
+
+      // If the user is a member, update the miembros table too
+      if (isMember) {
+        try {
+          // Try to update using user_uuid
+          const { error: profileError } = await supabase
+            .from("miembros")
+            .update({
+              name: formData.name,
+              telefono: formData.phone ? Number.parseInt(formData.phone, 10) : null,
+              direccion: formData.address,
+              poblacion: formData.city,
+              cp: formData.postalCode ? Number.parseInt(formData.postalCode, 10) : null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_uuid", user.id)
+
+          if (profileError) {
+            // Try with id instead
+            const { error: profileErrorById } = await supabase
+              .from("miembros")
+              .update({
+                name: formData.name,
+                telefono: formData.phone ? Number.parseInt(formData.phone, 10) : null,
+                direccion: formData.address,
+                poblacion: formData.city,
+                cp: formData.postalCode ? Number.parseInt(formData.postalCode, 10) : null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", user.id)
+
+            if (profileErrorById) {
+              console.error("Error updating member profile by ID:", profileErrorById)
+            }
+          }
+        } catch (memberError) {
+          console.error("Error updating member profile:", memberError)
+          // Not throwing here, we'll consider it a success if the auth user was updated
+        }
+      }
 
       setSuccess("Perfil actualizado correctamente")
     } catch (error: unknown) {
       console.error("Error updating profile:", error)
-      setError(error instanceof Error ? error.message : "Failed to update profile")
+      setError(error instanceof Error ? error.message : "No se pudo actualizar el perfil")
     } finally {
       setSaving(false)
     }
@@ -170,10 +290,14 @@ export default function SettingsPage() {
 
     try {
       if (!user) {
-        throw new Error("User not found")
+        throw new Error("Usuario no encontrado")
       }
 
-      // Update preferences
+      if (!isMember) {
+        throw new Error("Solo los miembros pueden actualizar preferencias de comunicación")
+      }
+
+      // Try to update using user_uuid
       const { error: preferencesError } = await supabase
         .from("miembros")
         .update({
@@ -181,14 +305,26 @@ export default function SettingsPage() {
           marketing_emails: formData.marketingEmails,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", user.id)
+        .eq("user_uuid", user.id)
 
-      if (preferencesError) throw preferencesError
+      if (preferencesError) {
+        // Try with id instead
+        const { error: preferencesErrorById } = await supabase
+          .from("miembros")
+          .update({
+            email_notifications: formData.emailNotifications,
+            marketing_emails: formData.marketingEmails,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", user.id)
+
+        if (preferencesErrorById) throw preferencesErrorById
+      }
 
       setSuccess("Preferencias actualizadas correctamente")
     } catch (error: unknown) {
       console.error("Error updating preferences:", error)
-      setError(error instanceof Error ? error.message : "Failed to update preferences")
+      setError(error instanceof Error ? error.message : "No se pudieron actualizar las preferencias")
     } finally {
       setSaving(false)
     }
@@ -224,10 +360,21 @@ export default function SettingsPage() {
         </Alert>
       )}
 
+      {!isMember && (
+        <Alert className="mb-6 bg-blue-50 border-blue-200">
+          <AlertDescription className="text-blue-800">
+            Algunas opciones de configuración solo están disponibles para miembros. 
+            <Link href="/membership" className="ml-2 font-medium underline">
+              Hazte miembro ahora
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Tabs defaultValue="perfil">
         <TabsList>
           <TabsTrigger value="perfil">Perfil</TabsTrigger>
-          <TabsTrigger value="preferencias">Preferencias</TabsTrigger>
+          <TabsTrigger value="preferencias" disabled={!isMember}>Preferencias</TabsTrigger>
           <TabsTrigger value="seguridad">Seguridad</TabsTrigger>
         </TabsList>
 
@@ -251,22 +398,38 @@ export default function SettingsPage() {
                       Para cambiar tu correo electrónico, contacta con el administrador
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Teléfono</Label>
-                    <Input id="phone" name="phone" value={formData.phone} onChange={handleChange} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="address">Dirección</Label>
-                    <Input id="address" name="address" value={formData.address} onChange={handleChange} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="city">Ciudad</Label>
-                    <Input id="city" name="city" value={formData.city} onChange={handleChange} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="postalCode">Código Postal</Label>
-                    <Input id="postalCode" name="postalCode" value={formData.postalCode} onChange={handleChange} />
-                  </div>
+                  
+                  {isMember ? (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">Teléfono</Label>
+                        <Input id="phone" name="phone" value={formData.phone} onChange={handleChange} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="address">Dirección</Label>
+                        <Input id="address" name="address" value={formData.address} onChange={handleChange} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="city">Ciudad</Label>
+                        <Input id="city" name="city" value={formData.city} onChange={handleChange} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="postalCode">Código Postal</Label>
+                        <Input id="postalCode" name="postalCode" value={formData.postalCode} onChange={handleChange} />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="col-span-2">
+                      <Alert className="bg-gray-50">
+                        <AlertDescription>
+                          Los campos adicionales de perfil están disponibles para miembros.
+                          <Link href="/membership" className="ml-2 font-medium underline">
+                            Hazte miembro ahora
+                          </Link>
+                        </AlertDescription>
+                      </Alert>
+                    </div>
+                  )}
                 </div>
                 <Button type="submit" className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black" disabled={saving}>
                   {saving ? "Guardando..." : "Guardar cambios"}
@@ -277,45 +440,64 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="preferencias">
-          <Card>
-            <CardHeader>
-              <CardTitle>Preferencias de Comunicación</CardTitle>
-              <CardDescription>Gestiona cómo quieres recibir comunicaciones de la Peña Lorenzo Sanz</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmitPreferences} className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="emailNotifications">Notificaciones por correo</Label>
-                      <p className="text-sm text-gray-500">
-                        Recibe notificaciones sobre eventos, actualizaciones de membresía y más
-                      </p>
+          {isMember ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Preferencias de Comunicación</CardTitle>
+                <CardDescription>Gestiona cómo quieres recibir comunicaciones de la Peña Lorenzo Sanz</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmitPreferences} className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="emailNotifications">Notificaciones por correo</Label>
+                        <p className="text-sm text-gray-500">
+                          Recibe notificaciones sobre eventos, actualizaciones de membresía y más
+                        </p>
+                      </div>
+                      <Switch
+                        id="emailNotifications"
+                        checked={formData.emailNotifications}
+                        onCheckedChange={(checked) => handleSwitchChange("emailNotifications", checked)}
+                      />
                     </div>
-                    <Switch
-                      id="emailNotifications"
-                      checked={formData.emailNotifications}
-                      onCheckedChange={(checked) => handleSwitchChange("emailNotifications", checked)}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="marketingEmails">Correos promocionales</Label>
-                      <p className="text-sm text-gray-500">Recibe ofertas especiales, promociones y novedades</p>
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="marketingEmails">Correos promocionales</Label>
+                        <p className="text-sm text-gray-500">Recibe ofertas especiales, promociones y novedades</p>
+                      </div>
+                      <Switch
+                        id="marketingEmails"
+                        checked={formData.marketingEmails}
+                        onCheckedChange={(checked) => handleSwitchChange("marketingEmails", checked)}
+                      />
                     </div>
-                    <Switch
-                      id="marketingEmails"
-                      checked={formData.marketingEmails}
-                      onCheckedChange={(checked) => handleSwitchChange("marketingEmails", checked)}
-                    />
                   </div>
-                </div>
-                <Button type="submit" className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black" disabled={saving}>
-                  {saving ? "Guardando..." : "Guardar Preferencias"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+                  <Button type="submit" className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black" disabled={saving}>
+                    {saving ? "Guardando..." : "Guardar Preferencias"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Preferencias de Comunicación</CardTitle>
+                <CardDescription>Esta sección está disponible solo para miembros</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Alert className="bg-gray-50">
+                  <AlertDescription>
+                    Para gestionar tus preferencias de comunicación, necesitas ser miembro.
+                    <Link href="/membership" className="ml-2 font-medium underline">
+                      Hazte miembro ahora
+                    </Link>
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="seguridad">
@@ -349,7 +531,7 @@ export default function SettingsPage() {
 
                         setSuccess("Se ha enviado un correo electrónico con instrucciones para cambiar tu contraseña")
                       } catch (error: unknown) {
-                        setError(error instanceof Error ? error.message : "Failed to send password reset email")
+                        setError(error instanceof Error ? error.message : "No se pudo enviar el correo de recuperación")
                       }
                     }}
                   >
@@ -371,7 +553,7 @@ export default function SettingsPage() {
 
                         setSuccess("Se han cerrado todas las demás sesiones activas")
                       } catch (error: unknown) {
-                        setError(error instanceof Error ? error.message : "Failed to sign out other sessions")
+                        setError(error instanceof Error ? error.message : "No se pudieron cerrar las otras sesiones")
                       }
                     }}
                   >

@@ -44,11 +44,19 @@ export default function Dashboard() {
 
         setUser(userData.user)
 
-        // Fetch user profile
+        const { data: sessionData } = await supabase.auth.getSession()
+        if (sessionData.session) {
+          const token = sessionData.session.access_token
+          // Decode the JWT payload (middle part)
+          const payload = JSON.parse(atob(token.split('.')[1]))
+          console.log("JWT Token Payload:", payload)
+        }
+
+        // Fetch user profile - FIXED: using user_uuid instead of id to match RLS policy
         const { data: profileData, error: profileError } = await supabase
           .from("miembros")
           .select("*")
-          .eq("id", userData.user.id)
+          .eq("user_uuid", userData.user.id)
           .single()
 
         if (profileError) {
@@ -311,4 +319,3 @@ export default function Dashboard() {
     </div>
   )
 }
-

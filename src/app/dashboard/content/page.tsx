@@ -229,7 +229,7 @@ export default function ContentPage() {
         </div>
         <Button 
           onClick={() => router.push("/dashboard")}
-          className="transition-colors hover:bg-white hover:text-primary hover:border-primary"
+          className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
         >
           Volver al Dashboard
         </Button>
@@ -301,13 +301,13 @@ export default function ContentPage() {
             <Button 
               variant="outline" 
               onClick={() => router.push("/dashboard")}
-              className="transition-colors hover:bg-primary hover:text-white"
+              className="transition-all bg-white border-black text-black hover:bg-black hover:text-white hover:border-black"
             >
               Volver al Dashboard
             </Button>
             <Button 
               onClick={() => router.push("/dashboard/membership")}
-              className="transition-colors hover:bg-white hover:text-primary hover:border-primary"
+              className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
             >
               Ver Planes de Membresía
             </Button>

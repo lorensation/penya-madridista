@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -7,10 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { createBillingPortalSession } from "@/app/actions/stripe"
+import { createBillingPortalSession, cancelSubscription } from "@/app/actions/stripe"
 import { createBrowserSupabaseClient } from "@/lib/supabase"
 import { CheckCircle, AlertCircle } from "lucide-react"
-import { User } from "@supabase/supabase-js"
 
 // Define types for membership data
 interface Membership {
@@ -31,7 +29,6 @@ export default function MembershipPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [membership, setMembership] = useState<Membership | null>(null)
-  const [user, setUser] = useState<User | null>(null)
   const [managingSubscription, setManagingSubscription] = useState(false)
 
   const supabase = createBrowserSupabaseClient()
@@ -70,22 +67,37 @@ export default function MembershipPage() {
           return
         }
         
-        setUser(userData.user)
-        
         // Get membership data
         try {
           console.log("Fetching membership for user ID:", userData.user.id)
           
-          const { data: memberData, error: memberError } = await supabase
+          // Try to find by user_uuid first
+          let { data: memberData, error: memberError } = await supabase
             .from("miembros")
             .select("*")
             .eq("user_uuid", userData.user.id)
             .single()
           
-          if (memberError) {
-            console.error("Error fetching membership:", memberError)
-            setError("No se pudo encontrar información de membresía")
-          } else if (memberData) {
+          // If not found, try by id
+          if (memberError || !memberData) {
+            console.log("Not found by user_uuid, trying with id")
+            const { data: memberDataById, error: memberErrorById } = await supabase
+              .from("miembros")
+              .select("*")
+              .eq("id", userData.user.id)
+              .single()
+              
+            if (memberErrorById) {
+              console.error("Error fetching membership by id:", memberErrorById)
+              setError("No se pudo encontrar información de membresía")
+              setLoading(false)
+              return
+            }
+            
+            memberData = memberDataById
+          }
+          
+          if (memberData) {
             console.log("Found membership data:", memberData)
             setMembership(memberData as Membership)
           } else {
@@ -108,25 +120,68 @@ export default function MembershipPage() {
   }, [router, supabase])
 
   const handleManageSubscription = async () => {
-    if (!user || !membership?.stripe_customer_id) {
-      setError("No se encontró información de suscripción")
+    if (!membership?.stripe_customer_id) {
+      setError("No se encontró información de cliente en Stripe")
       return
     }
 
     try {
       setManagingSubscription(true)
+      
+      // Pass the customer ID directly to the server action
+      // This avoids authentication issues with server actions
       const result = await createBillingPortalSession(membership.stripe_customer_id)
       
       if (result?.url) {
         window.location.href = result.url
+      } else if (result?.error) {
+        console.error("Error from server action:", result.error, result.message)
+        
+        // Handle specific error cases
+        if (result.error === "auth-error") {
+          // Refresh the page or redirect to login
+          router.push("/login?redirect=/dashboard/membership")
+        } else if (result.error === "no-customer") {
+          setError("No se encontró información de cliente en Stripe")
+        } else {
+          setError(`No se pudo acceder al portal de facturación: ${result.message || 'Error desconocido'}`)
+        }
       } else {
-        throw new Error("No se pudo crear la sesión del portal de facturación")
+        throw new Error("Respuesta inesperada del servidor")
       }
     } catch (error) {
       console.error("Error managing subscription:", error)
       setError("No se pudo acceder al portal de facturación")
     } finally {
       setManagingSubscription(false)
+    }
+  }
+
+  const handleCancelSubscription = async () => {
+    if (!membership?.subscription_id) {
+      setError("No se encontró información de suscripción")
+      return
+    }
+
+    try {
+      const result = await cancelSubscription(membership.subscription_id)
+      
+      if (result.success) {
+        // Update the local state to reflect the cancellation
+        setMembership({
+          ...membership,
+          subscription_status: "canceled"
+        })
+        
+        // Show success message
+        setError(null)
+        alert("Tu suscripción se cancelará al final del período de facturación actual.")
+      } else {
+        setError(`No se pudo cancelar la suscripción: ${result.error}`)
+      }
+    } catch (error) {
+      console.error("Error canceling subscription:", error)
+      setError("No se pudo cancelar la suscripción")
     }
   }
 
@@ -176,23 +231,55 @@ export default function MembershipPage() {
             <Button 
               variant="outline" 
               onClick={() => router.push("/dashboard")}
-              className="transition-colors hover:bg-primary hover:text-white"
+              className="transition-all border-black hover:bg-primary hover:text-white"
             >
               Volver al Dashboard
             </Button>
             <Button 
               onClick={() => router.push("/membership")}
-              className="transition-colors hover:bg-white hover:text-primary hover:border-primary"
+              className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
             >
               Ver Planes de Membresía
             </Button>
           </CardFooter>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Beneficios de Membresía</CardTitle>
+            <CardDescription>Disfruta de estos beneficios exclusivos como miembro</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              <li className="flex items-start">
+                <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                <span>Acceso a eventos exclusivos organizados por la peña</span>
+              </li>
+              <li className="flex items-start">
+                <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                <span>Descuentos en viajes organizados para ver partidos</span>
+              </li>
+              <li className="flex items-start">
+                <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                <span>Participación en sorteos y promociones exclusivas</span>
+              </li>
+              <li className="flex items-start">
+                <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                <span>Acceso al contenido exclusivo en nuestra web</span>
+              </li>
+              <li className="flex items-start">
+                <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                <span>Carnet oficial de socio de la Peña Lorenzo Sanz</span>
+              </li>
+            </ul>
+          </CardContent>
         </Card>
       </div>
     )
   }
 
   const isActive = membership.subscription_status === "active" || membership.subscription_status === "trialing"
+  const isCanceled = membership.subscription_status === "canceled"
   
   // Calculate renewal date from subscription_updated_at if available
   let renewalDate = "No disponible"
@@ -240,6 +327,10 @@ export default function MembershipPage() {
             <CardTitle>Estado de Membresía</CardTitle>
             {isActive ? (
               <Badge className="bg-green-500">Activa</Badge>
+            ) : isCanceled ? (
+              <Badge variant="outline" className="text-orange-500 border-orange-200">
+                Cancelada
+              </Badge>
             ) : (
               <Badge variant="outline" className="text-red-500 border-red-200">
                 Inactiva
@@ -278,14 +369,28 @@ export default function MembershipPage() {
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-end">
-          <Button 
-            onClick={handleManageSubscription} 
-            disabled={managingSubscription || !isActive}
-            className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
-          >
-            {managingSubscription ? "Procesando..." : "Gestionar Suscripción"}
-          </Button>
+        <CardFooter className="flex justify-between">
+          {isCanceled ? (
+            <p className="text-orange-500">Tu suscripción se cancelará al final del período de facturación actual.</p>
+          ) : (
+            <>
+              <Button 
+                onClick={handleCancelSubscription} 
+                variant="outline"
+                className="text-red-500 border-red-200 hover:bg-red-500 hover:text-white"
+                disabled={managingSubscription || !isActive}
+              >
+                Cancelar Suscripción
+              </Button>
+              <Button 
+                onClick={handleManageSubscription} 
+                disabled={managingSubscription || !isActive}
+                className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
+              >
+                {managingSubscription ? "Procesando..." : "Gestionar Suscripción"}
+              </Button>
+            </>
+          )}
         </CardFooter>
       </Card>
 
