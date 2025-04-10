@@ -17,18 +17,18 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { useToast } from "@/components/ui/use-toast"
-import { createBrowserSupabaseClient } from "@/lib/supabase"
+import { useToast } from "@/components/ui/use-toast-hook"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 
 const formSchema = z.object({
   name: z.string().min(2, {
-    message: "Name must be at least 2 characters.",
+    message: "El nombre debe tener al menos 2 caracteres.",
   }),
   email: z.string().email({
-    message: "Please enter a valid email address.",
+    message: "Por favor, introduce una dirección de correo electrónico válida.",
   }),
   password: z.string().min(8, {
-    message: "Password must be at least 8 characters.",
+    message: "La contraseña debe tener al menos 8 caracteres.",
   }),
 })
 
@@ -69,18 +69,33 @@ export function RegisterForm() {
         throw error
       }
 
+      // Create a record in the users table
+      try {
+        await supabase.from("users").insert({
+          id: (await supabase.auth.getUser()).data.user?.id,
+          email: values.email,
+          name: values.name,
+          is_member: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      } catch (userError) {
+        console.error("Error creating user record:", userError);
+        // Continue even if this fails, as the auth user was created successfully
+      }
+
       toast({
-        title: "Registration successful!",
-        description: "Please check your email to confirm your account.",
+        title: "¡Registro exitoso!",
+        description: "Por favor, revisa tu correo electrónico para confirmar tu cuenta.",
       })
 
       router.push("/login")
     } catch (error) {
-      console.error("Registration error:", error)
+      console.error("Error de registro:", error)
       toast({
         variant: "destructive",
-        title: "Registration failed",
-        description: error instanceof Error ? error.message : "Something went wrong. Please try again.",
+        title: "Error en el registro",
+        description: error instanceof Error ? error.message : "Algo salió mal. Por favor, inténtalo de nuevo.",
       })
     } finally {
       setIsLoading(false)
@@ -95,12 +110,12 @@ export function RegisterForm() {
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Name</FormLabel>
+              <FormLabel>Nombre</FormLabel>
               <FormControl>
-                <Input placeholder="John Doe" {...field} />
+                <Input placeholder="Juan Pérez" {...field} />
               </FormControl>
               <FormDescription>
-                This is your public display name.
+                Este es tu nombre público.
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -111,12 +126,12 @@ export function RegisterForm() {
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>Correo electrónico</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="john.doe@example.com" {...field} />
+                <Input type="email" placeholder="juan.perez@ejemplo.com" {...field} />
               </FormControl>
               <FormDescription>
-                We&apos;ll send a confirmation email to this address.
+                Enviaremos un correo de confirmación a esta dirección.
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -127,19 +142,19 @@ export function RegisterForm() {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Password</FormLabel>
+              <FormLabel>Contraseña</FormLabel>
               <FormControl>
                 <Input type="password" {...field} />
               </FormControl>
               <FormDescription>
-                Use at least 8 characters with a mix of letters, numbers & symbols.
+                Usa al menos 8 caracteres con una combinación de letras, números y símbolos.
               </FormDescription>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? "Registering..." : "Register"}
+        <Button type="submit" className="w-full transition-all hover:bg-white hover:text-primary hover:border hover:border-black" disabled={isLoading}>
+          {isLoading ? "Registrando..." : "Registrarse"}
         </Button>
       </form>
     </Form>

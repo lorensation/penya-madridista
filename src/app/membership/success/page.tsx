@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { supabase } from "@/lib/supabase"
+import { createBrowserSupabaseClient } from "@/lib/supabase"
 import { Suspense } from "react"
 
 function SuccessContent() {
@@ -13,6 +13,8 @@ function SuccessContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [redirectToProfile, setRedirectToProfile] = useState(false)
+
+  const supabase = createBrowserSupabaseClient()
 
   useEffect(() => {
     const processCheckoutSuccess = async () => {
@@ -154,11 +156,23 @@ function SuccessContent() {
   }, [searchParams, router])
 
   useEffect(() => {
-    if (redirectToProfile) {
-      const sessionId = searchParams.get("session_id")
-      const userId = searchParams.get("userId")
-      router.push(`/complete-profile?session_id=${sessionId}&userId=${userId}`)
+    const redirectToProfileAsync = async () => {
+      if (redirectToProfile) {
+        const sessionId = searchParams.get("session_id")
+        // Get the user
+        const { data: userData, error: userError } = await supabase.auth.getUser()
+        
+        if (userError) {
+          console.error("Error fetching user data:", userError)
+          return
+        }
+
+        const userId = userData?.user?.id
+        router.push(`/complete-profile?session_id=${sessionId}&userId=${userId}`)
+      }
     }
+
+    redirectToProfileAsync()
   }, [redirectToProfile, router, searchParams])
 
   if (loading) {

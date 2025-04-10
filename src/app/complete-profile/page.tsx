@@ -108,7 +108,7 @@ function CompleteProfileContent() {
   const supabase = createBrowserSupabaseClient()
 
   useEffect(() => {
-    async function checkUserAndSession() {
+    async function initializeProfileForm() {
       try {
         // Get the current user
         const { data: userData, error: userError } = await supabase.auth.getUser()
@@ -130,224 +130,65 @@ function CompleteProfileContent() {
 
         const currentUserId = userData.user.id
 
-        // Check if the user already has a profile in the miembros table
-        const { data: memberData, error: memberError } = await supabase
-          .from("miembros")
-          .select("*")
-          .eq("id", currentUserId)
-          .maybeSingle()
+        // If there's a session_id, verify the checkout session
+        if (sessionId) {
+          try {
+            const response = await fetch("/api/verify-checkout-session", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-user-id": currentUserId,
+              },
+              body: JSON.stringify({
+                sessionId,
+                userId: currentUserId,
+              }),
+            })
 
-        if (memberError && memberError.code !== "PGRST116") {
-          console.error("Error checking for existing profile:", memberError)
-          setError("Error checking for existing profile. Please try again.")
-          setLoading(false)
-          return
-        }
+            if (!response.ok) {
+              const errorData = await response.json()
+              console.error("Checkout session verification failed:", errorData)
 
-        // If user already has a profile
-        if (memberData) {
-          console.log("User already has a profile, redirecting to dashboard")
-
-          // If there's a session_id, we need to update the profile with subscription info
-          if (sessionId) {
-            try {
-              // Verify the checkout session
-              const response = await fetch("/api/verify-checkout-session", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "x-user-id": currentUserId, // Add the user ID in the headers
-                },
-                body: JSON.stringify({
-                  sessionId,
-                  userId: currentUserId, // Also include it in the body for redundancy
-                }),
-              })
-
-              if (!response.ok) {
-                const errorData = await response.json()
-                console.error("Checkout session verification failed:", errorData)
-
-                // If the error is about missing user ID but we have the user ID, retry with explicit user ID
-                if (errorData.error === "User ID not found in session" && currentUserId) {
-                  setError("Retrying checkout verification with explicit user ID...")
-
-                  try {
-                    const retryResponse = await fetch("/api/verify-checkout-session", {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                      },
-                      body: JSON.stringify({
-                        sessionId,
-                        userId: currentUserId,
-                        retry: true,
-                      }),
-                    })
-
-                    if (retryResponse.ok) {
-                      const sessionData = await retryResponse.json()
-                      // Continue with the successful response
-                      if (sessionData.status === "complete") {
-                        setCheckoutData({
-                          id: sessionId,
-                          status: "complete",
-                          customer_id: sessionData.customerId,
-                          subscription_id: sessionData.subscriptionId,
-                          payment_status: "paid",
-                          subscription_status: "active",
-                          //plan_type: sessionData.plan,
-                          last_four: sessionData.lastFour,
-                        })
-                        setLoading(false)
-                        return
-                      }
-                    } else {
-                      throw new Error("Retry failed: " + (await retryResponse.json()).error || "Unknown error")
-                    }
-                  } catch (retryError) {
-                    console.error("Retry error:", retryError)
-                  }
-                }
-
-                throw new Error(errorData.error || "Failed to verify checkout session")
-              }
-
-              const sessionData = await response.json()
-
-              // Update the member profile with subscription details
-              if (sessionData.status === "complete") {
-                const { error: updateError } = await supabase
-                  .from("miembros")
-                  .update({
-                    subscription_status: "active",
-                    subscription_plan: sessionData.plan,
-                    subscription_id: sessionData.subscriptionId,
-                    subscription_updated_at: new Date().toISOString(),
-                    stripe_customer_id: sessionData.customerId,
-                    last_four: sessionData.lastFour,
+              // If the error is about missing user ID but we have the user ID, retry with explicit user ID
+              if (errorData.error === "User ID not found in session" && currentUserId) {
+                try {
+                  const retryResponse = await fetch("/api/verify-checkout-session", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      sessionId,
+                      userId: currentUserId,
+                      retry: true,
+                    }),
                   })
-                  .eq("id", currentUserId)
 
-                if (updateError) {
-                  console.error("Error updating subscription details:", updateError)
-                  setError("Failed to update subscription details. Please contact support.")
-                } else {
-                  // Make sure the user is marked as a member in the users table
-                  const { error: userUpdateError } = await supabase
-                    .from("users")
-                    .update({
-                      is_member: true,
-                      updated_at: new Date().toISOString()
-                    })
-                    .eq("id", currentUserId)
-                  
-                  if (userUpdateError) {
-                    console.error("Error updating user membership status:", userUpdateError)
-                    // Continue anyway, this is not critical
+                  if (retryResponse.ok) {
+                    const sessionData = await retryResponse.json()
+                    // Continue with the successful response
+                    if (sessionData.status === "complete") {
+                      setCheckoutData({
+                        id: sessionId,
+                        status: "complete",
+                        customer_id: sessionData.customerId,
+                        subscription_id: sessionData.subscriptionId,
+                        payment_status: "paid",
+                        subscription_status: "active",
+                        plan_type: sessionData.plan,
+                        last_four: sessionData.lastFour,
+                      })
+                    }
+                  } else {
+                    console.error("Retry failed:", await retryResponse.json())
                   }
-                  
-                  // Redirect to dashboard after successful update
-                  router.push("/dashboard?subscription=success")
+                } catch (retryError) {
+                  console.error("Retry error:", retryError)
                 }
               } else {
-                setError("Payment not completed. Please try again or contact support.")
-                setLoading(false)
+                console.error("Failed to verify checkout session:", errorData.error)
               }
-            } catch (sessionError) {
-              console.error("Error processing session:", sessionError)
-              setError("Failed to process subscription information. Please contact support.")
-              setLoading(false)
-            }
-          } else {
-            // No session_id, just redirect to dashboard
-            // But first, ensure the user is marked as a member in the users table
-            try {
-              const { error: userUpdateError } = await supabase
-                .from("users")
-                .update({
-                  is_member: true,
-                  updated_at: new Date().toISOString()
-                })
-                .eq("id", currentUserId)
-              
-              if (userUpdateError) {
-                console.error("Error updating user membership status:", userUpdateError)
-                // Continue anyway, this is not critical
-              }
-            } catch (updateError) {
-              console.error("Error ensuring user membership status:", updateError)
-              // Continue anyway, this is not critical
-            }
-            
-            router.push("/dashboard")
-          }
-        } else {
-          // No existing profile, continue with form
-          if (sessionId) {
-            // If there's a session_id, verify the checkout session
-            try {
-              const response = await fetch("/api/verify-checkout-session", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "x-user-id": currentUserId, // Add the user ID in the headers
-                },
-                body: JSON.stringify({
-                  sessionId,
-                  userId: currentUserId, // Also include it in the body for redundancy
-                }),
-              })
-
-              if (!response.ok) {
-                const errorData = await response.json()
-                console.error("Checkout session verification failed:", errorData)
-
-                // If the error is about missing user ID but we have the user ID, retry with explicit user ID
-                if (errorData.error === "User ID not found in session" && currentUserId) {
-                  setError("Retrying checkout verification with explicit user ID...")
-
-                  try {
-                    const retryResponse = await fetch("/api/verify-checkout-session", {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                      },
-                      body: JSON.stringify({
-                        sessionId,
-                        userId: currentUserId,
-                        retry: true,
-                      }),
-                    })
-
-                    if (retryResponse.ok) {
-                      const sessionData = await retryResponse.json()
-                      // Continue with the successful response
-                      if (sessionData.status === "complete") {
-                        setCheckoutData({
-                          id: sessionId,
-                          status: "complete",
-                          customer_id: sessionData.customerId,
-                          subscription_id: sessionData.subscriptionId,
-                          payment_status: "paid",
-                          subscription_status: "active",
-                          //plan_type: sessionData.plan,
-                          last_four: sessionData.lastFour,
-                        })
-                        setLoading(false)
-                        return
-                      }
-                    } else {
-                      throw new Error("Retry failed: " + (await retryResponse.json()).error || "Unknown error")
-                    }
-                  } catch (retryError) {
-                    console.error("Retry error:", retryError)
-                  }
-                }
-
-                throw new Error(errorData.error || "Failed to verify checkout session")
-              }
-
+            } else {
               const sessionData = await response.json()
 
               if (sessionData.status === "complete") {
@@ -358,21 +199,20 @@ function CompleteProfileContent() {
                   subscription_id: sessionData.subscriptionId,
                   payment_status: "paid",
                   subscription_status: "active",
-                  //plan_type: sessionData.plan,
+                  plan_type: sessionData.plan,
                   last_four: sessionData.lastFour,
                 })
               } else {
                 console.warn("Payment not completed:", sessionData.status)
-                // Continue anyway, we'll just not have the checkout data
               }
-            } catch (sessionError) {
-              console.error("Error verifying session:", sessionError)
-              // Continue anyway, we'll just not have the checkout data
             }
+          } catch (sessionError) {
+            console.error("Error verifying session:", sessionError)
+            // Continue anyway, we'll just not have the checkout data
           }
-
-          setLoading(false)
         }
+
+        setLoading(false)
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred"
         console.error("Error in profile setup:", errorMessage)
@@ -381,7 +221,7 @@ function CompleteProfileContent() {
       }
     }
 
-    checkUserAndSession()
+    initializeProfileForm()
   }, [router, sessionId, userId, supabase])
 
   const handleProfileSubmit = async (formData: ProfileFormValues) => {
@@ -450,7 +290,7 @@ function CompleteProfileContent() {
         return
       }
 
-      // IMPORTANT: Update the users table to mark the user as a member
+      // Update the users table to mark the user as a member
       const { error: userUpdateError } = await supabase
         .from("users")
         .update({

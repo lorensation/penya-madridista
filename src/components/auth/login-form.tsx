@@ -79,7 +79,7 @@ export function LoginForm() {
         <Label htmlFor="password">Password</Label>
         <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
       </div>
-      <Button type="submit" className="w-full" disabled={loading || success}>
+      <Button type="submit" className="w-full hover:bg-white hover:text-primary hover:border hover:border-black" disabled={loading || success}>
         {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
       </Button>
     </form>
