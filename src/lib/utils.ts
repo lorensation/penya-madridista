@@ -38,7 +38,5 @@ export function getBaseUrl() {
   
   // When rendering on the server, we don't have access to window
   // Use environment variable or default to localhost
-  return process.env.NEXT_PUBLIC_APP_URL || 
-         process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
-         "https://www.lorenzosanz.com"
+  return process.env.NEXT_PUBLIC_SITE_URL || "https://www.lorenzosanz.com"
 }

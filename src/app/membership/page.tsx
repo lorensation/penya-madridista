@@ -72,7 +72,7 @@ const membershipPlans = [
   },
   {
     id: "family",
-    name: "Membresía Familiar",
+    name: "Membresía Familiar (Un adulto y un menor)",
     productId: process.env.NEXT_PUBLIC_STRIPE_FAMILY_PRODUCT_ID,
     paymentOptions: [
       {

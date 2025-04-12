@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getServiceSupabase } from "@/lib/supabase" // Changed from @/lib/supabase-server
+import { getServiceSupabase } from "@/lib/supabase"
 import { stripe } from "@/lib/stripe"
 
 export async function POST(request: NextRequest) {
