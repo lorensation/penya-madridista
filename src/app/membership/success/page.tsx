@@ -48,18 +48,45 @@ function SuccessContent() {
         console.log("User authenticated:", userData.user.id)
 
         // Fetch the session details from Stripe via our API
+        // Now explicitly pass the user ID in the request
         let sessionData
         try {
-          const response = await fetch(`/api/verify-checkout-session?session_id=${sessionId}`)
+          // First try with a POST request that includes the user ID
+          const postResponse = await fetch("/api/verify-checkout-session", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-user-id": userData.user.id
+            },
+            body: JSON.stringify({
+              sessionId,
+              userId: userData.user.id
+            })
+          })
           
-          if (!response.ok) {
-            throw new Error(`Failed to fetch session: ${response.statusText}`)
+          if (!postResponse.ok) {
+            // If POST fails, try with GET as a fallback
+            console.warn("POST request failed, trying GET as fallback")
+            const getResponse = await fetch(`/api/verify-checkout-session?session_id=${sessionId}&userId=${userData.user.id}`, {
+              headers: {
+                "x-user-id": userData.user.id
+              }
+            })
+            
+            if (!getResponse.ok) {
+              const errorData = await getResponse.json()
+              throw new Error(`Failed to fetch session: ${getResponse.statusText}. ${errorData.error || ''}`)
+            }
+            
+            sessionData = await getResponse.json()
+          } else {
+            sessionData = await postResponse.json()
           }
           
-          sessionData = await response.json()
           console.log("Retrieved session data from Stripe:", sessionData)
           
-          if (!sessionData || !sessionData.session) {
+          // Check if we have valid session data
+          if (!sessionData) {
             throw new Error("Invalid session data returned from API")
           }
         } catch (stripeError) {
@@ -97,26 +124,84 @@ function SuccessContent() {
         const { data: checkoutData, error: checkoutError } = await supabase
           .from("checkout_sessions")
           .select("plan_type, subscription_id, customer_id, subscription_status, metadata")
-          .eq("session_id", sessionId)
-          .single()
+          .eq("metadata->stripe_session_id", sessionId)
+          .maybeSingle()
 
-        if (checkoutError) {
+        if (checkoutError && checkoutError.code !== "PGRST116") {
           console.error("Error fetching checkout session data:", checkoutError)
-          
-          // If the error is "no rows returned", we need to wait for the webhook to process
-          if (checkoutError.code === "PGRST116") {
-            setError("Your payment is being processed. Please wait a moment and refresh the page.")
-          } else {
-            setError("Failed to retrieve subscription details. Please contact support.")
-          }
-          
+          setError("Failed to retrieve subscription details. Please contact support.")
           setLoading(false)
           return
         }
 
+        // If no checkout data found, try to use the data from the API response
         if (!checkoutData) {
-          console.error("No checkout data found for session:", sessionId)
-          setError("Failed to retrieve subscription details. Please contact support.")
+          console.log("No checkout data found in database, using API response data")
+          
+          // Create a checkout data object from the API response
+          const apiCheckoutData = {
+            plan_type: sessionData.plan,
+            subscription_id: sessionData.subscriptionId,
+            customer_id: sessionData.customerId,
+            subscription_status: "active",
+            metadata: {
+              payment_type: sessionData.paymentType || "monthly"
+            }
+          }
+          
+          // Member profile exists, update it with subscription details from API
+          const { error: updateError } = await supabase
+            .from("miembros")
+            .update({
+              subscription_status: "active",
+              subscription_plan: apiCheckoutData.plan_type,
+              subscription_id: apiCheckoutData.subscription_id,
+              subscription_updated_at: new Date().toISOString(),
+              stripe_customer_id: apiCheckoutData.customer_id,
+            })
+            .eq("id", userData.user.id)
+
+          if (updateError) {
+            console.error("Error updating member profile:", updateError)
+            setError("Failed to update subscription details. Please contact support.")
+            setLoading(false)
+            return
+          }
+
+          // Create subscription record in the new subscriptions table
+          const paymentType = apiCheckoutData.metadata?.payment_type || "monthly"
+          
+          // Calculate end date based on payment type
+          const startDate = new Date()
+          const endDate = new Date()
+          
+          if (paymentType === 'annual') {
+            endDate.setFullYear(endDate.getFullYear() + 1)
+          } else {
+            endDate.setMonth(endDate.getMonth() + 1)
+          }
+
+          // Create new subscription record
+          const { error: subscriptionInsertError } = await supabase
+            .from("subscriptions")
+            .insert({
+              member_id: userData.user.id,
+              plan_type: apiCheckoutData.plan_type,
+              payment_type: paymentType,
+              stripe_customer_id: apiCheckoutData.customer_id,
+              stripe_subscription_id: apiCheckoutData.subscription_id,
+              stripe_checkout_session_id: sessionId,
+              start_date: startDate.toISOString(),
+              end_date: endDate.toISOString(),
+              status: apiCheckoutData.subscription_status || "active",
+            })
+
+          if (subscriptionInsertError) {
+            console.error("Error creating subscription record:", subscriptionInsertError)
+            // Continue anyway as this is not critical for the user experience
+          }
+          
+          console.log("Successfully updated member profile and created subscription from API data")
           setLoading(false)
           return
         }
