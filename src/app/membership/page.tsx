@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { CheckCircle } from "lucide-react"
+import { CheckCircle, Calendar, CreditCard } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import type { User } from "@supabase/supabase-js"
@@ -12,11 +12,26 @@ import type { User } from "@supabase/supabase-js"
 // Define membership plans with direct checkout links
 const membershipPlans = [
   {
-    id: "annual",
-    name: "Membresía Anual",
-    price: "€100",
-    period: "/año",
-    checkoutUrl: "https://buy.stripe.com/test_cN26ot8oi3ol3rW146", //CAMBIADO TEMPORALMENTE A ENLACE DE PRUEBA, ESTE ES EL REAL: https://buy.stripe.com/dR69C47a4e0TccU4gg
+    id: "under25",
+    name: "Membresía Joven (Menores de 25)",
+    productId: process.env.NEXT_PUBLIC_STRIPE_UNDER25_PRODUCT_ID,
+    paymentOptions: [
+      {
+        id: "monthly",
+        name: "Mensual",
+        price: "€10",
+        period: "/mes",
+        checkoutUrl: "https://buy.stripe.com/test_3cscMRcEy0c92nS28c",
+      },
+      {
+        id: "annual",
+        name: "Anual",
+        price: "€100",
+        period: "/año",
+        checkoutUrl: "https://buy.stripe.com/test_4gw9AF6ga5wtd2w7sv",
+        discount: "¡Ahorra 2 meses!"
+      }
+    ],
     features: [
       "Acceso a eventos exclusivos organizados por la peña",
       "Descuentos en viajes organizados para ver partidos",
@@ -26,11 +41,56 @@ const membershipPlans = [
     ],
   },
   {
+    id: "over25",
+    name: "Membresía Adulto (Mayores de 25)",
+    productId: process.env.NEXT_PUBLIC_STRIPE_OVER25_PRODUCT_ID,
+    paymentOptions: [
+      {
+        id: "monthly",
+        name: "Mensual",
+        price: "€12",
+        period: "/mes",
+        checkoutUrl: "https://buy.stripe.com/test_bIY149dIC6AxgeI6ou",
+      },
+      {
+        id: "annual",
+        name: "Anual",
+        price: "€120",
+        period: "/año",
+        checkoutUrl: "https://buy.stripe.com/test_4gw5kpcEy6Ax9Qk7sx",
+        discount: "¡Ahorra 2 meses!"
+      }
+    ],
+    features: [
+      "Acceso a eventos exclusivos organizados por la peña",
+      "Descuentos en viajes organizados para ver partidos",
+      "Participación en sorteos y promociones exclusivas",
+      "Acceso al contenido exclusivo en nuestra web",
+      "Carnet oficial de socio de la Peña Lorenzo Sanz",
+    ],
+    popular: true,
+  },
+  {
     id: "family",
     name: "Membresía Familiar",
-    price: "€150",
-    period: "/año",
-    checkoutUrl: "https://buy.stripe.com/test_dR6bINawq3olgeIbIJ", //CAMBIADO TEMPORALMENTE A ENLACE DE PRUEBA, ESTE ES EL REAL: https://buy.stripe.com/5kAbKc7a42ib6SA001
+    productId: process.env.NEXT_PUBLIC_STRIPE_FAMILY_PRODUCT_ID,
+    paymentOptions: [
+      {
+        id: "monthly",
+        name: "Mensual",
+        price: "€15",
+        period: "/mes",
+        checkoutUrl: "https://buy.stripe.com/test_14k149fQK2kh4w06ow",
+      },
+      {
+        id: "annual",
+        name: "Anual",
+        price: "€150",
+        period: "/año",
+        checkoutUrl: "https://buy.stripe.com/test_dR67sx8oi0c99Qk6ov",
+        discount: "¡Ahorra 2 meses!"
+      }
+    ],
     features: [
       "Todos los beneficios de la membresía individual",
       "Válido para un adulto y un menor miembros de la familia",
@@ -38,7 +98,6 @@ const membershipPlans = [
       "Carnets oficiales para todos los miembros incluidos",
       "Actividades para los más pequeños",
     ],
-    popular: true,
   },
 ]
 
@@ -47,6 +106,7 @@ export default function Membership() {
   const [user, setUser] = useState<User | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
+  const [selectedPaymentOption, setSelectedPaymentOption] = useState<string | null>(null)
 
   useEffect(() => {
     const checkUser = async () => {
@@ -59,25 +119,36 @@ export default function Membership() {
 
   const handleSelectPlan = (planId: string) => {
     setSelectedPlan(planId)
+    setSelectedPaymentOption(null) // Reset payment option when plan changes
+  }
+
+  const handleSelectPaymentOption = (optionId: string) => {
+    setSelectedPaymentOption(optionId)
   }
 
   const handleSubscribe = () => {
-    if (!selectedPlan) return
+    if (!selectedPlan || !selectedPaymentOption) return
 
     if (!user) {
       router.push("/login?redirect=/membership")
       return
     }
 
-    // Get the selected plan
+    // Get the selected plan and payment option
     const plan = membershipPlans.find((p) => p.id === selectedPlan)
     if (!plan) {
       setError("Plan not found")
       return
     }
 
+    const paymentOption = plan.paymentOptions.find((o) => o.id === selectedPaymentOption)
+    if (!paymentOption) {
+      setError("Payment option not found")
+      return
+    }
+
     // Redirect to the direct Stripe checkout URL
-    window.location.href = plan.checkoutUrl
+    window.location.href = paymentOption.checkoutUrl
   }
 
   return (
@@ -97,7 +168,7 @@ export default function Membership() {
         )}
 
         <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {membershipPlans.map((plan) => (
               <div
                 key={plan.id}
@@ -113,10 +184,6 @@ export default function Membership() {
                     </div>
                   )}
                   <h2 className="text-2xl font-bold">{plan.name}</h2>
-                  <p className="text-3xl font-bold mt-2">
-                    {plan.price}
-                    <span className="text-sm font-normal">{plan.period}</span>
-                  </p>
                 </div>
                 <div className="p-6 flex-grow flex flex-col">
                   <ul className="space-y-4 mb-auto">
@@ -146,8 +213,52 @@ export default function Membership() {
             ))}
           </div>
 
+          {selectedPlan && (
+            <div className="mt-8 bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-xl font-bold text-primary mb-4">Elige tu opción de pago</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {membershipPlans
+                  .find((p) => p.id === selectedPlan)
+                  ?.paymentOptions.map((option) => (
+                    <div
+                      key={option.id}
+                      className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                        selectedPaymentOption === option.id ? "border-primary ring-2 ring-primary" : "border-gray-200"
+                      }`}
+                      onClick={() => handleSelectPaymentOption(option.id)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          {option.id === "monthly" ? (
+                            <Calendar className="h-5 w-5 text-primary mr-2" />
+                          ) : (
+                            <CreditCard className="h-5 w-5 text-primary mr-2" />
+                          )}
+                          <span className="font-medium">{option.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xl font-bold">
+                            {option.price}
+                            <span className="text-sm font-normal text-gray-500">{option.period}</span>
+                          </div>
+                          {option.discount && (
+                            <div className="text-xs text-green-600 font-medium">{option.discount}</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
           <div className="mt-8 text-center">
-            <Button size="lg" onClick={handleSubscribe} disabled={!selectedPlan} className="px-8 py-6 text-lg">
+            <Button 
+              size="lg" 
+              onClick={handleSubscribe} 
+              disabled={!selectedPlan || !selectedPaymentOption} 
+              className="px-8 py-6 text-lg"
+            >
               {user ? "Continuar con el pago" : "Iniciar Sesión para Suscribirse"}
             </Button>
           </div>

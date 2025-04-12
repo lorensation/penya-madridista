@@ -1,6 +1,6 @@
-'use server'
+"use server"
 
-import { createServerSupabaseClient } from "@/lib/supabase"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { getBaseUrl } from "@/lib/utils"
 import Stripe from "stripe"
@@ -31,7 +31,33 @@ type SubscriptionResponse = {
   error?: string;
 }
 
-export async function createCheckoutSession(priceId: string) {
+// Define plan types
+export type PlanType = 'under25' | 'over25' | 'family';
+export type PaymentType = 'monthly' | 'annual';
+
+// Map price IDs to plan types and payment types
+const priceIdToPlanMap: Record<string, { planType: PlanType, paymentType: PaymentType }> = {
+  // Under 25 plans
+  'price_under25_monthly': { planType: 'under25', paymentType: 'monthly' },
+  'price_under25_annual': { planType: 'under25', paymentType: 'annual' },
+  
+  // Over 25 plans
+  'price_over25_monthly': { planType: 'over25', paymentType: 'monthly' },
+  'price_over25_annual': { planType: 'over25', paymentType: 'annual' },
+  
+  // Family plans
+  'price_family_monthly': { planType: 'family', paymentType: 'monthly' },
+  'price_family_annual': { planType: 'family', paymentType: 'annual' },
+};
+
+// Map product IDs to plan types
+const productIdToPlanType: Record<string, PlanType> = {
+  [process.env.NEXT_PUBLIC_STRIPE_UNDER25_PRODUCT_ID || '']: 'under25',
+  [process.env.NEXT_PUBLIC_STRIPE_OVER25_PRODUCT_ID || '']: 'over25',
+  [process.env.NEXT_PUBLIC_STRIPE_FAMILY_PRODUCT_ID || '']: 'family',
+};
+
+export async function createCheckoutSession(priceId: string, successRedirect?: string) {
   try {
     const supabase = createServerSupabaseClient()
 
@@ -42,11 +68,37 @@ export async function createCheckoutSession(priceId: string) {
 
     if (authError || !user) {
       console.error("Authentication error in createCheckoutSession:", authError)
-      return redirect("/login?redirect=/dashboard/membership")
+      return redirect("/login?redirect=/membership")
     }
 
-    // Create a checkout session
-    const session = await stripe.checkout.sessions.create({
+    // Try to determine plan type and payment type from price ID
+    let planType: PlanType | undefined;
+    let paymentType: PaymentType | undefined;
+    
+    // First check our mapping
+    const planInfo = priceIdToPlanMap[priceId];
+    if (planInfo) {
+      planType = planInfo.planType;
+      paymentType = planInfo.paymentType;
+    } else {
+      // If not in our mapping, try to fetch from Stripe
+      try {
+        const price = await stripe.prices.retrieve(priceId);
+        if (price.product && typeof price.product === 'string') {
+          planType = productIdToPlanType[price.product];
+        }
+        
+        if (price.recurring) {
+          paymentType = price.recurring.interval === 'year' ? 'annual' : 'monthly';
+        }
+      } catch (error) {
+        console.error("Error fetching price details:", error);
+      }
+    }
+
+    // Fix the TypeScript error by using the correct type for the checkout session parameters
+    // Use explicit type casting to Stripe.Checkout.SessionCreateParams
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ["card"],
       line_items: [
         {
@@ -55,23 +107,28 @@ export async function createCheckoutSession(priceId: string) {
         },
       ],
       mode: "subscription",
-      success_url: `${getBaseUrl()}/dashboard/membership?success=true`,
-      cancel_url: `${getBaseUrl()}/dashboard/membership?canceled=true`,
+      success_url: `${getBaseUrl()}${successRedirect || '/membership/success'}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${getBaseUrl()}/membership?canceled=true`,
       customer_email: user.email,
       client_reference_id: user.id,
       metadata: {
         userId: user.id,
+        plan_type: planType ?? "",
+        payment_type: paymentType ?? "",
+        price_id: priceId
       },
-    })
+    };
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
 
     if (session.url) {
       return redirect(session.url)
     }
 
-    return redirect("/dashboard/membership?error=true")
+    return redirect("/membership?error=true")
   } catch (error) {
     console.error("Error creating checkout session:", error)
-    return redirect("/dashboard/membership?error=checkout-failed")
+    return redirect("/membership?error=checkout-failed")
   }
 }
 
@@ -135,10 +192,44 @@ export async function cancelSubscription(subscriptionId: string): Promise<Subscr
       }
     }
 
+    const supabase = createServerSupabaseClient()
+
     // Cancel the subscription at period end
     await stripe.subscriptions.update(subscriptionId, {
       cancel_at_period_end: true
     })
+
+    // Update the subscription status in our database
+    const { data: userData } = await supabase.auth.getUser()
+    if (userData.user) {
+      // Update in subscriptions table
+      const { error: subUpdateError } = await supabase
+        .from("subscriptions")
+        .update({
+          status: "canceled",
+          updated_at: new Date().toISOString()
+        })
+        .eq("member_id", userData.user.id)
+        .eq("stripe_subscription_id", subscriptionId)
+
+      if (subUpdateError) {
+        console.error("Error updating subscription status in database:", subUpdateError)
+      }
+
+      // Also update in miembros table for backward compatibility
+      const { error: memberUpdateError } = await supabase
+        .from("miembros")
+        .update({
+          subscription_status: "canceled",
+          subscription_updated_at: new Date().toISOString()
+        })
+        .eq("id", userData.user.id)
+        .eq("subscription_id", subscriptionId)
+
+      if (memberUpdateError) {
+        console.error("Error updating member subscription status:", memberUpdateError)
+      }
+    }
 
     return {
       success: true,
@@ -151,5 +242,61 @@ export async function cancelSubscription(subscriptionId: string): Promise<Subscr
       success: false,
       error: `Failed to cancel subscription: ${errorMessage}`
     }
+  }
+}
+
+// New function to handle direct checkout links
+export async function handleDirectCheckout(planType: PlanType, paymentType: PaymentType) {
+  try {
+    const supabase = createServerSupabaseClient()
+
+    const {
+      data: { user },
+      error: authError
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      console.error("Authentication error in handleDirectCheckout:", authError)
+      return redirect(`/login?redirect=/membership&plan=${planType}&payment=${paymentType}`)
+    }
+
+    // Map of direct checkout URLs
+    const checkoutUrls: Record<string, string> = {
+      'under25-monthly': 'https://buy.stripe.com/test_3cscMRcEy0c92nS28c',
+      'under25-annual': 'https://buy.stripe.com/test_4gw9AF6ga5wtd2w7sv',
+      'over25-monthly': 'https://buy.stripe.com/test_bIY149dIC6AxgeI6ou',
+      'over25-annual': 'https://buy.stripe.com/test_4gw5kpcEy6Ax9Qk7sx',
+      'family-monthly': 'https://buy.stripe.com/test_14k149fQK2kh4w06ow',
+      'family-annual': 'https://buy.stripe.com/test_dR67sx8oi0c99Qk6ov'
+    }
+
+    const key = `${planType}-${paymentType}`
+    const checkoutUrl = checkoutUrls[key]
+
+    if (!checkoutUrl) {
+      console.error("Invalid plan or payment type:", planType, paymentType)
+      return redirect("/membership?error=invalid-plan")
+    }
+
+    // Store the user's selection in the database for later reference
+    const { error: insertError } = await supabase
+      .from("checkout_selections")
+      .insert({
+        user_id: user.id,
+        plan_type: planType,
+        payment_type: paymentType,
+        created_at: new Date().toISOString()
+      })
+
+    if (insertError) {
+      console.error("Error storing checkout selection:", insertError)
+      // Continue anyway, as this is not critical
+    }
+
+    // Redirect to the direct checkout URL
+    return redirect(checkoutUrl)
+  } catch (error) {
+    console.error("Error in handleDirectCheckout:", error)
+    return redirect("/membership?error=checkout-failed")
   }
 }

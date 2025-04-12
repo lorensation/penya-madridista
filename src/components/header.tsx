@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { ProfileDropdown } from "@/components/profile-dropdown"
 import { useNavbarMenu } from "@/hooks/use-navbar-menu"
@@ -22,7 +22,6 @@ export function Header() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const pathname = usePathname()
-  const [supabase] = useState(() => createBrowserSupabaseClient())
 
   useEffect(() => {
     // Function to fetch user data
@@ -73,7 +72,7 @@ export function Header() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [supabase])
+  }, [])
 
   const closeMenu = () => {
     setIsOpen(false)

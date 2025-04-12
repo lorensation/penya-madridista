@@ -1,3 +1,4 @@
+//app/complete-profile/page.tsx
 "use client"
 
 import { useState, useEffect } from "react"
@@ -18,6 +19,7 @@ interface CheckoutSessionData {
   payment_status: string
   subscription_status: string | null
   plan_type?: string
+  payment_type?: string // Added payment type (monthly/annual)
   last_four?: string | null
 }
 
@@ -176,6 +178,7 @@ function CompleteProfileContent() {
                         payment_status: "paid",
                         subscription_status: "active",
                         plan_type: sessionData.plan,
+                        payment_type: sessionData.paymentType || "monthly", // Default to monthly if not specified
                         last_four: sessionData.lastFour,
                       })
                     }
@@ -200,6 +203,7 @@ function CompleteProfileContent() {
                   payment_status: "paid",
                   subscription_status: "active",
                   plan_type: sessionData.plan,
+                  payment_type: sessionData.paymentType || "monthly", // Default to monthly if not specified
                   last_four: sessionData.lastFour,
                 })
               } else {
@@ -270,7 +274,7 @@ function CompleteProfileContent() {
         created_at: new Date().toISOString(),
       }
 
-      // If we have checkout data, add subscription details
+      // If we have checkout data, add subscription details to the member record
       if (checkoutData) {
         processedData.subscription_status = checkoutData.subscription_status || "active"
         processedData.subscription_plan = checkoutData.plan_type
@@ -303,6 +307,38 @@ function CompleteProfileContent() {
       if (userUpdateError) {
         console.error("Error updating user membership status:", userUpdateError)
         // We'll continue even if this fails, as the member profile was created successfully
+      }
+
+      // If we have checkout data, create a subscription record in the new subscriptions table
+      if (checkoutData && checkoutData.plan_type) {
+        // Calculate end date based on payment type
+        const startDate = new Date()
+        const endDate = new Date()
+        
+        if (checkoutData.payment_type === 'annual') {
+          endDate.setFullYear(endDate.getFullYear() + 1)
+        } else {
+          endDate.setMonth(endDate.getMonth() + 1)
+        }
+
+        const { error: subscriptionError } = await supabase
+          .from("subscriptions")
+          .insert({
+            member_id: userData.user.id,
+            plan_type: checkoutData.plan_type,
+            payment_type: checkoutData.payment_type || "monthly", // Default to monthly if not specified
+            stripe_customer_id: checkoutData.customer_id,
+            stripe_subscription_id: checkoutData.subscription_id,
+            stripe_checkout_session_id: checkoutData.id,
+            start_date: startDate.toISOString(),
+            end_date: endDate.toISOString(),
+            status: checkoutData.subscription_status || "active",
+          })
+
+        if (subscriptionError) {
+          console.error("Error creating subscription record:", subscriptionError)
+          // Continue anyway, as the member profile was created successfully
+        }
       }
 
       // Redirect to dashboard

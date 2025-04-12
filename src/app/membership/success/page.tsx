@@ -1,10 +1,11 @@
+//app/membership/success/page.tsx
 "use client"
 
 import { useEffect, useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { createBrowserSupabaseClient } from "@/lib/supabase"
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { Suspense } from "react"
 
 function SuccessContent() {
@@ -69,11 +70,10 @@ function SuccessContent() {
         }
 
         // Check if the user already has a member profile
-        // Note: Using 'id' column instead of 'auth_id'
         const { data: memberData, error: memberError } = await supabase
           .from("miembros")
           .select("id, user_uuid")
-          .eq("id", userData.user.id)  // Using 'id' instead of 'auth_id'
+          .eq("id", userData.user.id)
           .single()
 
         if (memberError) {
@@ -96,7 +96,7 @@ function SuccessContent() {
         // Check if we have session data in our database
         const { data: checkoutData, error: checkoutError } = await supabase
           .from("checkout_sessions")
-          .select("plan_type, subscription_id, customer_id, subscription_status")
+          .select("plan_type, subscription_id, customer_id, subscription_status, metadata")
           .eq("session_id", sessionId)
           .single()
 
@@ -123,8 +123,10 @@ function SuccessContent() {
 
         console.log("Checkout session data found:", checkoutData)
 
+        // Determine payment type (monthly/annual) from metadata or default to monthly
+        const paymentType = checkoutData.metadata?.payment_type || "monthly"
+
         // Member profile exists, update it with subscription details
-        // Note: Using 'id' column instead of 'auth_id'
         const { error: updateError } = await supabase
           .from("miembros")
           .update({
@@ -134,7 +136,7 @@ function SuccessContent() {
             subscription_updated_at: new Date().toISOString(),
             stripe_customer_id: checkoutData.customer_id,
           })
-          .eq("id", userData.user.id)  // Using 'id' instead of 'auth_id'
+          .eq("id", userData.user.id)
 
         if (updateError) {
           console.error("Error updating member profile:", updateError)
@@ -143,7 +145,68 @@ function SuccessContent() {
           return
         }
 
-        console.log("Successfully updated member profile with subscription details")
+        // Create or update subscription record in the new subscriptions table
+        // First check if a subscription record already exists
+        const { data: existingSubscription, error: subscriptionCheckError } = await supabase
+          .from("subscriptions")
+          .select("id")
+          .eq("member_id", userData.user.id)
+          .eq("stripe_subscription_id", checkoutData.subscription_id)
+          .maybeSingle()
+
+        if (subscriptionCheckError && subscriptionCheckError.code !== "PGRST116") {
+          console.error("Error checking existing subscription:", subscriptionCheckError)
+        }
+
+        // Calculate end date based on payment type
+        const startDate = new Date()
+        const endDate = new Date()
+        
+        if (paymentType === 'annual') {
+          endDate.setFullYear(endDate.getFullYear() + 1)
+        } else {
+          endDate.setMonth(endDate.getMonth() + 1)
+        }
+
+        if (existingSubscription) {
+          // Update existing subscription
+          const { error: subscriptionUpdateError } = await supabase
+            .from("subscriptions")
+            .update({
+              status: checkoutData.subscription_status || "active",
+              stripe_customer_id: checkoutData.customer_id,
+              stripe_checkout_session_id: sessionId,
+              start_date: startDate.toISOString(),
+              end_date: endDate.toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", existingSubscription.id)
+
+          if (subscriptionUpdateError) {
+            console.error("Error updating subscription record:", subscriptionUpdateError)
+          }
+        } else {
+          // Create new subscription record
+          const { error: subscriptionInsertError } = await supabase
+            .from("subscriptions")
+            .insert({
+              member_id: userData.user.id,
+              plan_type: checkoutData.plan_type,
+              payment_type: paymentType,
+              stripe_customer_id: checkoutData.customer_id,
+              stripe_subscription_id: checkoutData.subscription_id,
+              stripe_checkout_session_id: sessionId,
+              start_date: startDate.toISOString(),
+              end_date: endDate.toISOString(),
+              status: checkoutData.subscription_status || "active",
+            })
+
+          if (subscriptionInsertError) {
+            console.error("Error creating subscription record:", subscriptionInsertError)
+          }
+        }
+
+        console.log("Successfully updated member profile and subscription details")
         setLoading(false)
       } catch (error: unknown) {
         console.error("Error processing subscription:", error)
