@@ -19,14 +19,14 @@ const membershipPlans = [
       {
         id: "monthly",
         name: "Mensual",
-        price: "€10",
+        price: "€5",
         period: "/mes",
-        checkoutUrl: "https://buy.stripe.com/test_3cscMRcEy0c92nS28c",
+        checkoutUrl: "https://buy.stripe.com/test_3cs3ch5c6aQN6E86ox",
       },
       {
         id: "annual",
         name: "Anual",
-        price: "€100",
+        price: "€50",
         period: "/año",
         checkoutUrl: "https://buy.stripe.com/test_4gw9AF6ga5wtd2w7sv",
         discount: "¡Ahorra 2 meses!"
@@ -48,14 +48,14 @@ const membershipPlans = [
       {
         id: "monthly",
         name: "Mensual",
-        price: "€12",
+        price: "€10",
         period: "/mes",
         checkoutUrl: "https://buy.stripe.com/test_bIY149dIC6AxgeI6ou",
       },
       {
         id: "annual",
         name: "Anual",
-        price: "€120",
+        price: "€100",
         period: "/año",
         checkoutUrl: "https://buy.stripe.com/test_4gw5kpcEy6Ax9Qk7sx",
         discount: "¡Ahorra 2 meses!"
