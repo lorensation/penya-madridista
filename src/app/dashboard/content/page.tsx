@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { FileText, Video, Download, AlertTriangle, AlertCircle, CheckCircle } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase"
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js"
 
 // Define types for our content
 interface ContentItem {
@@ -178,7 +179,7 @@ export default function ContentPage() {
   // Add a listener for auth state changes
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event: 'SIGNED_IN' | 'SIGNED_OUT' | 'USER_UPDATED' | 'PASSWORD_RECOVERY' | 'TOKEN_REFRESHED', session: { user: { id: string } } | null) => {
+      (event: AuthChangeEvent, session: Session | null) => { // Explicitly typed callback parameters
         if (event === 'SIGNED_IN' && session) {
           setIsAuthenticated(true)
         } else if (event === 'SIGNED_OUT') {

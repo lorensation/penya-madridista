@@ -23,7 +23,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
@@ -425,7 +424,7 @@ export default function AdminEventsPage() {
           <CalendarIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-xl font-medium text-gray-700 mb-2">No hay eventos</h3>
           <p className="text-gray-600 mb-8">
-            No hay eventos creados actualmente. Haz clic en "Crear Evento" para añadir uno nuevo.
+            No hay eventos creados actualmente. Haz clic en Crear Evento para añadir uno nuevo.
           </p>
           <Button onClick={handleCreateEvent} className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
