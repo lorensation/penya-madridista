@@ -8,73 +8,35 @@ import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Calendar, MapPin, Clock, Users, AlertTriangle } from "lucide-react"
+import { Calendar, MapPin, Clock, Users, AlertTriangle, CalendarX, PhoneOutgoing } from "lucide-react"
 
 // Define types for our data
 interface Event {
-  id: number
+  id: string
   title: string
-  description: string
+  description: string | null
   date: string
-  time: string
-  location: string
-  capacity: number
-  available: number
-  image: string
+  time: string | null
+  location: string | null
+  capacity: number | null
+  available: number | null
+  image_url: string | null
+  created_at: string | null
+  updated_at: string | null
 }
 
 interface Profile {
   id: string
   subscription_status?: string
-  // Replace any with a more specific type
   [key: string]: string | number | boolean | null | undefined
 }
-
-// Mock events data
-const events: Event[] = [
-  {
-    id: 1,
-    title: "Comida Anual de Socios",
-    description:
-      "Comida para celebrar el establecimiento de la peña con la presencia de exjugadores del Real Madrid.",
-    date: "2023-12-15",
-    time: "20:00",
-    location: "Hotel Meliá Castilla, Madrid",
-    capacity: 150,
-    available: 72,
-    image: "/comida-socios-penya.jpg",
-  },
-  {
-    id: 2,
-    title: "Viaje a París - Champions League",
-    description:
-      "Viaje organizado para ver el partido de Champions League contra el PSG en el Parque de los Príncipes.",
-    date: "2024-02-10",
-    time: "21:00",
-    location: "París, Francia",
-    capacity: 50,
-    available: 8,
-    image: "/psg-madrid-ucl.jpg",
-  },
-  {
-    id: 3,
-    title: "Charla con Fernando Hierro",
-    description:
-      "Coloquio exclusivo con Fernando Hierro sobre la época dorada del Real Madrid bajo la presidencia de Lorenzo Sanz.",
-    date: "2024-01-20",
-    time: "18:30",
-    location: "Sede de la Peña, Madrid",
-    capacity: 80,
-    available: 35,
-    image: "/fernando-hierro.jpg",
-  },
-]
 
 export default function EventsPage() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null) // Renamed to use it later
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const checkUser = async () => {
@@ -98,6 +60,19 @@ export default function EventsPage() {
           setProfile(null)
         } else {
           setProfile(profileData)
+        }
+
+        // Fetch events from database
+        const { data: eventsData, error: eventsError } = await supabase
+          .from("events")
+          .select("*")
+          .order('date', { ascending: true })
+        
+        if (eventsError) {
+          console.error("Error fetching events:", eventsError)
+          setError("No se pudieron cargar los eventos. Por favor, inténtalo de nuevo más tarde.")
+        } else {
+          setEvents(eventsData || [])
         }
 
         setLoading(false)
@@ -136,6 +111,13 @@ export default function EventsPage() {
 
   const subscriptionStatus = profile?.subscription_status || "inactive"
 
+  // Create a WhatsApp chat link for event reservation
+  const createWhatsAppLink = (eventTitle: string) => {
+    // Format the message for WhatsApp
+    const message = encodeURIComponent(`Hola, me gustaría reservar una plaza para el evento: ${eventTitle}`);
+    return `https://wa.me/34679240500?text=${message}`; // Replace with your actual WhatsApp number
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -156,50 +138,85 @@ export default function EventsPage() {
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {events.map((event) => (
-          <Card key={event.id} className="overflow-hidden flex flex-col h-full">
-            <div className="relative h-48">
-              <Image src={event.image || "/placeholder.svg"} alt={event.title} fill className="object-cover" />
-            </div>
-            <CardHeader className="pb-2">
-              <CardTitle>{event.title}</CardTitle>
-              <CardDescription>{event.description}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col flex-grow">
-              <div className="space-y-3 mb-4">
-                <div className="flex items-start">
-                  <Calendar className="h-4 w-4 text-primary mr-2 mt-0.5" />
-                  <span className="text-sm">
-                    {new Date(event.date).toLocaleDateString("es-ES", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </span>
-                </div>
-                <div className="flex items-start">
-                  <Clock className="h-4 w-4 text-primary mr-2 mt-0.5" />
-                  <span className="text-sm">{event.time} h</span>
-                </div>
-                <div className="flex items-start">
-                  <MapPin className="h-4 w-4 text-primary mr-2 mt-0.5" />
-                  <span className="text-sm">{event.location}</span>
-                </div>
-                <div className="flex items-start">
-                  <Users className="h-4 w-4 text-primary mr-2 mt-0.5" />
-                  <span className="text-sm">
-                    {event.available} plazas disponibles de {event.capacity}
-                  </span>
-                </div>
+      {events.length === 0 ? (
+        <div className="text-center py-16">
+          <CalendarX className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-xl font-medium text-gray-700 mb-2">No hay eventos disponibles</h3>
+          <p className="text-gray-600 mb-8">
+            Actualmente no hay eventos programados. Vuelve a consultar pronto.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {events.map((event) => (
+            <Card key={event.id} className="overflow-hidden flex flex-col h-full">
+              <div className="relative h-48">
+                <Image 
+                  src={event.image_url || "/placeholder.svg"} 
+                  alt={event.title} 
+                  fill 
+                  className="object-cover" 
+                />
               </div>
-              <Button className="w-full transition-all mt-auto bg-primary hover:bg-secondary" disabled={subscriptionStatus !== "active"}>
-                {subscriptionStatus === "active" ? "Reservar Plaza" : "Membresía Requerida"}
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              <CardHeader className="pb-2">
+                <CardTitle>{event.title}</CardTitle>
+                <CardDescription>{event.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col flex-grow">
+                <div className="space-y-3 mb-4">
+                  <div className="flex items-start">
+                    <Calendar className="h-4 w-4 text-primary mr-2 mt-0.5" />
+                    <span className="text-sm">
+                      {new Date(event.date).toLocaleDateString("es-ES", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </div>
+                  {event.time && (
+                    <div className="flex items-start">
+                      <Clock className="h-4 w-4 text-primary mr-2 mt-0.5" />
+                      <span className="text-sm">{event.time} h</span>
+                    </div>
+                  )}
+                  {event.location && (
+                    <div className="flex items-start">
+                      <MapPin className="h-4 w-4 text-primary mr-2 mt-0.5" />
+                      <span className="text-sm">{event.location}</span>
+                    </div>
+                  )}
+                  {event.capacity && event.available !== null && (
+                    <div className="flex items-start">
+                      <Users className="h-4 w-4 text-primary mr-2 mt-0.5" />
+                      <span className="text-sm">
+                        {event.available} plazas disponibles de {event.capacity}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <a 
+                  href={createWhatsAppLink(event.title)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full mt-auto"
+                >
+                  <Button 
+                    className={`w-full transition-all flex items-center justify-center gap-2 
+                    ${subscriptionStatus === "active" 
+                      ? "hover:bg-white hover:text-primary hover:border hover:border-black" 
+                      : "bg-gray-400 hover:bg-gray-500 cursor-not-allowed"}`} 
+                    disabled={subscriptionStatus !== "active"}
+                  >
+                    <PhoneOutgoing className="h-4 w-4" />
+                    {subscriptionStatus === "active" ? "Reservar Plaza por WhatsApp" : "Membresía Requerida"}
+                  </Button>
+                </a>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -84,8 +84,6 @@ export default function MembershipPage() {
         
         // Get membership data
         try {
-          console.log("Fetching membership for user ID:", userData.user.id)
-          
           // Try to find by user_uuid first
           const { data: memberData, error: memberError } = await supabase
             .from("miembros")
@@ -111,7 +109,6 @@ export default function MembershipPage() {
             
             setMembership(memberDataById as Membership)
           } else {
-            console.log("Found membership data:", memberData)
             setMembership(memberData as Membership)
           }
         } catch (err) {

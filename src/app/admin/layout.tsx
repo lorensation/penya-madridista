@@ -1,19 +1,9 @@
 ///admin/layout.tsx
 import type React from "react"
-//import { redirect } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-//import { checkAdminStatusSSR } from "@/lib/auth"
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  /*const adminData = await checkAdminStatusSSR()
-
-  // If not an admin, redirect to login
-  if (!adminData) {
-    console.log("Redirecting non-admin user to login page");
-    redirect("/login")
-  }*/
-
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-primary text-white p-4">
@@ -35,14 +25,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 Users
               </Button>
             </Link>
-            <Link href="/admin/webhooks">
+            <Link href="/admin/events">
               <Button variant="ghost" className="text-white hover:text-black transition-all hover:bg-white hover:border hover:border-white">
-                Webhooks
+                Events
               </Button>
             </Link>
-            <Link href="/admin/fix-subscription">
+            <Link href="/admin/settings">
               <Button variant="ghost" className="text-white hover:text-black transition-all hover:bg-white hover:border hover:border-white">
-                Fix Subscriptions
+                Settings
               </Button>
             </Link>
             <Link href="/dashboard">

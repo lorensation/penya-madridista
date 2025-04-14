@@ -138,51 +138,24 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Webhook Configuration Card */}
+  
+        {/* Event Management Card */}
         <Card className="flex flex-col h-full">
           <CardHeader>
             <CardTitle className="flex items-center">
               <Webhook className="mr-2 h-5 w-5 text-primary" />
-              Webhook Configuration
+              Event Management
             </CardTitle>
-            <CardDescription>Set up and manage Supabase webhooks</CardDescription>
+            <CardDescription>Manage events and registrations</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col flex-grow justify-between">
-            <p className="mb-4">
-              Configure webhooks to handle events from Supabase, such as user creation, updates, and deletions.
-            </p>
+            <p className="mb-4">Create, edit, and manage events and their registrations.</p>
             <div className="mt-auto pt-4">
-              <Link href="/admin/webhooks" className="w-full block">
+              <Link href="/admin/events" className="w-full block">
                 <Button 
                   className="w-full transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
                 >
-                  Manage Webhooks
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Subscription Fixes Card */}
-        <Card className="flex flex-col h-full">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <CreditCard className="mr-2 h-5 w-5 text-primary" />
-              Subscription Fixes
-            </CardTitle>
-            <CardDescription>Fix user subscription issues</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col flex-grow justify-between">
-            <p className="mb-4">
-              Manually update subscription status for users when webhooks fail or other issues occur.
-            </p>
-            <div className="mt-auto pt-4">
-              <Link href="/admin/fix-subscription" className="w-full block">
-                <Button 
-                  className="w-full transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
-                >
-                  Fix Subscriptions
+                  Manage Events
                 </Button>
               </Link>
             </div>
