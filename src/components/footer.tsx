@@ -13,7 +13,7 @@ export default function Footer() {
                 alt="Peña Lorenzo Sanz Logo"
                 width={120}
                 height={120}
-                className="rounded-md"
+                className="rounded-md width:auto height:auto"
               />
             </div>
             <h3 className="text-xl font-bold mb-4">Peña Lorenzo Sanz</h3>

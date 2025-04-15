@@ -62,9 +62,9 @@ const exclusiveContent: ContentItem[] = [
     description: "Un recorrido visual por la historia del club desde su fundación hasta la actualidad.",
     type: "pdf",
     date: "2023-08-05",
-    pages: 120,
+    pages: 13,
     thumbnail: "/Logo-Penya-LS.jpg",
-    url: "/content/pdfs/historia-ilustrada"
+    url: "https://kuxnugwdppajyxdoygzy.supabase.co/storage/v1/object/public/pdfs//historia-real-madrid-breve.pdf"
   },
   {
     id: 5,
@@ -84,7 +84,7 @@ const exclusiveContent: ContentItem[] = [
     date: "2025-03-08",
     duration: "100 min",
     thumbnail: "/LorenzoSanzjr-lagalerna.jpg",
-    url: "/content/galleries/fotos-historicas"
+    url: "https://youtu.be/kp_5s00-ikw?si=s0wTeNYNvxV1ydNy"
   },
 ]
 
