@@ -131,7 +131,7 @@ export default function About() {
                   Hazte Socio
                 </Button>
               </Link>
-              <Link href="/membership">
+              <Link href="/contact">
                 <Button className="text-black bg-white hover:bg-black hover:text-secondary text-lg px-8 py-6 w-full sm:w-auto shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 font-bold">
                   Contáctanos
                 </Button>
