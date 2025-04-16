@@ -38,6 +38,8 @@ import {
 
 interface FormData {
   name: string
+  apellido1: string
+  apellido2: string
   email: string
   phone: string
   address: string
@@ -80,6 +82,8 @@ export default function SettingsPage() {
 
   const [formData, setFormData] = useState<FormData>({
     name: "",
+    apellido1: "",
+    apellido2: "",
     email: "",
     phone: "",
     address: "",
@@ -251,33 +255,20 @@ export default function SettingsPage() {
 
       if (memberError) {
         // Try with auth_id instead
-        const { data: memberDataById, error: memberErrorById } = await supabase
+        const { data: memberDataById } = await supabase
           .from("miembros")
           .select("*")
-          .eq("auth_id", userId)
+          .eq("id", userId)
           .single()
-          
-        if (memberErrorById) {
-          // Try with id as last resort
-          const { data: memberDataByIdDirect, error: memberErrorByIdDirect } = await supabase
-            .from("miembros")
-            .select("*")
-            .eq("id", userId)
-            .single()
-            
-          if (memberErrorByIdDirect) {
-            console.error("Error fetching member data with all methods:", memberErrorByIdDirect)
-            return false
-          } else {
-            setMemberData(memberDataByIdDirect)
-            updateFormWithMemberData(memberDataByIdDirect)
+        
+          if (memberDataById !== null) {
+            setMemberData(memberDataById)
+            updateFormWithMemberData(memberDataById)
             return true
+          } else {
+            console.log("both fetches didnt work")
           }
-        } else {
-          setMemberData(memberDataById)
-          updateFormWithMemberData(memberDataById)
-          return true
-        }
+        
       } else {
         setMemberData(memberRecord)
         updateFormWithMemberData(memberRecord)
@@ -294,6 +285,8 @@ export default function SettingsPage() {
     setFormData(prevData => ({
       ...prevData,
       name: memberRecord.name || prevData.name || "",
+      apellido1: memberRecord.apellido1 || "",
+      apellido2: memberRecord.apellido2 || "",
       phone: memberRecord.telefono?.toString() || "",
       address: memberRecord.direccion || "",
       city: memberRecord.poblacion || "",
@@ -320,6 +313,176 @@ export default function SettingsPage() {
     }))
   }
 
+  // Handle basic user profile updates (users table)
+  const updateUserProfile = async () => {
+    if (!user) {
+      throw new Error("Usuario no encontrado")
+    }
+
+    // Update user metadata in Auth
+    const { error: updateError } = await supabase.auth.updateUser({
+      data: {
+        name: formData.name,
+      },
+    })
+
+    if (updateError) throw updateError
+
+    // Update user in the users table
+    const { error: userUpdateError } = await supabase
+      .from("users")
+      .update({
+        name: formData.name,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", user.id)
+
+    if (userUpdateError) {
+      throw userUpdateError
+    }
+    
+    // Refresh user data after update
+    const { data: refreshedUserData, error: refreshError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", user.id)
+      .single()
+      
+    if (refreshError) {
+      console.error("Error refreshing user data:", refreshError)
+    } else if (refreshedUserData) {
+      setUserData(refreshedUserData)
+      
+      // Update the form data to reflect the changes
+      updateFormWithUserData(refreshedUserData)
+      
+      // Also update the Auth session to ensure it's consistent
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        // Force refresh the user session data
+        await supabase.auth.refreshSession()
+        
+        // Get the updated user to ensure we have the latest metadata
+        const { data: { user: refreshedUser } } = await supabase.auth.getUser()
+        if (refreshedUser) {
+          setUser({
+            ...user,
+            user_metadata: {
+              ...user.user_metadata,
+              name: formData.name
+            }
+          })
+        }
+      }
+    }
+    
+    return "Información básica actualizada correctamente"
+  }
+
+  // Handle member profile updates (miembros table)
+  const updateMemberProfile = async () => {
+    if (!user || !isMiembro) {
+      throw new Error("Usuario no encontrado o no es miembro")
+    }
+
+    // Update miembros table with all fields
+    const updateData = {
+      name: formData.name,
+      apellido1: formData.apellido1,
+      apellido2: formData.apellido2,
+      telefono: formData.phone ? Number.parseInt(formData.phone, 10) : null,
+      direccion: formData.address,
+      poblacion: formData.city,
+      cp: formData.postalCode ? Number.parseInt(formData.postalCode, 10) : null,
+      provincia: formData.province,
+      pais: formData.country,
+    }
+
+    // Try user_uuid first
+    let updated = false;
+    if (memberData?.user_uuid) {
+      const { error: updateError } = await supabase
+        .from("miembros")
+        .update(updateData)
+        .eq("user_uuid", memberData.user_uuid)
+
+      if (!updateError) updated = true;
+    }
+
+    // If not updated yet, try auth_id
+    if (!updated && memberData?.auth_id) {
+      const { error: updateError } = await supabase
+        .from("miembros")
+        .update(updateData)
+        .eq("auth_id", memberData.auth_id)
+
+      if (!updateError) updated = true;
+    }
+
+    // If still not updated, try id as last resort
+    if (!updated && memberData?.id) {
+      const { error: updateError } = await supabase
+        .from("miembros")
+        .update(updateData)
+        .eq("id", memberData.id)
+
+      if (updateError) throw updateError;
+    }
+    
+    // Refresh member data after update
+    const refreshedMember = await loadMemberDataFromTable(user.id)
+    
+    // If member profile was updated, also update basic user info for consistency
+    if (refreshedMember) {
+      // Update basic user data to keep it in sync
+      const { error: userUpdateError } = await supabase
+        .from("users")
+        .update({
+          name: formData.name,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id)
+      
+      if (!userUpdateError) {
+        // Refresh user data in the state
+        const { data: refreshedUserData } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", user.id)
+          .single()
+          
+        if (refreshedUserData) {
+          setUserData(refreshedUserData)
+          updateFormWithUserData(refreshedUserData)
+        }
+      }
+      
+      // Update Auth user metadata
+      await supabase.auth.updateUser({
+        data: {
+          name: formData.name,
+        },
+      })
+      
+      // Update Auth session
+      await supabase.auth.refreshSession()
+      
+      // Update local user state
+      const { data: { user: refreshedUser } } = await supabase.auth.getUser()
+      if (refreshedUser) {
+        setUser({
+          ...user,
+          user_metadata: {
+            ...user.user_metadata,
+            name: formData.name
+          }
+        })
+      }
+    }
+    
+    return "Información de miembro actualizada correctamente"
+  }
+
   const handleSubmitProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -330,91 +493,17 @@ export default function SettingsPage() {
       if (!user) {
         throw new Error("Usuario no encontrado")
       }
-
-      // Update user metadata in Auth
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: {
-          name: formData.name,
-        },
-      })
-
-      if (updateError) throw updateError
-
-      // Update appropriate table based on editTable value
+      
+      let successMessage = "";
+      
+      // Call the appropriate update function based on selected edit table
       if (editTable === "users") {
-        // Update user in the users table
-        const { error: userUpdateError } = await supabase
-          .from("users")
-          .update({
-            name: formData.name,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", user.id)
-
-        if (userUpdateError) {
-          throw userUpdateError
-        }
-        
-        // Refresh user data after update
-        const { data: refreshedUserData } = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", user.id)
-          .single()
-          
-        if (refreshedUserData) {
-          setUserData(refreshedUserData)
-        }
-        
-        setSuccess("Información básica actualizada correctamente")
+        successMessage = await updateUserProfile();
       } else if (editTable === "miembros" && isMiembro) {
-        // Update miembros table with all fields
-        const updateData = {
-          name: formData.name,
-          telefono: formData.phone ? Number.parseInt(formData.phone, 10) : null,
-          direccion: formData.address,
-          poblacion: formData.city,
-          cp: formData.postalCode ? Number.parseInt(formData.postalCode, 10) : null,
-          provincia: formData.province,
-          pais: formData.country,
-        }
-
-        // Try user_uuid first
-        let updated = false;
-        if (memberData?.user_uuid) {
-          const { error: updateError } = await supabase
-            .from("miembros")
-            .update(updateData)
-            .eq("user_uuid", memberData.user_uuid)
-
-          if (!updateError) updated = true;
-        }
-
-        // If not updated yet, try auth_id
-        if (!updated && memberData?.auth_id) {
-          const { error: updateError } = await supabase
-            .from("miembros")
-            .update(updateData)
-            .eq("auth_id", memberData.auth_id)
-
-          if (!updateError) updated = true;
-        }
-
-        // If still not updated, try id as last resort
-        if (!updated && memberData?.id) {
-          const { error: updateError } = await supabase
-            .from("miembros")
-            .update(updateData)
-            .eq("id", memberData.id)
-
-          if (updateError) throw updateError;
-        }
-        
-        // Refresh member data after update
-        await loadMemberDataFromTable(user.id)
-        
-        setSuccess("Información de miembro actualizada correctamente")
+        successMessage = await updateMemberProfile();
       }
+      
+      setSuccess(successMessage);
     } catch (error: unknown) {
       console.error("Error updating profile:", error)
       setError(error instanceof Error ? error.message : "No se pudo actualizar la información")
@@ -542,6 +631,7 @@ export default function SettingsPage() {
       setSuccess(null)
       setSaving(true);
       
+      // Make sure we use the correct redirect URL for password reset
       const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
         redirectTo: `${window.location.origin}/reset-password`,
       })
@@ -802,20 +892,20 @@ export default function SettingsPage() {
             <CardContent>
               <form onSubmit={handleSubmitProfile} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nombre completo</Label>
-                    <Input id="name" name="name" value={formData.name} onChange={handleChange} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Correo electrónico</Label>
-                    <Input id="email" name="email" type="email" value={formData.email} disabled className="bg-gray-100" />
-                    <p className="text-xs text-gray-500">
-                      Para cambiar tu correo electrónico, contacta con el administrador
-                    </p>
-                  </div>
-                  
                   {editTable === "miembros" ? (
                     <>
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Nombre</Label>
+                        <Input id="name" name="name" value={formData.name} onChange={handleChange} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="apellido1">Primer Apellido</Label>
+                        <Input id="apellido1" name="apellido1" value={formData.apellido1} onChange={handleChange} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="apellido2">Segundo Apellido (opcional)</Label>
+                        <Input id="apellido2" name="apellido2" value={formData.apellido2} onChange={handleChange} />
+                      </div>
                       <div className="space-y-2">
                         <Label htmlFor="phone">Teléfono</Label>
                         <Input id="phone" name="phone" value={formData.phone} onChange={handleChange} />
@@ -841,7 +931,21 @@ export default function SettingsPage() {
                         <Input id="country" name="country" value={formData.country} onChange={handleChange} />
                       </div>
                     </>
-                  ) : null}
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Nombre completo</Label>
+                      <Input id="name" name="name" value={formData.name} onChange={handleChange} required />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Correo electrónico</Label>
+                    <Input id="email" name="email" type="email" value={formData.email} disabled className="bg-gray-100" />
+                    <p className="text-xs text-gray-500">
+                      Para cambiar tu correo electrónico, contacta con el administrador
+                    </p>
+                  </div>
+                  
+                  {editTable === "miembros" ? null : null}
                 </div>
                 <div className="flex justify-end">
                   <Button 
@@ -850,10 +954,7 @@ export default function SettingsPage() {
                     disabled={saving}
                   >
                     {saving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Guardando...
-                      </>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
                       <>
                         <Save className="mr-2 h-4 w-4" />
@@ -964,10 +1065,7 @@ export default function SettingsPage() {
                     disabled={saving}
                   >
                     {saving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Guardando...
-                      </>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : !isMiembro ? (
                       <>
                         <UserPlus className="mr-2 h-4 w-4" />
@@ -1024,10 +1122,7 @@ export default function SettingsPage() {
                     disabled={saving || passwordResetSent}
                   >
                     {saving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Enviando...
-                      </>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : passwordResetSent ? (
                       <>
                         <Check className="mr-2 h-4 w-4" />
@@ -1068,10 +1163,7 @@ export default function SettingsPage() {
                     disabled={saving || sessionClosed}
                   >
                     {saving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Procesando...
-                      </>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : sessionClosed ? (
                       <>
                         <Check className="mr-2 h-4 w-4" />
@@ -1126,7 +1218,7 @@ export default function SettingsPage() {
                   variant="outline"
                   className="transition-all border-purple-600 text-black hover:bg-purple-500 hover:text-white"
                   onClick={() => {
-                    window.location.href = `mailto:${process.env.NEXT_PUBLIC_ADMIN_EMAIL || "admin@penallorenzosanz.com"}?subject=Solicitud de eliminación de cuenta&body=Hola, me gustaría solicitar la eliminación de mi cuenta con el correo: ${user?.email}`
+                    window.location.href = `mailto:${"info@lorenzosanz.com"}?subject=Solicitud de eliminación de cuenta&body=Hola, me gustaría solicitar la eliminación de mi cuenta con el correo: ${user?.email}`
                   }}
                 >
                   Contactar Administrador

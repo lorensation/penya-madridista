@@ -57,7 +57,7 @@ export async function resetPassword(email: string) {
   const client = getClient()
   
   return await client.auth.resetPasswordForEmail(email, {
-    redirectTo: `${baseUrl}/auth/reset-password`,
+    redirectTo: `${baseUrl}/reset-password`,
   })
 }
 

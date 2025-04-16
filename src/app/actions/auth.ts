@@ -84,8 +84,12 @@ export async function resetPassword(formData: FormData) {
     }
   }
 
+  // Use the absolute URL with origin to ensure the correct redirect
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
+    (typeof window !== 'undefined' ? window.location.origin : 'https://www.lorenzosanz.com')
+  
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/reset-password`,
+    redirectTo: `${baseUrl}/reset-password`,
   })
 
   if (error) {
