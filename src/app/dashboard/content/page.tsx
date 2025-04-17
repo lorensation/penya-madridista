@@ -244,10 +244,12 @@ export default function ContentPage() {
   // Fallback UI for non-members
   if (!isSubscribed) {
     return (
-      <div className="space-y-6">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold">Contenido Exclusivo</h1>
-          <p className="text-gray-500">Accede a contenido exclusivo disponible solo para socios</p>
+      <div className="space-y-6 p-6 md:p-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Contenido Exclusivo</h1>
+            <p className="text-gray-500">Accede al contenido exclusivo para miembros de la Peña Lorenzo Sanz</p>
+          </div>
         </div>
 
         {error && (
@@ -345,14 +347,17 @@ export default function ContentPage() {
     )
   }
 
+  // Content page with proper styling for active subscribers
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-primary mb-2">Contenido Exclusivo</h1>
-        <p className="text-gray-600">Accede a contenido exclusivo disponible solo para socios</p>
+    <div className="space-y-6 p-6 md:p-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Contenido Exclusivo</h1>
+          <p className="text-gray-500">Accede a contenido exclusivo disponible solo para socios</p>
+        </div>
       </div>
 
-      <Card className="p-4 border-black/5 mb-8">
+      <Card className="border-black/5 mb-8">
         <CardHeader>
           <CardTitle className="font-medium">Membresía Activa</CardTitle>
           <CardDescription>
@@ -360,7 +365,6 @@ export default function ContentPage() {
           </CardDescription>
         </CardHeader>
       </Card>
-
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {exclusiveContent.map((content) => (

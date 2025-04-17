@@ -209,7 +209,7 @@ export default function MembershipPage() {
   // Fallback UI when no membership data is available or subscription is inactive
   if (!membership || !membership.subscription_id || membership.subscription_status === "inactive") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 p-6 md:p-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold">Membresía</h1>
           <p className="text-gray-500">Gestiona tu membresía de la Peña Lorenzo Sanz</p>
@@ -237,11 +237,11 @@ export default function MembershipPage() {
               </AlertDescription>
             </Alert>
           </CardContent>
-          <CardFooter className="flex justify-between">
+          <CardFooter className="flex flex-col md:flex-row justify-between">
             <Button 
               variant="outline" 
               onClick={() => router.push("/dashboard")}
-              className="transition-all border-black hover:bg-primary hover:text-white"
+              className="transition-all border-black hover:bg-primary hover:text-white mb-2 md:mb-0"
             >
               Volver al Dashboard
             </Button>
@@ -302,17 +302,19 @@ export default function MembershipPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold">Membresía</h1>
-        <p className="text-gray-500">Gestiona tu membresía de la Peña Lorenzo Sanz</p>
+    <div className="space-y-6 p-6 md:p-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Membresía</h1>
+          <p className="text-gray-500">Gestiona tu membresía de la Peña Lorenzo Sanz</p>
+        </div>
       </div>
 
       {success && (
         <Alert className="bg-green-50 border-green-200">
           <CheckCircle className="h-4 w-4 text-green-600" />
           <AlertDescription className="text-green-800">
-            ¡Tu suscripci��n se ha procesado correctamente! Ya eres miembro oficial de la Peña Lorenzo Sanz.
+            ¡Tu suscripción se ha procesado correctamente! Ya eres miembro oficial de la Peña Lorenzo Sanz.
           </AlertDescription>
         </Alert>
       )}
@@ -379,7 +381,7 @@ export default function MembershipPage() {
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-between">
+        <CardFooter className="flex flex-col md:flex-row justify-between">
           {isCanceled ? (
             <p className="text-orange-500">Tu suscripción se cancelará al final del período de facturación actual.</p>
           ) : (
@@ -387,7 +389,7 @@ export default function MembershipPage() {
               <Button 
                 onClick={handleCancelSubscription} 
                 variant="outline"
-                className="text-red-500 border-red-200 hover:bg-red-500 hover:text-white"
+                className="text-red-500 border-red-200 hover:bg-red-500 hover:text-white mb-2 md:mb-0"
                 disabled={managingSubscription || !isActive}
               >
                 Cancelar Suscripción

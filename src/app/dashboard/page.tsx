@@ -10,11 +10,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CreditCard, Calendar, FileText, Settings, AlertTriangle } from "lucide-react"
 
 // Define interfaces for our data types
-interface User {
-  id: string
-  email?: string
-}
-
 interface Profile {
   id: string
   name?: string
@@ -23,9 +18,8 @@ interface Profile {
   subscription_plan?: "annual" | "family" | null
 }
 
-export default function Dashboard() {
+export default function DashboardPage() {
   const router = useRouter()
-  const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -41,8 +35,6 @@ export default function Dashboard() {
           router.push("/login")
           return
         }
-
-        setUser(userData.user)
 
         // Fetch user profile - FIXED: using user_uuid instead of id to match RLS policy
         const { data: profileData, error: profileError } = await supabase
@@ -97,11 +89,11 @@ export default function Dashboard() {
   const subscriptionPlan = profile?.subscription_plan || null
 
   return (
-    <div className="container mx-auto px-4 py-8 md:pl-4">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+    <div className="space-y-6 p-6 md:p-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-primary">Bienvenido a tu Panel de Socio</h1>
-          <p className="text-gray-600">Hola, {profile?.name || user?.email}</p>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-gray-500">Bienvenido a tu área personal</p>
         </div>
       </div>
 

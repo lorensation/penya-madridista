@@ -734,7 +734,7 @@ export default function SettingsPage() {
 
   // Main settings page UI for authenticated users
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6 md:p-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
         <div>
           <h1 className="text-3xl font-bold">Configuración</h1>
@@ -744,7 +744,7 @@ export default function SettingsPage() {
         <div className="flex items-center mt-4 md:mt-0">
           <Avatar className="h-14 w-14">
             <AvatarImage src={String(user?.user_metadata?.avatar_url || "")} />
-            <AvatarFallback>
+            <AvatarFallback className="bg-gray-200 text-black border border-black rounded-full">
               {userData?.name ? userData.name.substring(0, 2).toUpperCase() : user?.email?.substring(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>

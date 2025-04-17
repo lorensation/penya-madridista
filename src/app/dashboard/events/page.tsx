@@ -119,10 +119,10 @@ export default function EventsPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="space-y-6 p-6 md:p-8">
       <div className="mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-primary mb-2">Eventos</h1>
-        <p className="text-gray-600">Descubre y reserva tu plaza en los próximos eventos exclusivos para socios</p>
+        <h1 className="text-3xl font-bold">Eventos</h1>
+        <p className="text-gray-500">Descubre y reserva tu plaza en los próximos eventos exclusivos para socios</p>
       </div>
 
       {subscriptionStatus !== "active" && (
