@@ -121,7 +121,7 @@ export default function SettingsPage() {
         loadUserData()
       }
     })
-  }, [router])
+  }, [router, supabase])
 
   async function loadUserData() {
     try {
