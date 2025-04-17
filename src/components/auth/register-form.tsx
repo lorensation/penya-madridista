@@ -19,6 +19,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast-hook"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { Checkbox } from "@/components/ui/checkbox"
+import { addUserToNewsletter } from "@/app/actions/newsletter"
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -30,6 +32,7 @@ const formSchema = z.object({
   password: z.string().min(8, {
     message: "La contraseña debe tener al menos 8 caracteres.",
   }),
+  subscribeToNewsletter: z.boolean().default(true),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -45,6 +48,7 @@ export function RegisterForm() {
       name: "",
       email: "",
       password: "",
+      subscribeToNewsletter: true,
     },
   })
 
@@ -82,6 +86,16 @@ export function RegisterForm() {
       } catch (userError) {
         console.error("Error creating user record:", userError);
         // Continue even if this fails, as the auth user was created successfully
+      }
+      
+      // Subscribe to newsletter if opted in
+      if (values.subscribeToNewsletter) {
+        try {
+          await addUserToNewsletter(values.email, values.name);
+        } catch (newsletterError) {
+          console.error("Error subscribing to newsletter:", newsletterError);
+          // Continue anyway as this is not critical
+        }
       }
 
       toast({
@@ -150,6 +164,28 @@ export function RegisterForm() {
                 Usa al menos 8 caracteres con una combinación de letras, números y símbolos.
               </FormDescription>
               <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="subscribeToNewsletter"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel>
+                  Suscribirme a la newsletter de la Peña Lorenzo Sanz
+                </FormLabel>
+                <FormDescription>
+                  Recibirás noticias, eventos y actualizaciones sobre nuestra peña.
+                </FormDescription>
+              </div>
             </FormItem>
           )}
         />

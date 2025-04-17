@@ -1,76 +1,124 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import React, { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
 import { subscribeToNewsletter } from "@/app/actions/newsletter"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { useToast } from "@/components/ui/use-toast-hook"
 
-export default function NewsletterForm() {
-  const [email, setEmail] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+const formSchema = z.object({
+  email: z.string().email({
+    message: "Por favor, introduce una dirección de correo electrónico válida.",
+  }),
+  name: z.string().optional(),
+})
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-    setSuccess(false)
+type NewsletterFormProps = {
+  includeNameField?: boolean
+  buttonText?: string
+  className?: string
+}
+
+export default function NewsletterForm({
+  includeNameField = false,
+  buttonText = "Suscribirse",
+  className = "",
+}: NewsletterFormProps) {
+  const [isLoading, setIsLoading] = useState(false)
+  const { toast } = useToast()
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: "",
+      name: "",
+    },
+  })
+
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    setIsLoading(true)
 
     try {
       const formData = new FormData()
-      formData.append("email", email)
+      formData.append("email", values.email)
+      if (values.name) {
+        formData.append("name", values.name)
+      }
 
       const result = await subscribeToNewsletter(formData)
 
       if (result.success) {
-        setSuccess(true)
-        setEmail("")
+        toast({
+          title: "¡Suscripción exitosa!",
+          description: result.message || "Gracias por suscribirte a nuestra newsletter.",
+        })
+        form.reset()
       } else {
-        setError(result.error || "Error al suscribirse. Inténtalo de nuevo.")
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: result.error || "Hubo un problema al procesar tu suscripción. Inténtalo de nuevo.",
+        })
       }
     } catch (error) {
-      console.error("Newsletter subscription error:", error)
-      setError("Error al suscribirse. Inténtalo de nuevo.")
+      console.error("Error subscribing to newsletter:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No pudimos procesar tu suscripción. Por favor, inténtalo más tarde.",
+      })
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      {success ? (
-        <Alert className="bg-white/10 border-white/20 text-white mb-6">
-          <AlertDescription>
-            ¡Gracias por suscribirte! Recibirás nuestras actualizaciones en tu correo electrónico.
-          </AlertDescription>
-        </Alert>
-      ) : error ? (
-        <Alert className="bg-red-500/20 border-red-500/30 text-white mb-6">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
-        <Input
-          type="email"
-          placeholder="Tu correo electrónico"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="bg-white/10 border-white/20 text-white placeholder:text-white/70 focus:border-white"
-        />
-        <Button
-          type="submit"
-          disabled={loading}
-          className="bg-white text-primary hover:bg-black hover:text-white transition-colors"
-        >
-          {loading ? "Enviando..." : "Suscribirse"}
-        </Button>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className={`space-y-4 ${className}`}>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          {includeNameField && (
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem className="flex-1">
+                  <FormControl>
+                    <Input placeholder="Tu nombre" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+          
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem className="flex-1">
+                <FormControl>
+                  <Input type="email" placeholder="Tu correo electrónico" {...field} required />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <Button type="submit" disabled={isLoading} className="mt-0">
+            {isLoading ? "Enviando..." : buttonText}
+          </Button>
+        </div>
       </form>
-    </div>
+    </Form>
   )
 }

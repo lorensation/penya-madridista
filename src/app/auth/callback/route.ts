@@ -1,5 +1,6 @@
+import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
-import { type NextRequest, NextResponse } from "next/server"
+import { addUserToNewsletter } from "@/app/actions/newsletter"
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
@@ -31,6 +32,20 @@ export async function GET(request: NextRequest) {
 
           if (insertError) {
             console.error("Error creating profile in callback:", insertError)
+          }
+          
+          // Check if the user opted in for newsletter (stored in user metadata)
+          const subscribeNewsletter = data.user.user_metadata?.subscribeToNewsletter === true
+          
+          if (subscribeNewsletter && data.user.email) {
+            try {
+              await addUserToNewsletter(
+                data.user.email, 
+                data.user.user_metadata?.name || ""
+              )
+            } catch (newsletterError) {
+              console.error("Error subscribing user to newsletter in callback:", newsletterError)
+            }
           }
         }
       }

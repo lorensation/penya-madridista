@@ -1,10 +1,52 @@
 "use server"
 
-import { createServerSupabaseClient } from "@/lib/supabase"
-import type { ApiResponse } from "@/types/common"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { generateWelcomeEmailTemplate, sendEmail } from "@/lib/email"
+import { revalidatePath } from "next/cache"
+
+export type ApiResponse = {
+  success?: boolean
+  message?: string
+  error?: string
+}
+
+// Add a new function to add users to the newsletter when they register
+export async function addUserToNewsletter(email: string, name?: string): Promise<boolean> {
+  try {
+    // Store subscriber in database
+    const supabase = createServerSupabaseClient()
+    const { error } = await supabase.from("newsletter_subscribers").upsert(
+      {
+        email,
+        name: name || null,
+        status: "active",
+        created_at: new Date().toISOString(),
+      },
+      { onConflict: "email" },
+    )
+
+    if (error) {
+      console.error("Supabase error when adding user to newsletter:", error)
+      return false
+    }
+
+    // Send welcome email
+    await sendEmail({
+      to: email,
+      subject: "¡Bienvenido a la Newsletter de la Peña Lorenzo Sanz!",
+      html: generateWelcomeEmailTemplate(name),
+    })
+
+    return true
+  } catch (error) {
+    console.error("Error adding user to newsletter:", error)
+    return false
+  }
+}
 
 export async function subscribeToNewsletter(formData: FormData): Promise<ApiResponse> {
   const email = formData.get("email") as string
+  const name = formData.get("name") as string // Optional name field
 
   if (!email) {
     return {
@@ -19,69 +61,50 @@ export async function subscribeToNewsletter(formData: FormData): Promise<ApiResp
     if (!emailRegex.test(email)) {
       return {
         success: false,
-        error: "Please enter a valid email address",
+        error: "Por favor, introduce un email válido",
       }
     }
 
-    // Add to Mailgun mailing list
-    const mailgunApiKey = process.env.MAILGUN_API_KEY
-    const mailgunDomain = process.env.MAILGUN_DOMAIN
-    const mailgunMailingList = process.env.MAILGUN_MAILING_LIST
-
-    if (!mailgunApiKey || !mailgunDomain || !mailgunMailingList) {
-      console.error("Mailgun configuration missing")
-      return {
-        success: false,
-        error: "Newsletter service is not configured properly",
-      }
-    }
-
-    const response = await fetch(`https://api.mailgun.net/v3/lists/${mailgunMailingList}/members`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${Buffer.from(`api:${mailgunApiKey}`).toString("base64")}`,
-      },
-      body: new URLSearchParams({
-        address: email,
-        subscribed: "yes",
-        upsert: "yes",
-      }).toString(),
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      console.error("Mailgun API error:", errorData)
-      return {
-        success: false,
-        error: "Failed to subscribe to the newsletter",
-      }
-    }
-
-    // Also store in our database
+    // Store subscriber in database
     const supabase = createServerSupabaseClient()
     const { error } = await supabase.from("newsletter_subscribers").upsert(
       {
         email,
-        subscribed_at: new Date().toISOString(),
+        name: name || null,
+        status: "active",
+        created_at: new Date().toISOString(),
       },
       { onConflict: "email" },
     )
 
     if (error) {
       console.error("Supabase error:", error)
-      // We don't return an error here since the subscription to Mailgun was successful
+      return {
+        success: false,
+        error: "Error al guardar la suscripción",
+      }
     }
+
+    // Send welcome email
+    await sendEmail({
+      to: email,
+      subject: "¡Bienvenido a la Newsletter de la Peña Lorenzo Sanz!",
+      html: generateWelcomeEmailTemplate(name),
+    })
+
+    // Revalidate relevant paths
+    revalidatePath("/")
+    revalidatePath("/dashboard")
 
     return {
       success: true,
-      message: "Successfully subscribed to the newsletter!",
+      message: "¡Gracias por suscribirte a nuestra newsletter!",
     }
   } catch (error) {
     console.error("Newsletter subscription error:", error)
     return {
       success: false,
-      error: "An unexpected error occurred",
+      error: "Error al procesar la suscripción",
     }
   }
 }
