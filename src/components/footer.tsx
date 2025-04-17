@@ -81,6 +81,25 @@ export default function Footer() {
                 </svg>
               </a>
             </div>
+            <div className="mt-4">
+              <ul className="space-y-2">
+                <li>
+                  <Link href="/privacy-policy" className="hover:text-accent">
+                    Política de Privacidad
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/terms-and-conditions" className="hover:text-accent">
+                    Términos y Condiciones
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/faqs" className="hover:text-accent">
+                    Preguntas Frecuentes
+                  </Link>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
         <div className="mt-8 border-t border-white/20 pt-8 text-center">
