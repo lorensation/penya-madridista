@@ -1,6 +1,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import JuntaDirectiva from "@/components/junta-diretiva"
 import NewsletterForm from "@/components/newsletter-form"
 
 export default function Home() {
@@ -142,104 +143,15 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Testimonials Section */}
-      <section className="py-16 md:py-24 bg-gray-50">
+      {/* Board Members Section */}
+      <section className="py-16 md:py-24 bg-white">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-primary mb-4">Lo Que Dicen Nuestros Socios</h2>
-            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Descubre las experiencias de quienes ya forman parte de nuestra peña madridista.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-white p-8 rounded-lg shadow-md">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-gray-200 rounded-full mr-4">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className={"h-full w-full text-gray-400"}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="font-bold">Carlos Rodríguez</h4>
-                  <p className="text-sm text-gray-500">Socio desde 2020</p>
-                </div>
-              </div>
-              <p className="text-gray-600">
-                &ldquo;Ser parte de la Peña Lorenzo Sanz ha sido una experiencia increíble. Los eventos exclusivos y la
-                camaradería entre los socios hacen que valga la pena cada euro de la membresía.&rdquo;
-              </p>
-            </div>
-
-            <div className="bg-white p-8 rounded-lg shadow-md">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-gray-200 rounded-full mr-4">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className={"h-full w-full text-gray-400"}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="font-bold">Ana Martínez</h4>
-                  <p className="text-sm text-gray-500">Socia desde 2021</p>
-                </div>
-              </div>
-              <p className="text-gray-600">
-                &ldquo;Los descuentos en entradas y la posibilidad de conocer a exjugadores del Madrid han hecho que mi
-                experiencia como madridista sea aún más especial. Totalmente recomendado.&rdquo;
-              </p>
-            </div>
-
-            <div className="bg-white p-8 rounded-lg shadow-md">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-gray-200 rounded-full mr-4">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className={"h-full w-full text-gray-400"}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="font-bold">Miguel Fernández</h4>
-                  <p className="text-sm text-gray-500">Socio desde 2019</p>
-                </div>
-              </div>
-              <p className="text-gray-600">
-                &ldquo;La peña organiza los mejores viajes para ver al Madrid. He podido asistir a partidos de Champions que
-                nunca habría podido organizar por mi cuenta. Una familia madridista de verdad.&rdquo;
-              </p>
-            </div>
-          </div>
+          <h2 className="text-3xl md:text-4xl font-bold text-primary text-center mb-8">Junta Directiva</h2>
+          <p className="text-lg text-gray-600 text-center mb-12">
+            Conoce a los miembros de nuestra junta directiva, quienes trabajan incansablemente para mantener vivo el
+            legado de Lorenzo Sanz y promover el madridismo.
+          </p>
+          <JuntaDirectiva />
         </div>
       </section>
 
