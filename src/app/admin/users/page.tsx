@@ -12,25 +12,13 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { supabase } from "@/lib/supabase"
+import { Database } from "@/types/supabase"
 
 // Add route segment config to mark this route as dynamic
 export const dynamic = 'force-dynamic'
 
 // Define types for both tables
-interface MiembroUser {
-  id: string;
-  user_uuid?: string;
-  email?: string;
-  created_at?: string;
-  role?: string;
-  subscription_status?: string;
-  name?: string;
-  apellido1?: string;
-  apellido2?: string | null;
-  telefono?: number;
-  dni_pasaporte?: string;
-  es_socio_realmadrid?: boolean;
-  num_socio?: number | null;
+type MiembroUser = Database['public']['Tables']['miembros']['Row'] & {
   user_metadata?: {
     name?: string;
   };
@@ -117,6 +105,7 @@ export default function AdminUsersPage() {
     try {
       setLoading(true)
 
+
       // Build query for miembros
       let query = supabase
         .from('miembros')
@@ -145,30 +134,20 @@ export default function AdminUsersPage() {
         throw new Error("Failed to fetch miembros: " + error.message)
       }
 
-      // Transform the data to match MiembroUser structure
-      const transformedUsers: MiembroUser[] = data?.map(miembro => ({
-        id: miembro.user?.id || miembro.user_uuid,
-        user_uuid: miembro.user_uuid,
-        email: miembro.email || miembro.user?.email || '',
-        created_at: miembro.user?.created_at || miembro.created_at,
-        role: miembro.role || 'user',
-        subscription_status: miembro.subscription_status || 'inactive',
-        user_metadata: {
-          name: miembro.name || 'Sin nombre'
-        },
-        name: miembro.name,
-        apellido1: miembro.apellido1,
-        apellido2: miembro.apellido2,
-        telefono: miembro.telefono,
-        dni_pasaporte: miembro.dni_pasaporte,
-        es_socio_realmadrid: miembro.es_socio_realmadrid,
-        num_socio: miembro.num_socio
-      })) || [];
+      console.log("Fetched miembros:", data?.length || 0, "rows"); // Debug log
+      
+      if (!data) {
+        setMiembros([]);
+        setTotalCount(0);
+        setTotalPages(1);
+        return;
+      }
 
-      setMiembros(transformedUsers)
-      setTotalCount(count || 0)
-      setTotalPages(Math.ceil((count || 0) / usersPerPage))
-      setError(null)
+      // Use the data directly as it now matches our MiembroUser type from Database
+      setMiembros(data);
+      setTotalCount(count || 0);
+      setTotalPages(Math.ceil((count || 0) / usersPerPage));
+      setError(null);
     } catch (error) {
       console.error("Error fetching miembros:", error)
       setError(error instanceof Error ? error.message : "Failed to load miembros")
@@ -399,7 +378,7 @@ export default function AdminUsersPage() {
                     </thead>
                     <tbody>
                       {miembros.map((miembro) => (
-                        <tr key={miembro.id} className="border-b hover:bg-gray-50">
+                        <tr key={miembro.user_uuid} className="border-b hover:bg-gray-50">
                           <td className="py-3 px-4">
                             <div className="font-medium">
                               {miembro.name} {miembro.apellido1} {miembro.apellido2 || ''}
@@ -440,17 +419,17 @@ export default function AdminUsersPage() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => router.push(`/admin/users/edit/${miembro.user_uuid || miembro.id}`)}>
+                                  <DropdownMenuItem onClick={() => router.push(`/admin/users/edit/${miembro.user_uuid}`)}>
                                     <User className="h-4 w-4 mr-2" />
                                     Ver Detalles
                                   </DropdownMenuItem>
                                   {miembro.role !== "admin" ? (
-                                    <DropdownMenuItem onClick={() => handleUpdateUserRole(miembro.user_uuid || miembro.id, "admin")}>
+                                    <DropdownMenuItem onClick={() => miembro.user_uuid && handleUpdateUserRole(miembro.user_uuid, "admin")}>
                                       <UserCheck className="h-4 w-4 mr-2" />
                                       Hacer Administrador
                                     </DropdownMenuItem>
                                   ) : (
-                                    <DropdownMenuItem onClick={() => handleUpdateUserRole(miembro.user_uuid || miembro.id, "user")}>
+                                    <DropdownMenuItem onClick={() => (miembro.user_uuid) && handleUpdateUserRole(miembro.user_uuid, "user")}>
                                       <UserX className="h-4 w-4 mr-2" />
                                       Quitar Administrador
                                     </DropdownMenuItem>

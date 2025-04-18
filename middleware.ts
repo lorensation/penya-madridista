@@ -13,12 +13,27 @@ const ALLOWED_PATHS = [
   '/public'
 ]
 
+// Paths that should be accessible without authentication
+const PUBLIC_PATHS = [
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+  '/api',
+  '/_next',
+  '/favicon.ico'
+]
+
 export async function middleware(request: NextRequest) {
   // Skip middleware for webhook endpoints - using exact path matching
   if (request.nextUrl.pathname.startsWith("/api/webhooks/")) {
     console.log("Skipping middleware for webhook endpoint")
     return NextResponse.next()
   }
+
+  // Check if the current path should be public
+  const currentPath = request.nextUrl.pathname
+  const isPublicPath = PUBLIC_PATHS.some(path => currentPath.startsWith(path))
 
   // Check for /complete-profile access without checkout session ID
   if (request.nextUrl.pathname === "/complete-profile") {
@@ -119,6 +134,7 @@ export async function middleware(request: NextRequest) {
   // If no authenticated user and trying to access protected routes, redirect to login
   if (
     !authUser &&
+    !isPublicPath && // Skip authentication check for public paths
     (request.nextUrl.pathname.startsWith("/dashboard") ||
       request.nextUrl.pathname.startsWith("/admin"))
   ) {

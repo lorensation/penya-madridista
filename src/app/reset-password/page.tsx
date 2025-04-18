@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,8 +11,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Eye, EyeOff, Check, Loader2, ArrowRight, LockKeyhole, AlertCircle } from "lucide-react"
 import Link from "next/link"
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -20,26 +21,36 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [validHash, setValidHash] = useState(false)
+  const [validLink, setValidLink] = useState<boolean | null>(null)
 
   useEffect(() => {
-    const checkHash = async () => {
-      const { data, error } = await supabase.auth.getUser()
+    const verifyToken = async () => {
+      // Check for token in URL parameters
+      const token = searchParams.get('token')
+      const type = searchParams.get('type')
       
-      if (error) {
-        console.error("Error checking authentication:", error)
-        setValidHash(false)
-      } else if (data?.user) {
-        // User is authenticated - likely has a valid hash in the URL
-        setValidHash(true)
+      if (type === 'recovery' && token) {
+        // We have a recovery token in the URL
+        setValidLink(true)
       } else {
-        // No authenticated user - hash may be invalid or expired
-        setValidHash(false)
+        // No token found or not recovery type, check if user is authenticated as fallback
+        try {
+          const { data, error } = await supabase.auth.getUser()
+          if (error || !data?.user) {
+            setValidLink(false)
+          } else {
+            // User is authenticated somehow, allow password reset
+            setValidLink(true)
+          }
+        } catch (err) {
+          console.error("Error checking authentication:", err)
+          setValidLink(false)
+        }
       }
     }
 
-    checkHash()
-  }, [])
+    verifyToken()
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -112,7 +123,7 @@ export default function ResetPasswordPage() {
                   Tu contraseña ha sido cambiada con éxito. Redirigiendo a la página de inicio de sesión...
                 </p>
               </div>
-            ) : !validHash ? (
+            ) : validLink === false ? (
               <div className="text-center space-y-4">
                 <div className="flex justify-center">
                   <div className="rounded-full bg-amber-100 p-2">
@@ -124,7 +135,7 @@ export default function ResetPasswordPage() {
                   El enlace para restablecer la contraseña no es válido o ha expirado. Por favor, solicita un nuevo enlace.
                 </p>
                 <Button 
-                  className="w-full mt-4" 
+                  className="w-full mt-4 transition-all hover:bg-white hover:text-black hover:border hover:border-black" 
                   onClick={() => router.push("/forgot-password")}
                 >
                   Solicitar nuevo enlace
@@ -226,5 +237,25 @@ export default function ResetPasswordPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+// Loading component
+function LoadingForm() {
+  return (
+    <div className="container max-w-3xl py-10">
+      <div className="bg-white rounded-lg shadow-md p-8 text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+        <p className="mt-4 text-gray-600">Cargando formulario para restablecer contraseña...</p>
+      </div>
+    </div>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<LoadingForm />}>
+      <ResetPasswordContent />
+    </Suspense>
   )
 }

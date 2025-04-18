@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AuthError } from "@supabase/supabase-js"
 import { CheckCircle } from "lucide-react"
+import Link from "next/link"
 
 export function LoginForm() {
   const [email, setEmail] = useState("")
@@ -79,6 +80,17 @@ export function LoginForm() {
         <Label htmlFor="password">Password</Label>
         <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
       </div>
+      
+      {/* Forgot password link */}
+      <div className="flex justify-end">
+        <Link 
+          href="/forgot-password" 
+          className="text-sm text-primary hover:underline"
+        >
+          ¿Olvidaste tu contraseña?
+        </Link>
+      </div>
+
       <Button type="submit" className="w-full hover:bg-white hover:text-primary hover:border hover:border-black" disabled={loading || success}>
         {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
       </Button>

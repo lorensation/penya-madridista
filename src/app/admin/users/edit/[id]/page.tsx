@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -41,44 +41,9 @@ import {
 import { supabase } from "@/lib/supabase"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { Database } from "@/types/supabase"
 
-// Define types for the user data
-interface MiembroUser {
-  id: string;
-  user_uuid: string;
-  email?: string;
-  created_at?: string;
-  updated_at?: string;
-  role?: string;
-  subscription_status?: string;
-  subscription_plan?: string;
-  subscription_id?: string | null;
-  subscription_updated_at?: string;
-  stripe_customer_id?: string | null;
-  name?: string;
-  apellido1?: string;
-  apellido2?: string | null;
-  telefono?: string | null;
-  dni_pasaporte?: string | null;
-  es_socio_realmadrid?: boolean;
-  num_socio?: string | null;
-  direccion?: string | null;
-  codigo_postal?: string | null;
-  ciudad?: string | null;
-  provincia?: string | null;
-  pais?: string | null;
-  fecha_nacimiento?: string | null;
-  notas?: string | null;
-}
-
-interface AuthUser {
-  id: string;
-  email: string | null;
-  created_at: string;
-  last_sign_in_at?: string | null;
-  email_confirmed_at?: string | null;
-  confirmed_at?: string | null;
-}
+type MiembroUser = Database['public']['Tables']['miembros']['Row']
 
 export default function UserDetailsPage() {
   const router = useRouter()
@@ -86,7 +51,6 @@ export default function UserDetailsPage() {
   const userId = params.id as string
   
   const [miembro, setMiembro] = useState<MiembroUser | null>(null)
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -96,6 +60,7 @@ export default function UserDetailsPage() {
   const [infiniteSubscriptionDialogOpen, setInfiniteSubscriptionDialogOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [authChecking, setAuthChecking] = useState(true)
+  const originalMiembro = useRef<MiembroUser | null>(null)
 
   // Check if user is admin on client side
   useEffect(() => {
@@ -169,26 +134,13 @@ export default function UserDetailsPage() {
             }
             
             setMiembro(miembroByIdData)
+            originalMiembro.current = miembroByIdData
             } else {
             throw new Error("Error al cargar datos del miembro: " + miembroError.message)
             }
         } else {
             setMiembro(miembroData)
-        }
-        
-        // Fetch auth user data using RPC function
-        try {
-            const { data: authUserData, error: authUserError } = await supabase
-            .rpc('get_auth_user_by_id', { user_id: userId })
-            
-            if (authUserError) {
-            console.error("Error fetching auth user:", authUserError)
-            } else if (authUserData && authUserData.length > 0) {
-            setAuthUser(authUserData[0])
-            }
-        } catch (authError) {
-            console.error("Error in auth user fetch:", authError)
-            // Don't set error state here, we'll still show miembro data
+            originalMiembro.current = miembroData
         }
         
         setError(null)
@@ -210,7 +162,7 @@ export default function UserDetailsPage() {
     try {
       setSaving(true)
       
-      // Update miembro data
+      // Update miembro data with proper field names to match table structure
       const { error } = await supabase
         .from('miembros')
         .update({
@@ -218,24 +170,33 @@ export default function UserDetailsPage() {
           apellido1: miembro.apellido1,
           apellido2: miembro.apellido2,
           email: miembro.email,
-          telefono: miembro.telefono,
+          telefono: miembro.telefono ? Number(miembro.telefono) : null,
           dni_pasaporte: miembro.dni_pasaporte,
           es_socio_realmadrid: miembro.es_socio_realmadrid,
-          num_socio: miembro.num_socio,
+          num_socio: miembro.num_socio ? Number(miembro.num_socio) : null,
+          socio_carnet_madridista: miembro.socio_carnet_madridista,
+          num_carnet: miembro.num_carnet ? Number(miembro.num_carnet) : null,
           direccion: miembro.direccion,
-          codigo_postal: miembro.codigo_postal,
-          ciudad: miembro.ciudad,
+          direccion_extra: miembro.direccion_extra,
+          poblacion: miembro.poblacion, // Use only the existing field
+          cp: miembro.cp ? Number(miembro.cp) : null,
           provincia: miembro.provincia,
           pais: miembro.pais,
           fecha_nacimiento: miembro.fecha_nacimiento,
-          role: miembro.role,
-          notas: miembro.notas,
-          updated_at: new Date().toISOString()
+          role: miembro.role, // This handles the admin role change
         })
         .eq('user_uuid', miembro.user_uuid)
       
       if (error) {
-        throw new Error("Error al guardar los cambios: " + error.message)
+        setTimeout(() => {
+          setError(error instanceof Error ? error.message : "Error al guardar los cambios")
+        }, 3000)
+      }
+      
+      // If the role was changed to admin, log it
+      const wasRoleChanged = originalMiembro.current && originalMiembro.current.role !== miembro.role;
+      if (wasRoleChanged && miembro.role === 'admin') {
+        console.log(`User ${miembro.name} (${miembro.user_uuid}) was promoted to admin role`);
       }
       
       setSuccess("Los cambios se han guardado correctamente")
@@ -295,7 +256,7 @@ export default function UserDetailsPage() {
         .from('miembros')
         .update({
           subscription_status: 'active',
-          subscription_plan: 'infinite', // Use subscription_plan instead of subscription_end_date
+          subscription_plan: 'infinite', // Special plan type that indicates permanent subscription
           subscription_updated_at: new Date().toISOString()
         })
         .eq('user_uuid', miembro.user_uuid)
@@ -308,7 +269,7 @@ export default function UserDetailsPage() {
       setMiembro({
         ...miembro,
         subscription_status: 'active',
-        subscription_plan: 'infinite', // Update local state to match
+        subscription_plan: 'infinite',
         subscription_updated_at: new Date().toISOString()
       })
       
@@ -322,6 +283,46 @@ export default function UserDetailsPage() {
     } catch (error) {
       console.error("Error setting infinite subscription:", error)
       setError(error instanceof Error ? error.message : "Error al establecer la suscripción infinita")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Handle making user an admin
+  const handleMakeAdmin = async () => {
+    if (!miembro) return;
+    
+    try {
+      setSaving(true)
+      
+      // Update the role to admin
+      const { error } = await supabase
+        .from('miembros')
+        .update({
+          role: 'admin',
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_uuid', miembro.user_uuid)
+      
+      if (error) {
+        throw new Error("Error al establecer el rol de administrador: " + error.message)
+      }
+      
+      // Update local state
+      setMiembro({
+        ...miembro,
+        role: 'admin'
+      })
+      
+      setSuccess("El usuario ahora es administrador")
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccess(null)
+      }, 3000)
+    } catch (error) {
+      console.error("Error making user admin:", error)
+      setError(error instanceof Error ? error.message : "Error al establecer el rol de administrador")
     } finally {
       setSaving(false)
     }
@@ -537,7 +538,7 @@ export default function UserDetailsPage() {
                   <Input 
                     id="telefono" 
                     value={miembro.telefono || ''} 
-                    onChange={(e) => setMiembro({...miembro, telefono: e.target.value})}
+                    onChange={(e) => setMiembro({...miembro, telefono: e.target.value ? Number(e.target.value) : 0})}
                     disabled={!isEditing}
                   />
                 </div>
@@ -577,20 +578,29 @@ export default function UserDetailsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="codigo_postal">Código Postal</Label>
+                    <Label htmlFor="direccion_extra">Dirección Extra</Label>
                     <Input 
-                      id="codigo_postal" 
-                      value={miembro.codigo_postal || ''} 
-                      onChange={(e) => setMiembro({...miembro, codigo_postal: e.target.value})}
+                      id="direccion_extra" 
+                      value={miembro.direccion_extra || ''} 
+                      onChange={(e) => setMiembro({...miembro, direccion_extra: e.target.value})}
                       disabled={!isEditing}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cp">Código Postal</Label>
+                    <Input 
+                        id="cp" 
+                        value={miembro.cp || ''} 
+                        onChange={(e) => setMiembro({...miembro, cp: e.target.value ? Number(e.target.value) : 0})}
+                        disabled={!isEditing}
+                      />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="ciudad">Ciudad</Label>
                     <Input 
                       id="ciudad" 
-                      value={miembro.ciudad || ''} 
-                      onChange={(e) => setMiembro({...miembro, ciudad: e.target.value})}
+                      value={miembro.poblacion || ''} 
+                      onChange={(e) => setMiembro({...miembro, poblacion: e.target.value})}
                       disabled={!isEditing}
                     />
                   </div>
@@ -630,33 +640,39 @@ export default function UserDetailsPage() {
                   />
                   <Label htmlFor="es_socio_realmadrid">Es socio del Real Madrid</Label>
                 </div>
-                {(miembro.es_socio_realmadrid || isEditing) && (
+                {(miembro.es_socio_realmadrid && isEditing) && (
                   <div className="space-y-2">
                     <Label htmlFor="num_socio">Número de Socio</Label>
                     <Input 
                       id="num_socio" 
                       value={miembro.num_socio || ''} 
-                      onChange={(e) => setMiembro({...miembro, num_socio: e.target.value})}
+                      onChange={(e) => setMiembro({...miembro, num_socio: e.target.value ? Number(e.target.value) : null})}
                       disabled={!isEditing}
                     />
                   </div>
                 )}
-              </div>
-
-              <Separator className="my-6" />
-              
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Notas Adicionales</h3>
-                <div className="space-y-2">
-                  <Label htmlFor="notas">Notas</Label>
-                  <textarea 
-                    id="notas" 
-                    className="w-full min-h-[100px] p-2 border rounded-md"
-                    value={miembro.notas || ''} 
-                    onChange={(e) => setMiembro({...miembro, notas: e.target.value})}
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="socio_carnet_madridista" 
+                    checked={miembro.socio_carnet_madridista || false}
+                    onCheckedChange={(checked) => 
+                      setMiembro({...miembro, socio_carnet_madridista: checked as boolean})
+                    }
                     disabled={!isEditing}
                   />
+                  <Label htmlFor="socio_carnet_madridista">Tiene Carnet Madridista</Label>
                 </div>
+                {(miembro.socio_carnet_madridista && isEditing) && (
+                  <div className="space-y-2">
+                    <Label htmlFor="num_socio">Número de Carnet Madridista</Label>
+                    <Input 
+                      id="num_socio" 
+                      value={miembro.num_carnet || ''} 
+                      onChange={(e) => setMiembro({...miembro, num_carnet: e.target.value ? Number(e.target.value) : null})}
+                      disabled={!isEditing}
+                    />
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -847,43 +863,6 @@ export default function UserDetailsPage() {
                     <span>{formatDate(miembro.created_at)}</span>
                   </div>
                 </div>
-                
-                <div className="space-y-2">
-                  <Label>Última Actualización</Label>
-                  <div className="flex items-center">
-                    <Clock className="h-4 w-4 mr-2 text-gray-500" />
-                    <span>{formatDate(miembro.updated_at)}</span>
-                  </div>
-                </div>
-                
-                {authUser && (
-                  <>
-                    <div className="space-y-2">
-                      <Label>Último Inicio de Sesión</Label>
-                      <div className="flex items-center">
-                        <Clock className="h-4 w-4 mr-2 text-gray-500" />
-                        <span>{formatDate(authUser.last_sign_in_at)}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Estado de Email</Label>
-                      <div className="flex items-center">
-                        {authUser.email_confirmed_at || authUser.confirmed_at ? (
-                          <>
-                            <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-                            <span className="text-green-600 font-medium">Email Confirmado</span>
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="h-4 w-4 mr-2 text-yellow-600" />
-                            <span className="text-yellow-600 font-medium">Email No Confirmado</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
               </div>
 
               <Separator className="my-6" />
@@ -929,6 +908,15 @@ export default function UserDetailsPage() {
                   >
                     <FileText className="mr-2 h-4 w-4" />
                     Generar Informe
+                  </Button>
+                  
+                  <Button 
+                    variant="outline"
+                    onClick={handleMakeAdmin}
+                    disabled={miembro.role === 'admin'}
+                  >
+                    <Shield className="mr-2 h-4 w-4" />
+                    Hacer Administrador
                   </Button>
                   
                   <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -996,4 +984,3 @@ export default function UserDetailsPage() {
     </div>
   )
 }
-                    

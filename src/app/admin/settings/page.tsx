@@ -22,7 +22,6 @@ import {
   Globe, 
   Mail, 
   CreditCard, 
-  FileText, 
   Image as ImageIcon, 
   CheckCircle 
 } from "lucide-react"
@@ -46,16 +45,9 @@ interface SiteSettings {
   secondary_color: string;
   enable_blog: boolean;
   enable_subscriptions: boolean;
-  subscription_price: number;
-  subscription_currency: string;
   footer_text: string;
-  privacy_policy: string;
-  terms_of_service: string;
   meta_description: string;
   meta_keywords: string;
-  social_twitter: string;
-  social_facebook: string;
-  social_instagram: string;
   maintenance_mode: boolean;
   updated_at?: string;
 }
@@ -63,25 +55,18 @@ interface SiteSettings {
 // Default settings
 const defaultSettings: SiteSettings = {
   site_name: "Peña Lorenzo Sanz",
-  site_description: "Peña Madridista Lorenzo Sanz",
-  contact_email: "contacto@penallorenzosanz.com",
-  support_email: "soporte@penallorenzosanz.com",
+  site_description: "Peña Madridista Lorenzo Sanz Siempre Presente",
+  contact_email: "info@lorenzosanz.com",
+  support_email: "info@lorenzosanz.com",
   logo_url: "/logo.png",
   favicon_url: "/favicon.ico",
   primary_color: "#1e40af",
   secondary_color: "#ffffff",
   enable_blog: true,
   enable_subscriptions: true,
-  subscription_price: 30,
-  subscription_currency: "EUR",
   footer_text: "© Peña Lorenzo Sanz. Todos los derechos reservados.",
-  privacy_policy: "",
-  terms_of_service: "",
   meta_description: "Peña Madridista Lorenzo Sanz - Aficionados del Real Madrid",
   meta_keywords: "real madrid, peña, lorenzo sanz, madridistas",
-  social_twitter: "",
-  social_facebook: "",
-  social_instagram: "",
   maintenance_mode: false
 }
 
@@ -354,7 +339,7 @@ export default function SiteSettingsPage() {
       )}
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 mb-8">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-8">
           <TabsTrigger value="general" className="flex items-center gap-2">
             <Globe className="h-4 w-4" aria-hidden="true" />
             <span>General</span>
@@ -370,10 +355,6 @@ export default function SiteSettingsPage() {
           <TabsTrigger value="subscriptions" className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" aria-hidden="true" />
             <span>Suscripciones</span>
-          </TabsTrigger>
-          <TabsTrigger value="legal" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" aria-hidden="true" />
-            <span>Legal</span>
           </TabsTrigger>
         </TabsList>
         
@@ -453,44 +434,8 @@ export default function SiteSettingsPage() {
                     placeholder="palabra1, palabra2, palabra3"
                   />
                 </div>
-              </div>
-
-              <Separator className="my-6" />
-              
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Redes Sociales</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="social_twitter">Twitter</Label>
-                    <Input 
-                      id="social_twitter" 
-                      value={settings.social_twitter} 
-                      onChange={(e) => handleChange('social_twitter', e.target.value)}
-                      placeholder="https://twitter.com/username"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="social_facebook">Facebook</Label>
-                    <Input 
-                      id="social_facebook" 
-                      value={settings.social_facebook} 
-                      onChange={(e) => handleChange('social_facebook', e.target.value)}
-                      placeholder="https://facebook.com/pagename"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="social_instagram">Instagram</Label>
-                    <Input 
-                      id="social_instagram" 
-                      value={settings.social_instagram} 
-                      onChange={(e) => handleChange('social_instagram', e.target.value)}
-                      placeholder="https://instagram.com/username"
-                    />
-                  </div>
-                </div>
-              </div>
+              </div>       
+    
             </CardContent>
           </Card>
         </TabsContent>
@@ -641,73 +586,6 @@ export default function SiteSettingsPage() {
                   onCheckedChange={(checked) => handleChange('enable_subscriptions', checked)}
                 />
                 <Label htmlFor="enable_subscriptions">Habilitar Suscripciones</Label>
-              </div>
-              
-              {settings.enable_subscriptions && (
-                <>
-                  <Separator className="my-6" />
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="subscription_price">Precio de Suscripción</Label>
-                      <Input 
-                        id="subscription_price" 
-                        type="number"
-                        value={settings.subscription_price.toString()} 
-                        onChange={(e) => handleChange('subscription_price', parseFloat(e.target.value) || 0)}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="subscription_currency">Moneda</Label>
-                      <select
-                        id="subscription_currency"
-                        value={settings.subscription_currency}
-                        onChange={(e) => handleChange('subscription_currency', e.target.value)}
-                        className="w-full p-2 border rounded-md"
-                      >
-                        <option value="EUR">EUR (€)</option>
-                        <option value="USD">USD ($)</option>
-                        <option value="GBP">GBP (£)</option>
-                      </select>
-                    </div>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        {/* Legal Tab */}
-        <TabsContent value="legal">
-          <Card>
-            <CardHeader>
-              <CardTitle>Documentos Legales</CardTitle>
-              <CardDescription>
-                Configura los textos legales del sitio web
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="privacy_policy">Política de Privacidad</Label>
-                <Textarea 
-                  id="privacy_policy" 
-                  value={settings.privacy_policy} 
-                  onChange={(e) => handleChange('privacy_policy', e.target.value)}
-                  className="min-h-[200px]"
-                />
-              </div>
-              
-              <Separator className="my-6" />
-              
-              <div className="space-y-2">
-                <Label htmlFor="terms_of_service">Términos de Servicio</Label>
-                <Textarea 
-                  id="terms_of_service" 
-                  value={settings.terms_of_service} 
-                  onChange={(e) => handleChange('terms_of_service', e.target.value)}
-                  className="min-h-[200px]"
-                />
               </div>
             </CardContent>
           </Card>

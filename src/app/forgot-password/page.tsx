@@ -75,7 +75,7 @@ export default function ForgotPassword() {
               </p>
               <div className="mt-6">
                 <Link href="/login">
-                  <Button className="w-full bg-primary hover:bg-secondary">Volver a Iniciar Sesión</Button>
+                  <Button className="w-full transition-all hover:bg-white hover:text-black hover:border hover:border-black">Volver a Iniciar Sesión</Button>
                 </Link>
               </div>
             </div>
@@ -97,13 +97,13 @@ export default function ForgotPassword() {
               </div>
 
               <div>
-                <Button type="submit" className="w-full bg-primary hover:bg-secondary" disabled={loading}>
+                <Button type="submit" className="w-full bg-primary hover:bg-white hover:border hover:border-black hover:text-black" disabled={loading}>
                   {loading ? "Enviando..." : "Enviar Correo de Recuperación"}
                 </Button>
               </div>
 
               <div className="text-center">
-                <Link href="/login" className="text-sm font-medium text-secondary hover:text-accent">
+                <Link href="/login" className="text-sm font-medium text-black hover:underline">
                   Volver a Iniciar Sesión
                 </Link>
               </div>
