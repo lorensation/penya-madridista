@@ -1,6 +1,6 @@
 "use server"
 
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerSupabaseClient } from "@/lib/supabase"
 import { generateWelcomeEmailTemplate, sendEmail } from "@/lib/email"
 import { revalidatePath } from "next/cache"
 
@@ -8,6 +8,7 @@ export type ApiResponse = {
   success?: boolean
   message?: string
   error?: string
+  alreadySubscribed?: boolean
 }
 
 // Add a new function to add users to the newsletter when they register
@@ -15,15 +16,29 @@ export async function addUserToNewsletter(email: string, name?: string): Promise
   try {
     // Store subscriber in database
     const supabase = createServerSupabaseClient()
-    const { error } = await supabase.from("newsletter_subscribers").upsert(
-      {
+
+    // First check if the email already exists
+    const { data: existingSubscriber } = await supabase
+      .from("newsletter_subscribers")
+      .select("id, email")
+      .eq("email", email)
+      .maybeSingle()
+
+    // If the email exists, we can consider it a success (already subscribed)
+    if (existingSubscriber) {
+      console.log("Email already subscribed during registration:", email)
+      return true
+    }
+
+    // If not existing, insert new subscriber
+    const { error } = await supabase
+      .from("newsletter_subscribers")
+      .insert({
         email,
         name: name || null,
         status: "active",
         created_at: new Date().toISOString(),
-      },
-      { onConflict: "email" },
-    )
+      })
 
     if (error) {
       console.error("Supabase error when adding user to newsletter:", error)
@@ -67,22 +82,71 @@ export async function subscribeToNewsletter(formData: FormData): Promise<ApiResp
 
     // Store subscriber in database
     const supabase = createServerSupabaseClient()
-    const { error } = await supabase.from("newsletter_subscribers").upsert(
-      {
-        email,
-        name: name || null,
-        status: "active",
-        created_at: new Date().toISOString(),
-      },
-      { onConflict: "email" },
-    )
-
-    if (error) {
-      console.error("Supabase error:", error)
-      return {
-        success: false,
-        error: "Error al guardar la suscripción",
+    
+    try {
+      // First check if the email already exists
+      const { data: existingSubscriber } = await supabase
+        .from("newsletter_subscribers")
+        .select("id, email")
+        .eq("email", email)
+        .maybeSingle()
+      
+      // If the email exists, we consider it a success but with a different message
+      if (existingSubscriber) {
+        console.log("Email already subscribed:", email)
+        
+        return {
+          success: true,
+          message: "Este email ya está suscrito a nuestra newsletter",
+          alreadySubscribed: true
+        }
       }
+      
+      // If not existing, insert new subscriber
+      const { error } = await supabase
+        .from("newsletter_subscribers")
+        .insert({
+          email,
+          name: name || null,
+          status: "active",
+          created_at: new Date().toISOString(),
+        })
+
+      if (error) {
+        // Handle duplicate key error specifically
+        if (error.code === '23505') {
+          console.log("Duplicate email caught:", email)
+          return {
+            success: true,
+            message: "Este email ya está suscrito a nuestra newsletter",
+            alreadySubscribed: true
+          }
+        }
+        
+        console.error("Supabase error:", error)
+        return {
+          success: false,
+          error: "Error al guardar la suscripción",
+        }
+      }
+    } catch (dbError: unknown) {
+      // Catch any database errors, including unique constraint violations
+      // Type guard to check if it's a database error object with code property
+      if (typeof dbError === 'object' && dbError !== null) {
+        const error = dbError as { code?: string; message?: string };
+        
+        if (error.code === '23505' || 
+           (error.message && error.message.includes('newsletter_subscribers_email_key'))) {
+          console.log("Duplicate email exception caught:", email);
+          return {
+            success: true,
+            message: "Este email ya está suscrito a nuestra newsletter",
+            alreadySubscribed: true
+          };
+        }
+      }
+      
+      throw dbError; // Re-throw if it's not a duplicate key error
     }
 
     // Send welcome email

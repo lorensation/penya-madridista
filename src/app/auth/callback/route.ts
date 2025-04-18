@@ -39,12 +39,19 @@ export async function GET(request: NextRequest) {
           
           if (subscribeNewsletter && data.user.email) {
             try {
-              await addUserToNewsletter(
+              // The addUserToNewsletter function will handle the case where the email
+              // already exists in the newsletter_subscribers table
+              const subscribed = await addUserToNewsletter(
                 data.user.email, 
                 data.user.user_metadata?.name || ""
               )
+              
+              if (!subscribed) {
+                console.log("User wanted to subscribe to newsletter but couldn't be subscribed")
+              }
             } catch (newsletterError) {
-              console.error("Error subscribing user to newsletter in callback:", newsletterError)
+              // We'll just log the error but continue - not critical for auth flow
+              console.error("Error in newsletter subscription during auth callback:", newsletterError)
             }
           }
         }

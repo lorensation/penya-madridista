@@ -59,8 +59,9 @@ export default function NewsletterForm({
 
       if (result.success) {
         toast({
-          title: "¡Suscripción exitosa!",
+          title: result.alreadySubscribed ? "Email ya suscrito" : "¡Suscripción exitosa!",
           description: result.message || "Gracias por suscribirte a nuestra newsletter.",
+          variant: result.alreadySubscribed ? "default" : "default",
         })
         form.reset()
       } else {
@@ -114,7 +115,7 @@ export default function NewsletterForm({
             )}
           />
           
-          <Button type="submit" disabled={isLoading} className="mt-0">
+          <Button type="submit" disabled={isLoading} className="mt-0 hover:scale-105 transition-transform duration-300 hover:bg-white hover:text-black hover:border hover:border-black">
             {isLoading ? "Enviando..." : buttonText}
           </Button>
         </div>

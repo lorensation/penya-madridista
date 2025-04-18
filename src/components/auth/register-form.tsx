@@ -65,6 +65,7 @@ export function RegisterForm() {
         options: {
           data: {
             name: values.name,
+            subscribeToNewsletter: values.subscribeToNewsletter
           },
         },
       })
@@ -87,11 +88,16 @@ export function RegisterForm() {
         console.error("Error creating user record:", userError);
         // Continue even if this fails, as the auth user was created successfully
       }
-      
+
       // Subscribe to newsletter if opted in
       if (values.subscribeToNewsletter) {
         try {
-          await addUserToNewsletter(values.email, values.name);
+          // The addUserToNewsletter function has been updated to handle the case
+          // where the email already exists in the newsletter_subscribers table
+          const subscribed = await addUserToNewsletter(values.email, values.name);
+          if (!subscribed) {
+            console.log("User opted for newsletter but couldn't be subscribed. Will try again in the callback route.");
+          }
         } catch (newsletterError) {
           console.error("Error subscribing to newsletter:", newsletterError);
           // Continue anyway as this is not critical
