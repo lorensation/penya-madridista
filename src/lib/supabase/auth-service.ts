@@ -66,6 +66,5 @@ export async function resetPassword(email: string) {
  */
 export async function getCurrentUser() {
   const client = getClient()
-  
   return await client.auth.getUser()
 }

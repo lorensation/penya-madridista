@@ -106,15 +106,35 @@ export default function AdminBlogPage() {
     }
 
     try {
-      const { error } = await supabase.from("posts").delete().eq("id", postId);
+      setLoading(true);
+      
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId);
 
-      if (error) throw error;
-
-      // Refresh the posts list
-      fetchPosts();
+      if (error) throw error
+      
+      // Update UI after successful deletion
+      setPosts((currentPosts) => currentPosts.filter(post => post.id !== postId));
+      setTotalCount((prevCount) => Math.max(0, prevCount - 1));
+      
+      // Recalculate total pages
+      const newTotalPages = Math.ceil((totalCount - 1) / postsPerPage);
+      setTotalPages(newTotalPages);
+      
+      // If current page is now empty and not the first page, go to previous page
+      if (currentPage > 1 && currentPage > newTotalPages) {
+        setCurrentPage(newTotalPages);
+      } else {
+        // Otherwise refresh the data to ensure consistency
+        await fetchPosts();
+      }
     } catch (error) {
       console.error("Error deleting post:", error);
       setError(error instanceof Error ? error.message : "Failed to delete post");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -188,6 +208,7 @@ export default function AdminBlogPage() {
                     <th className="text-left py-3 px-4">Título</th>
                     <th className="text-left py-3 px-4 hidden md:table-cell">Autor</th>
                     <th className="text-left py-3 px-4 hidden md:table-cell">Categoría</th>
+                    <th className="text-left py-3 px-4 hidden md:table-cell">Estado</th>
                     <th className="text-left py-3 px-4 hidden md:table-cell">Fecha</th>
                     <th className="text-right py-3 px-4">Acciones</th>
                   </tr>
@@ -205,6 +226,11 @@ export default function AdminBlogPage() {
                       <td className="py-3 px-4 hidden md:table-cell">
                         <span className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
                           {post.category}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 hidden md:table-cell">
+                        <span className={`px-2 py-1 text-xs rounded-full ${post.published ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                          {post.published ? "Publicado" : "Borrador"}
                         </span>
                       </td>
                       <td className="py-3 px-4 hidden md:table-cell">{formatDate(post.created_at)}</td>

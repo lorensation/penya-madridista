@@ -95,7 +95,7 @@ export const subscriptionService = {
    */
   async hasActiveSubscription(): Promise<boolean> {
     const subscription = await this.getCurrentSubscription()
-    return !!subscription && subscription.status === 'active'
+    return subscription !== null
   },
   
   /**

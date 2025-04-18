@@ -121,7 +121,7 @@ export async function getMember() {
     .select("*")
     .eq("user_uuid", authUser.user.id)
     .single()
-
+    
   return { data, error }
 }
 

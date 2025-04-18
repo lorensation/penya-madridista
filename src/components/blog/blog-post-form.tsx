@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { createBrowserSupabaseClient as createClient } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,7 @@ const formSchema = z.object({
   slug: z.string().min(1, "Slug is required"),
   excerpt: z.string().optional(),
   content: z.string().min(1, "Content is required"),
-  featured_image: z.string().optional(),
+  image_url: z.string().optional(),
   published: z.boolean().default(false),
 });
 
@@ -52,18 +52,35 @@ export function BlogPostForm({ initialData }: BlogPostFormProps) {
       slug: "",
       excerpt: "",
       content: "",
-      featured_image: "",
+      image_url: "",
       published: false,
     },
   });
+
+  // Generate a slug from the title
+  function generateSlug(title: string): string {
+      return title
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, "") // Remove special characters
+        .replace(/\s+/g, "-") // Replace spaces with hyphens
+        .replace(/-+/g, "-"); // Replace multiple hyphens with a single hyphen
+    }
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const title = e.target.value;
+    form.setValue("title", title);
+    form.setValue("slug", generateSlug(title));
+  };
+
+  const slug = generateSlug(form.getValues("title"));
+  form.setValue("slug", slug);
+  
 
   // Handle form submission
   async function onSubmit(values: BlogPostFormValues) {
     setIsLoading(true);
 
     try {
-      const supabase = createClient();
-      
       if (isEditing) {
         // Update existing post - changed from blog_posts to posts
         const { error } = await supabase
@@ -73,7 +90,7 @@ export function BlogPostForm({ initialData }: BlogPostFormProps) {
             slug: values.slug,
             excerpt: values.excerpt,
             content: values.content,
-            featured_image: values.featured_image || null,
+            image_url: values.image_url || null,
             published: values.published,
             updated_at: new Date().toISOString(),
           })
@@ -94,7 +111,7 @@ export function BlogPostForm({ initialData }: BlogPostFormProps) {
             slug: values.slug,
             excerpt: values.excerpt,
             content: values.content,
-            featured_image: values.featured_image || null,
+            image_url: values.image_url || null,
             published: values.published,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -126,17 +143,6 @@ export function BlogPostForm({ initialData }: BlogPostFormProps) {
     }
   }
 
-  // Generate a slug from the title
-  function generateSlug(title: string) {
-    const slug = title
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, "") // Remove special characters
-      .replace(/\s+/g, "-") // Replace spaces with hyphens
-      .replace(/-+/g, "-"); // Replace multiple hyphens with a single hyphen
-    
-    form.setValue("slug", slug);
-  }
-
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -150,13 +156,7 @@ export function BlogPostForm({ initialData }: BlogPostFormProps) {
                 <Input 
                   placeholder="Enter blog post title" 
                   {...field} 
-                  onChange={(e) => {
-                    field.onChange(e);
-                    // If creating a new post and slug is empty, generate it from title
-                    if (!isEditing && !form.getValues("slug")) {
-                      generateSlug(e.target.value);
-                    }
-                  }}
+                  onChange={handleTitleChange}
                 />
               </FormControl>
               <FormDescription>
@@ -189,7 +189,7 @@ export function BlogPostForm({ initialData }: BlogPostFormProps) {
           name="excerpt"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Excerpt</FormLabel>
+              <FormLabel>Summary</FormLabel>
               <FormControl>
                 <Textarea 
                   placeholder="Brief summary of the blog post" 
@@ -228,7 +228,7 @@ export function BlogPostForm({ initialData }: BlogPostFormProps) {
         
         <FormField
           control={form.control}
-          name="featured_image"
+          name="image_url"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Featured Image URL</FormLabel>

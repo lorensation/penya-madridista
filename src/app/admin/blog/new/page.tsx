@@ -44,7 +44,7 @@ export default function NewBlogPostPage() {
     setFormData((prev) => ({
       ...prev,
       title,
-      slug: prev.slug || generateSlug(title),
+      slug: generateSlug(title),
     }))
   }
 

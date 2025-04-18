@@ -232,7 +232,7 @@ function CompleteProfileContent() {
     }
 
     initializeProfileForm()
-  }, [router, sessionId, userId, supabase])
+  }, [router, sessionId, userId])
 
   const handleProfileSubmit = async (formData: ProfileFormValues) => {
     try {

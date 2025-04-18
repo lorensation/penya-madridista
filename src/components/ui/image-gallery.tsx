@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Image from "next/image"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -78,19 +78,19 @@ export function ImageGallery({ bucketName, folderPath, title, description }: Ima
     setIsOpen(true)
   }
 
-  const closeLightbox = () => {
+  const closeLightbox = useCallback(() => {
     setIsOpen(false)
-  }
+  }, []);
 
-  const goToPrevious = () => {
+  const goToPrevious = useCallback(() => {
     if (selectedImageIndex === null) return
     setSelectedImageIndex((selectedImageIndex - 1 + images.length) % images.length)
-  }
+  }, [selectedImageIndex, images.length])
 
-  const goToNext = () => {
+  const goToNext = useCallback(() => {
     if (selectedImageIndex === null) return
     setSelectedImageIndex((selectedImageIndex + 1) % images.length)
-  }
+  }, [selectedImageIndex, images.length])
 
   // Add keyboard navigation
   useEffect(() => {
@@ -114,7 +114,7 @@ export function ImageGallery({ bucketName, folderPath, title, description }: Ima
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, selectedImageIndex, images.length])
+  }, [isOpen, goToPrevious, goToNext, closeLightbox])
 
   if (loading) {
     return (

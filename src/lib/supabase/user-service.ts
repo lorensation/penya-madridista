@@ -80,6 +80,6 @@ export async function checkMembershipStatus() {
   if (error) {
     return { isMember: false, error }
   }
-
+  
   return { isMember: data?.is_member || false, error: null }
 }

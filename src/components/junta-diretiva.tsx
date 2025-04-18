@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -98,19 +98,19 @@ export default function JuntaDirectiva() {
   // Calculate visible cards based on screen size
   const visibleCards = isMobile ? 1 : Math.min(3, boardMembers.length);
 
-  // Move to previous slide
-  const prevSlide = () => {
+  // Move to previous slide - wrapped in useCallback
+  const prevSlide = useCallback(() => {
     setCurrentIndex((prevIndex) => 
       prevIndex === 0 ? Math.max(0, boardMembers.length - visibleCards) : Math.max(0, prevIndex - 1)
     );
-  };
+  }, [boardMembers.length, visibleCards]);
 
-  // Move to next slide
-  const nextSlide = () => {
+  // Move to next slide - wrapped in useCallback
+  const nextSlide = useCallback(() => {
     setCurrentIndex((prevIndex) => 
       prevIndex >= boardMembers.length - visibleCards ? 0 : prevIndex + 1
     );
-  };
+  }, [boardMembers.length, visibleCards]);
 
   // Auto-scroll effect (optional, can be removed if not needed)
   useEffect(() => {
@@ -119,7 +119,7 @@ export default function JuntaDirectiva() {
     }, 5000); // Change slide every 5 seconds
 
     return () => clearInterval(interval);
-  }, [currentIndex, visibleCards, boardMembers.length]);
+  }, [nextSlide]);
 
   return (
     <div className="w-full py-8 px-4">

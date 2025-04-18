@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -95,35 +95,71 @@ export default function SettingsPage() {
     marketingEmails: true,
   })
 
-  // Check authentication status and redirect if not logged in
-  useEffect(() => {
-    async function checkAuthentication() {
-      try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        
-        if (sessionError || !session) {
-          console.error("Not authenticated", sessionError)
-          // Redirect to fallback UI for login with return URL
-          router.push(`/login?redirect=${encodeURIComponent('/dashboard/settings')}`)
-          return false
-        }
-        
-        return true
-      } catch (error) {
-        console.error("Error checking authentication:", error)
-        router.push(`/login?redirect=${encodeURIComponent('/dashboard/settings')}`)
-        return false
-      }
-    }
-    
-    checkAuthentication().then((isAuthenticated) => {
-      if (isAuthenticated) {
-        loadUserData()
-      }
-    })
-  }, [router, supabase])
+  // Update form with user data from users table - wrapped in useCallback
+  const updateFormWithUserData = useCallback((userRecord: UserData) => {
+    setFormData(prevData => ({
+      ...prevData,
+      name: userRecord.name || "",
+      email: userRecord.email || "",
+    }))
+  }, []);
 
-  async function loadUserData() {
+  // Update form with member data - wrapped in useCallback
+  const updateFormWithMemberData = useCallback((memberRecord: MemberData) => {
+    setFormData(prevData => ({
+      ...prevData,
+      name: memberRecord.name || prevData.name || "",
+      apellido1: memberRecord.apellido1 || "",
+      apellido2: memberRecord.apellido2 || "",
+      phone: memberRecord.telefono?.toString() || "",
+      address: memberRecord.direccion || "",
+      city: memberRecord.poblacion || "",
+      postalCode: memberRecord.cp?.toString() || "",
+      province: memberRecord.provincia || "",
+      country: memberRecord.pais || "",
+      emailNotifications: memberRecord.email_notifications !== false,
+      marketingEmails: memberRecord.marketing_emails !== false,
+    }))
+  }, []);
+
+  // Load member data from miembros table - wrapped in useCallback
+  const loadMemberDataFromTable = useCallback(async (userId: string) => {
+    try {
+      // Try to get member data using user_uuid
+      const { data: memberRecord, error: memberError } = await supabase
+        .from("miembros")
+        .select("*")
+        .eq("user_uuid", userId)
+        .single()
+
+      if (memberError) {
+        // Try with auth_id instead
+        const { data: memberDataById } = await supabase
+          .from("miembros")
+          .select("*")
+          .eq("id", userId)
+          .single()
+        
+          if (memberDataById !== null) {
+            setMemberData(memberDataById)
+            updateFormWithMemberData(memberDataById)
+            return true
+          } else {
+            console.log("both fetches didnt work")
+          }
+        
+      } else {
+        setMemberData(memberRecord)
+        updateFormWithMemberData(memberRecord)
+        return true
+      }
+    } catch (error) {
+      console.error("Error loading member data:", error)
+      return false
+    }
+  }, [supabase, updateFormWithMemberData]);
+  
+  const loadUserData = useCallback(async () => {
     try {
       // Get the current user from auth
       const { data: userData, error: userError } = await supabase.auth.getUser()
@@ -232,71 +268,35 @@ export default function SettingsPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  // Update form with user data from users table
-  function updateFormWithUserData(userRecord: UserData) {
-    setFormData(prevData => ({
-      ...prevData,
-      name: userRecord.name || "",
-      email: userRecord.email || "",
-    }))
-  }
-
-  // Load member data from miembros table
-  async function loadMemberDataFromTable(userId: string) {
-    try {
-      // Try to get member data using user_uuid
-      const { data: memberRecord, error: memberError } = await supabase
-        .from("miembros")
-        .select("*")
-        .eq("user_uuid", userId)
-        .single()
-
-      if (memberError) {
-        // Try with auth_id instead
-        const { data: memberDataById } = await supabase
-          .from("miembros")
-          .select("*")
-          .eq("id", userId)
-          .single()
+  }, [router, supabase, updateFormWithUserData, loadMemberDataFromTable, updateFormWithMemberData])
+  
+  // Check authentication status and redirect if not logged in
+  useEffect(() => {
+    async function checkAuthentication() {
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         
-          if (memberDataById !== null) {
-            setMemberData(memberDataById)
-            updateFormWithMemberData(memberDataById)
-            return true
-          } else {
-            console.log("both fetches didnt work")
-          }
+        if (sessionError || !session) {
+          console.error("Not authenticated", sessionError)
+          // Redirect to fallback UI for login with return URL
+          router.push(`/login?redirect=${encodeURIComponent('/dashboard/settings')}`)
+          return false
+        }
         
-      } else {
-        setMemberData(memberRecord)
-        updateFormWithMemberData(memberRecord)
         return true
+      } catch (error) {
+        console.error("Error checking authentication:", error)
+        router.push(`/login?redirect=${encodeURIComponent('/dashboard/settings')}`)
+        return false
       }
-    } catch (error) {
-      console.error("Error loading member data:", error)
-      return false
     }
-  }
-
-  // Update form with member data
-  function updateFormWithMemberData(memberRecord: MemberData) {
-    setFormData(prevData => ({
-      ...prevData,
-      name: memberRecord.name || prevData.name || "",
-      apellido1: memberRecord.apellido1 || "",
-      apellido2: memberRecord.apellido2 || "",
-      phone: memberRecord.telefono?.toString() || "",
-      address: memberRecord.direccion || "",
-      city: memberRecord.poblacion || "",
-      postalCode: memberRecord.cp?.toString() || "",
-      province: memberRecord.provincia || "",
-      country: memberRecord.pais || "",
-      emailNotifications: memberRecord.email_notifications !== false,
-      marketingEmails: memberRecord.marketing_emails !== false,
-    }))
-  }
+    
+    checkAuthentication().then((isAuthenticated) => {
+      if (isAuthenticated) {
+        loadUserData()
+      }
+    })
+  }, [router, supabase, loadUserData])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target

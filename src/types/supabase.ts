@@ -227,6 +227,7 @@ export interface Database {
           author: string
           category: string
           image_url: string | null
+          published: boolean
         }
         Insert: {
           id?: string
@@ -239,6 +240,7 @@ export interface Database {
           author: string
           category: string
           image_url?: string | null
+          published?: boolean
         }
         Update: {
           id?: string
@@ -251,6 +253,7 @@ export interface Database {
           author?: string
           category?: string
           image_url?: string | null
+          published?: boolean
         }
       }
       events: {

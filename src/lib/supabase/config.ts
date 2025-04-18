@@ -5,7 +5,7 @@ export const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 export const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // For server-side operations that need more privileges
-export const supabaseServiceKey = process.env.SUPABASE_WEBHOOK_SECRET
+export const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 // Common Supabase options
 export const defaultOptions = {

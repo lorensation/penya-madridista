@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase"
 
 async function getBlogPosts() {
   try {
-    const { data, error } = await supabase.from("posts").select("*").order("created_at", { ascending: false })
+    const { data, error } = await supabase.from("posts").select("*").eq("published", true).order("created_at", { ascending: false })
 
     if (error) {
       console.error("Error fetching blog posts:", error)
