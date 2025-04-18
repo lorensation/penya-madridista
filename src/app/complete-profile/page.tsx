@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase"
 import { ProfileForm } from "@/components/profile-form"
 import { Loader2 } from "lucide-react"
 import { Suspense } from "react"
@@ -106,10 +106,16 @@ function CompleteProfileContent() {
   const [error, setError] = useState<string | null>(null)
   const [checkoutData, setCheckoutData] = useState<CheckoutSessionData | null>(null)
   const [authError, setAuthError] = useState<boolean>(false)
-
-  const supabase = createBrowserSupabaseClient()
+  const [missingSessionId, setMissingSessionId] = useState<boolean>(!sessionId)
 
   useEffect(() => {
+    // If there's no session_id, we shouldn't be on this page
+    if (!sessionId) {
+      setLoading(false)
+      setMissingSessionId(true)
+      return
+    }
+
     async function initializeProfileForm() {
       try {
         // Get the current user
@@ -357,6 +363,33 @@ function CompleteProfileContent() {
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
           <p className="mt-4 text-gray-600">Cargando tu perfil...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (missingSessionId) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
+          <div className="text-red-500 mx-auto h-12 w-12">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-red-600">Error</h2>
+          <p className="mt-2 text-center text-sm text-gray-600">Falta el identificador de sesión. Por favor, verifica el enlace.</p>
+          <Button
+            onClick={() => router.push("/")}
+            className="mt-6 w-full"
+          >
+            Volver al Inicio
+          </Button>
         </div>
       </div>
     )

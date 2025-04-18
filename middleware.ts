@@ -1,4 +1,3 @@
-
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
@@ -19,6 +18,17 @@ export async function middleware(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith("/api/webhooks/")) {
     console.log("Skipping middleware for webhook endpoint")
     return NextResponse.next()
+  }
+
+  // Check for /complete-profile access without checkout session ID
+  if (request.nextUrl.pathname === "/complete-profile") {
+    const sessionId = request.nextUrl.searchParams.get("session_id")
+    
+    // If no session_id is provided, redirect to membership page
+    if (!sessionId) {
+      console.log("Attempt to access complete-profile without session_id")
+      return NextResponse.redirect(new URL("/membership", request.url))
+    }
   }
 
   const response = NextResponse.next({
@@ -110,8 +120,7 @@ export async function middleware(request: NextRequest) {
   if (
     !authUser &&
     (request.nextUrl.pathname.startsWith("/dashboard") ||
-      request.nextUrl.pathname.startsWith("/admin") ||
-      request.nextUrl.pathname.startsWith("/account"))
+      request.nextUrl.pathname.startsWith("/admin"))
   ) {
     return NextResponse.redirect(new URL("/login", request.url))
   }
@@ -138,8 +147,8 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL("/login", request.url))
       }
 
-      // For dashboard or admin routes, we need detailed member info
-      if (request.nextUrl.pathname.startsWith("/dashboard") || request.nextUrl.pathname.startsWith("/admin")) {
+      // For admin routes, we need to check admin role
+      if (request.nextUrl.pathname.startsWith("/admin")) {
         // Try to get member data using multiple methods
         let memberData = null
 
@@ -173,28 +182,12 @@ export async function middleware(request: NextRequest) {
         }
 
         // For admin routes, check if the user has admin role
-        if (request.nextUrl.pathname.startsWith("/admin")) {
-          if (!memberData || memberData.role !== "admin") {
-            console.log("User does not have admin role:", memberData?.role || "no profile found")
-            return NextResponse.redirect(new URL("/dashboard", request.url))
-          }
-
-          console.log("Admin access granted for user:", authUser.email || authUser.id)
+        if (!memberData || memberData.role !== "admin") {
+          console.log("User does not have admin role:", memberData?.role || "no profile found")
+          return NextResponse.redirect(new URL("/dashboard", request.url))
         }
 
-        // For dashboard routes, ensure we have member data
-        if (request.nextUrl.pathname.startsWith("/dashboard")) {
-          // If accessing settings but no member data, redirect to complete profile
-          if (request.nextUrl.pathname.includes("/settings") && !memberData) {
-            return NextResponse.redirect(new URL("/dashboard/complete-profile", request.url))
-          }
-
-          // If checking subscription status, ensure we have the data
-          if (request.nextUrl.pathname.includes("/subscription") && (!memberData || !memberData.subscription_status)) {
-            // Allow access but the page will handle showing appropriate message
-            console.log("User accessing subscription without status data")
-          }
-        }
+        console.log("Admin access granted for user:", authUser.email || authUser.id)
       }
     } catch (error) {
       console.error("Error in middleware:", error)
