@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Mail, Phone, MapPin } from "lucide-react"
+import { submitContactForm } from "../actions/contact"
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -32,20 +33,39 @@ export default function Contact() {
     setError(null)
 
     try {
-      // In a real application, this would send data to an API
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      // Simulate success
-      setSuccess(true)
-      setFormData({
-        name: "",
-        email: "",
-        subject: "",
-        message: "",
-      })
-    } catch {
-      // Catch any errors but we don't use the error variable
+      // Submit the form using our server action
+      const result = await submitContactForm(formData)
+      
+      if (result.success) {
+        setSuccess(true)
+        // Reset form on success
+        setFormData({
+          name: "",
+          email: "",
+          subject: "",
+          message: "",
+        })
+        
+        // Auto-hide the success message after 5 seconds
+        setTimeout(() => {
+          setSuccess(false)
+        }, 5000)
+      } else {
+        setError(result.error || "Error al enviar el mensaje. Por favor, inténtalo de nuevo.")
+        
+        // Auto-hide the error message after 5 seconds
+        setTimeout(() => {
+          setError(null)
+        }, 5000)
+      }
+    } catch (err) {
+      console.error("Error submitting contact form:", err)
       setError("Hubo un error al enviar el mensaje. Por favor, inténtalo de nuevo.")
+      
+      // Auto-hide the error message after 5 seconds
+      setTimeout(() => {
+        setError(null)
+      }, 5000)
     } finally {
       setLoading(false)
     }
@@ -78,7 +98,7 @@ export default function Contact() {
                     <Phone className="h-5 w-5 text-primary mr-3 mt-0.5" />
                     <div>
                       <p className="font-medium">Teléfono</p>
-                      <p className="text-gray-600">+34 679 240 500</p>
+                      <a href="https://wa.me/34679240500"><p className="text-gray-600 hover:underline">+34 XXX XXX XXX</p></a>
                     </div>
                   </div>
                   <div className="flex items-start">
@@ -176,7 +196,7 @@ export default function Contact() {
                       className="mt-1 min-h-[150px]"
                     />
                   </div>
-                  <Button type="submit" className="w-full bg-primary hover:bg-secondary hover:text-black" disabled={loading}>
+                  <Button type="submit" className="w-full transition-all bg-primary hover:bg-white hover:text-black hover:border hover:border-black" disabled={loading}>
                     {loading ? "Enviando..." : "Enviar Mensaje"}
                   </Button>
                 </form>

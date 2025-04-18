@@ -23,27 +23,27 @@ export default function Footer() {
             <h3 className="text-xl font-bold mb-4">Enlaces</h3>
             <ul className="space-y-2">
               <li>
-                <Link href="/" className="hover:text-accent">
+                <Link href="/" className="hover:text-accent hover:underline">
                   Inicio
                 </Link>
               </li>
               <li>
-                <Link href="/about" className="hover:text-accent">
+                <Link href="/about" className="hover:text-accent hover:underline">
                   Sobre Nosotros
                 </Link>
               </li>
               <li>
-                <Link href="/blog" className="hover:text-accent">
+                <Link href="/blog" className="hover:text-accent hover:underline">
                   Blog
                 </Link>
               </li>
               <li>
-                <Link href="/membership" className="hover:text-accent">
+                <Link href="/membership" className="hover:text-accent hover:underline">
                   Hazte Socio
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="hover:text-accent">
+                <Link href="/contact" className="hover:text-accent hover:underline">
                   Contacto
                 </Link>
               </li>
@@ -52,7 +52,7 @@ export default function Footer() {
           <div>
             <h3 className="text-xl font-bold mb-4">Contacto</h3>
             <p>Email: info@lorenzosanz.com</p>
-            <p>Teléfono: +34 679 240 500</p>
+            <a href="https://wa.me/34679240500"><p>Teléfono: +34 XXX XXX XXX</p></a>
             <div className="flex space-x-4 mt-4">
               <a href="#" className="text-white hover:text-accent">
                 <span className="sr-only">Twitter</span>
@@ -84,17 +84,17 @@ export default function Footer() {
             <div className="mt-4">
               <ul className="space-y-2">
                 <li>
-                  <Link href="/privacy-policy" className="hover:text-accent">
+                  <Link href="/privacy-policy" className="hover:text-accent hover:underline">
                     Política de Privacidad
                   </Link>
                 </li>
                 <li>
-                  <Link href="/terms-and-conditions" className="hover:text-accent">
+                  <Link href="/terms-and-conditions" className="hover:text-accent hover:underline">
                     Términos y Condiciones
                   </Link>
                 </li>
                 <li>
-                  <Link href="/faqs" className="hover:text-accent">
+                  <Link href="/faqs" className="hover:text-accent hover:underline">
                     Preguntas Frecuentes
                   </Link>
                 </li>
