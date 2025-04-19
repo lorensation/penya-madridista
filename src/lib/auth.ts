@@ -1,4 +1,6 @@
-///lib/auth.ts
+//lib/auth.ts
+"use server"
+
 import { supabase } from "@/lib/supabase";
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';

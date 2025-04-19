@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useMobile } from "@/hooks/use-mobile"
 import { isUserBlocked } from "@/lib/blocked-users"
+import { supabase } from "@/lib/supabase"
 
 interface User {
   id: string
@@ -21,6 +22,7 @@ export function ProfileDropdown({ user }: ProfileDropdownProps) {
   const [isBlocked, setIsBlocked] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const isMobile = useMobile()
+  const [isAdmin, setIsAdmin] = useState(false)
 
   // Check if user is blocked
   useEffect(() => {
@@ -32,6 +34,23 @@ export function ProfileDropdown({ user }: ProfileDropdownProps) {
     }
     
     checkBlockedStatus()
+  }, [user?.id])
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (user?.id) {
+        const { data } = await supabase
+          .from("miembros")
+          .select("role")
+          .eq("user_uuid", user.id)
+        if (data && data.length > 0 && data[0].role === "admin") {
+          setIsAdmin(true)
+        } else {
+          setIsAdmin(false)
+        }
+      }
+    }
+    checkAdmin()
   }, [user?.id])
 
   // Close dropdown when clicking outside
@@ -113,6 +132,15 @@ export function ProfileDropdown({ user }: ProfileDropdownProps) {
                 >
                   Configuración
                 </Link>
+                {isAdmin && (
+                  <Link
+                    href="/admin"
+                    className="block px-4 py-2 text-sm text-black hover:bg-primary hover:text-white transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Panel de Admin
+                  </Link>
+                )}
               </>
             )}
             

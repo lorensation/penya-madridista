@@ -756,7 +756,7 @@ export default function AdminUsersPage() {
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem onClick={() => window.alert('Funcionalidad en desarrollo')}>
                                     <Mail className="h-4 w-4 mr-2" />
-                                    Enviar Email
+                                    Hacer Miembro
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
