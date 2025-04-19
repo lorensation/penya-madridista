@@ -7,12 +7,33 @@ import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { 
   Users, Search, UserCheck, UserX, MoreHorizontal, ChevronLeft, ChevronRight, 
-  AlertCircle, UserCog, Mail, User, Shield
+  AlertCircle, UserCog, Mail, User, Shield, Ban
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { supabase } from "@/lib/supabase"
 import { Database } from "@/types/supabase"
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { 
+  Select, 
+  SelectContent, 
+  SelectGroup, 
+  SelectItem, 
+  SelectLabel, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select"
+import { blockUser, unblockUser, isUserBlocked, BlockedUser, BlockReasonType, getBlockedUsers } from "@/lib/blocked-users"
+import { useToast } from "@/components/ui/use-toast"
 
 // Add route segment config to mark this route as dynamic
 export const dynamic = 'force-dynamic'
@@ -54,6 +75,17 @@ export default function AdminUsersPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [activeTab, setActiveTab] = useState("miembros")
   const usersPerPage = 10
+  
+  // Block/unblock user state
+  const [admin, setAdmin] = useState<MiembroUser | null>(null)
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false)
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
+  const [reasonType, setReasonType] = useState<BlockReasonType>("other")
+  const [reasonDetails, setReasonDetails] = useState("")
+  const [notes, setNotes] = useState("")
+  const [blockingUser, setBlockingUser] = useState(false)
+  const [blockedUsers, setBlockedUsers] = useState<Record<string, BlockedUser>>({})
+  const { toast } = useToast()
 
   // Check if user is admin on client side
   useEffect(() => {
@@ -71,7 +103,7 @@ export default function AdminUsersPage() {
         // Check if user has admin role
         const { data: profile, error: profileError } = await supabase
           .from('miembros')
-          .select('role')
+          .select('*')
           .eq('user_uuid', user.id)
           .single()
         
@@ -87,6 +119,7 @@ export default function AdminUsersPage() {
           return
         }
         
+        setAdmin(profile)
         setIsAdmin(true)
         setAuthChecking(false)
       } catch (err) {
@@ -133,8 +166,6 @@ export default function AdminUsersPage() {
       if (error) {
         throw new Error("Failed to fetch miembros: " + error.message)
       }
-
-      console.log("Fetched miembros:", data?.length || 0, "rows"); // Debug log
       
       if (!data) {
         setMiembros([]);
@@ -217,16 +248,44 @@ export default function AdminUsersPage() {
     }
   }, [authCurrentPage, authSearchQuery, usersPerPage, isAdmin, authChecking])
 
+    // Check which users are blocked
+  const checkBlockStatus = useCallback(async () => {
+    try {
+      // Fetch all blocked users in one call for efficiency
+      const allBlocked = await getBlockedUsers();
+
+      if (allBlocked && allBlocked.length > 0) {
+        const blockedUsersObj: Record<string, BlockedUser> = {};
+        
+        // Create a map of user_id -> blocked user record
+        allBlocked.forEach(blockedUser => {
+          if (blockedUser.user_id) {
+            blockedUsersObj[blockedUser.user_id] = blockedUser;
+          }
+        });
+        
+        setBlockedUsers(blockedUsersObj);
+      } else {
+        setBlockedUsers({});
+      }
+    } catch (error) {
+      console.error("Error checking blocked status:", error);
+    }
+  }, []);
+  
   // Fetch users when dependencies change
   useEffect(() => {
     if (isAdmin && !authChecking) {
       if (activeTab === "miembros") {
         fetchMiembros()
       } else {
-        fetchAuthUsers()
+        fetchAuthUsers().then(() => {
+          // After fetching users, check their block status
+          checkBlockStatus();
+        })
       }
     }
-  }, [fetchMiembros, fetchAuthUsers, isAdmin, authChecking, activeTab])
+  }, [fetchMiembros, fetchAuthUsers, checkBlockStatus, isAdmin, authChecking, activeTab])
 
   // Add debounced search to improve performance for miembros
   useEffect(() => {
@@ -281,6 +340,102 @@ export default function AdminUsersPage() {
       year: "numeric",
     })
   }
+
+  // Handle blocking a user
+  const handleOpenBlockDialog = (user: AuthUser) => {
+    setCurrentUser(user);
+    setReasonType("other");
+    setReasonDetails("");
+    setNotes("");
+    setBlockDialogOpen(true);
+  };
+
+  // Handle unblocking a user
+  const handleUnblockUser = async (userId: string) => {
+    try {
+      const { success, error } = await unblockUser(userId);
+      
+      if (!success) {
+        throw new Error(error || "Failed to unblock user");
+      }
+      
+      // Update the blockedUsers state
+      setBlockedUsers(prev => {
+        const newState = { ...prev };
+        delete newState[userId];
+        return newState;
+      });
+      
+      // Show success message
+      toast({
+        title: "Usuario desbloqueado",
+        description: "El usuario ha sido desbloqueado exitosamente.",
+        variant: "default",
+      });
+      
+    } catch (error) {
+      console.error("Error unblocking user:", error);
+      toast({
+        title: "Error al desbloquear",
+        description: error instanceof Error ? error.message : "Ha ocurrido un error al desbloquear el usuario.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle block user form submission
+  const handleBlockUser = async () => {
+    if (!currentUser) return;
+    
+    try {
+      setBlockingUser(true);
+      
+      if (!admin?.user_uuid) {
+        console.error("Admin user not found")
+        return
+      }
+      const { success, error } = await blockUser(
+        admin.user_uuid,
+        currentUser.id,
+        reasonType,
+        reasonDetails,
+        notes
+      );
+      
+      if (!success) {
+        throw new Error(error || "Failed to block user");
+      }
+      
+      // Refresh the blocked users state
+      const blocked = await isUserBlocked(currentUser.id);
+      
+      if (blocked) {
+        setBlockedUsers(prev => ({
+          ...prev,
+          [currentUser.id]: blocked
+        }));
+      }
+      
+      setBlockDialogOpen(false);
+      
+      // Show success message
+      toast({
+        title: "Usuario bloqueado",
+        description: "El usuario ha sido bloqueado exitosamente.",
+        variant: "default",
+      });
+      
+    } catch (error) {
+      console.error("Error blocking user:", error);
+      toast({
+        title: "Error al bloquear",
+        description: error instanceof Error ? error.message : "Ha ocurrido un error al bloquear el usuario.",
+        variant: "destructive",
+      });
+    } finally {
+      setBlockingUser(false);
+    }
+  };
 
   // Show loading state while checking authentication
   if (authChecking) {
@@ -524,6 +679,7 @@ export default function AdminUsersPage() {
                       <tr className="border-b">
                         <th className="text-left py-3 px-4">Email</th>
                         <th className="text-left py-3 px-4 hidden md:table-cell">Estado</th>
+                        <th className="text-left py-3 px-4 hidden md:table-cell">Estado Cuenta</th>
                         <th className="text-left py-3 px-4 hidden md:table-cell">Último Acceso</th>
                         <th className="text-left py-3 px-4 hidden md:table-cell">Registro</th>
                         <th className="text-right py-3 px-4">Acciones</th>
@@ -531,11 +687,12 @@ export default function AdminUsersPage() {
                     </thead>
                     <tbody>
                       {authUsers.map((user) => (
-                        <tr key={user.id} className="border-b hover:bg-gray-50">
+                        <tr key={user.id} className={`border-b hover:bg-gray-50 ${blockedUsers[user.id] ? 'bg-red-50' : ''}`}>
                           <td className="py-3 px-4">
                             <div className="font-medium">{user.email}</div>
                             <div className="text-sm text-gray-500 md:hidden">
                               {user.confirmed_at ? "Confirmado" : "Pendiente"}
+                              {blockedUsers[user.id] && <span className="ml-2 text-red-600">• Bloqueado</span>}
                             </div>
                           </td>
                           <td className="py-3 px-4 hidden md:table-cell">
@@ -550,6 +707,17 @@ export default function AdminUsersPage() {
                             </span>
                           </td>
                           <td className="py-3 px-4 hidden md:table-cell">
+                            {blockedUsers[user.id] ? (
+                              <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
+                                Bloqueado
+                              </span>
+                            ) : (
+                              <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+                                Activo
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 hidden md:table-cell">
                             {formatDate(user.last_sign_in_at || null)}
                           </td>
                           <td className="py-3 px-4 hidden md:table-cell">
@@ -557,6 +725,27 @@ export default function AdminUsersPage() {
                           </td>
                           <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-2">
+                              {blockedUsers[user.id] ? (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 hover:text-green-800"
+                                  onClick={() => handleUnblockUser(user.id)}
+                                >
+                                  <UserCheck className="h-4 w-4 mr-1" />
+                                  Desbloquear
+                                </Button>
+                              ) : (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100 hover:text-red-800"
+                                  onClick={() => handleOpenBlockDialog(user)}
+                                >
+                                  <Ban className="h-4 w-4 mr-1" />
+                                  Bloquear
+                                </Button>
+                              )}
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="outline" size="icon" className="h-8 w-8">
@@ -568,19 +757,6 @@ export default function AdminUsersPage() {
                                   <DropdownMenuItem onClick={() => window.alert('Funcionalidad en desarrollo')}>
                                     <Mail className="h-4 w-4 mr-2" />
                                     Enviar Email
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => window.alert('Funcionalidad en desarrollo')}>
-                                    {user.banned ? (
-                                      <>
-                                        <UserCheck className="h-4 w-4 mr-2" />
-                                        Desbloquear Usuario
-                                      </>
-                                    ) : (
-                                      <>
-                                        <UserX className="h-4 w-4 mr-2" />
-                                        Bloquear Usuario
-                                      </>
-                                    )}
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -629,6 +805,65 @@ export default function AdminUsersPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Block User Dialog */}
+      <Dialog open={blockDialogOpen} onOpenChange={setBlockDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bloquear Usuario</DialogTitle>
+            <DialogDescription>
+              Por favor, proporciona una razón para bloquear a este usuario.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="reasonType">Razón</Label>
+              <Select
+                  value={reasonType}
+                  onValueChange={(value: string) => setReasonType(value as BlockReasonType)}
+                >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona una razón" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Razones Comunes</SelectLabel>
+                    <SelectItem value="spam">Spam</SelectItem>
+                    <SelectItem value="abuse">Abuso</SelectItem>
+                    <SelectItem value="other">Otra</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="reasonDetails">Detalles</Label>
+              <Textarea
+                id="reasonDetails"
+                value={reasonDetails}
+                onChange={(e) => setReasonDetails(e.target.value)}
+                placeholder="Proporciona más detalles sobre la razón del bloqueo"
+              />
+            </div>
+            <div>
+              <Label htmlFor="notes">Notas</Label>
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Notas adicionales (opcional)"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBlockDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleBlockUser} disabled={blockingUser}>
+              {blockingUser ? "Bloqueando..." : "Bloquear Usuario"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

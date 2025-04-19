@@ -4,6 +4,7 @@ import type React from "react"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
+import { isUserBlocked } from "@/lib/blocked-users"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
 import { useMobile } from "@/hooks/use-mobile"
 import { useNavbarMenu } from "@/hooks/use-navbar-menu"
@@ -27,6 +28,17 @@ export default function DashboardLayout({
 
         if (!data.user) {
           router.push("/login")
+          return
+        }
+
+        // Check if user is blocked
+        const blockedStatus = await isUserBlocked(data.user.id)
+        if (blockedStatus) {
+          console.log("Blocked user attempted to access dashboard:", data.user.email)
+          // Force sign out
+          await supabase.auth.signOut()
+          // Redirect to blocked page with reason
+          router.push(`/blocked?reason=${blockedStatus.reason_type || 'other'}`)
           return
         }
 

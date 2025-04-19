@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useMobile } from "@/hooks/use-mobile"
+import { isUserBlocked } from "@/lib/blocked-users"
 
 interface User {
   id: string
@@ -17,8 +18,21 @@ interface ProfileDropdownProps {
 
 export function ProfileDropdown({ user }: ProfileDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [isBlocked, setIsBlocked] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const isMobile = useMobile()
+
+  // Check if user is blocked
+  useEffect(() => {
+    const checkBlockedStatus = async () => {
+      if (user?.id) {
+        const blockedStatus = await isUserBlocked(user.id)
+        setIsBlocked(!!blockedStatus)
+      }
+    }
+    
+    checkBlockedStatus()
+  }, [user?.id])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -74,20 +88,34 @@ export function ProfileDropdown({ user }: ProfileDropdownProps) {
                 <p className="text-xs opacity-75 truncate">{user.email}</p>
               </div>
             )}
-            <Link
-              href="/dashboard"
-              className="block px-4 py-2 text-sm text-black hover:bg-primary hover:text-white transition-colors"
-              onClick={() => setIsOpen(false)}
-            >
-              Panel de Socio
-            </Link>
-            <Link
-              href="/dashboard/settings"
-              className="block px-4 py-2 text-sm text-black hover:bg-primary hover:text-white transition-colors"
-              onClick={() => setIsOpen(false)}
-            >
-              Configuración
-            </Link>
+            
+            {isBlocked ? (
+              <Link
+                href="/blocked"
+                className="block px-4 py-2 text-sm text-red-600 hover:bg-primary hover:text-white transition-colors"
+                onClick={() => setIsOpen(false)}
+              >
+                Cuenta Bloqueada
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/dashboard"
+                  className="block px-4 py-2 text-sm text-black hover:bg-primary hover:text-white transition-colors"
+                  onClick={() => setIsOpen(false)}
+                >
+                  Panel de Socio
+                </Link>
+                <Link
+                  href="/dashboard/settings"
+                  className="block px-4 py-2 text-sm text-black hover:bg-primary hover:text-white transition-colors"
+                  onClick={() => setIsOpen(false)}
+                >
+                  Configuración
+                </Link>
+              </>
+            )}
+            
             <Link
               href="/dashboard/logout"
               className="block px-4 py-2 text-sm text-red-600 hover:bg-primary hover:text-red-300 transition-colors"

@@ -1,5 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
+import { cookies } from "next/headers"
+import { isUserBlockedSSR } from "@/lib/blocked-users"
 
 // Paths that should be accessible even in maintenance mode
 const ALLOWED_PATHS = [
@@ -21,7 +23,8 @@ const PUBLIC_PATHS = [
   '/reset-password',
   '/api',
   '/_next',
-  '/favicon.ico'
+  '/favicon.ico',
+  '/blocked', // Allow access to blocked page
 ]
 
 export async function middleware(request: NextRequest) {
@@ -34,6 +37,7 @@ export async function middleware(request: NextRequest) {
   // Check if the current path should be public
   const currentPath = request.nextUrl.pathname
   const isPublicPath = PUBLIC_PATHS.some(path => currentPath.startsWith(path))
+  const isBlockedPage = currentPath === "/blocked"
 
   // Check for /complete-profile access without checkout session ID
   if (request.nextUrl.pathname === "/complete-profile") {
@@ -58,28 +62,77 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll().map((cookie) => ({
-            name: cookie.name,
-            value: cookie.value,
-          }))
+        get(name) {
+          return request.cookies.get(name)?.value
         },
-        setAll(cookieOptions) {
-          cookieOptions.forEach(({ name, value, ...options }) => {
-            response.cookies.set({
-              name,
-              value,
-              ...options,
-            })
+        set(name, value, options) {
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          })
+        },
+        remove(name, options) {
+          response.cookies.set({
+            name,
+            value: "",
+            ...options,
+            maxAge: 0,
           })
         },
       },
-    },
+    }
   )
 
   // Refresh session if expired - required for Server Components
   const { data: authData } = await supabase.auth.getUser()
   const authUser = authData?.user || null
+
+  // Check if user is blocked (if authenticated) and trying to access any non-blocked pages
+  if (authUser && !isBlockedPage) {
+    try {
+      // Check if user is in blocked_users table
+      const { data: blockedUser, error: blockError } = await supabase
+        .from("blocked_users")
+        .select("*")
+        .eq("user_id", authUser.id)
+        .single()
+      
+      if (!blockError && blockedUser) {
+        console.log("Blocked user attempt to access site:", authUser.email)
+        
+        // User is blocked, create URL with reason type as a parameter
+        const blockedUrl = new URL('/blocked', request.url)
+        if (blockedUser.reason_type) {
+          blockedUrl.searchParams.append('reason', blockedUser.reason_type)
+        }
+        
+        // Force sign out the user
+        const { error: signOutError } = await supabase.auth.signOut()
+        if (signOutError) console.error("Error signing out blocked user:", signOutError)
+        
+        // Clear all auth cookies explicitly
+        response.cookies.delete("sb-access-token")
+        response.cookies.delete("sb-refresh-token")
+        response.cookies.delete("supabase-auth-token")
+        
+        return NextResponse.redirect(blockedUrl, {
+          // Using 307 Temporary Redirect to maintain the HTTP method
+          status: 307,
+          headers: {
+            'Set-Cookie': [
+              'sb-access-token=; Path=/; Max-Age=0; HttpOnly',
+              'sb-refresh-token=; Path=/; Max-Age=0; HttpOnly',
+              'supabase-auth-token=; Path=/; Max-Age=0; HttpOnly'
+            ].join(', ')
+          }
+        })
+      }
+    } catch (error) {
+      console.error("Error checking if user is blocked:", error)
+      // Continue with normal flow in case of error
+    }
+  }
 
   // Check for maintenance mode
   try {

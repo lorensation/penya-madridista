@@ -5,6 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { signIn } from "@/lib/supabase"
+import { isUserBlocked } from "@/lib/blocked-users"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -28,10 +29,21 @@ export function LoginForm() {
     setSuccess(false)
 
     try {
-      const { error } = await signIn(email, password) // Using the unified function
+      const { error, data } = await signIn(email, password) // Using the unified function
 
       if (error) {
         throw error
+      }
+
+      // Check if user is blocked
+      if (data?.user) {
+        const blockedStatus = await isUserBlocked(data.user.id)
+        
+        if (blockedStatus) {
+          // User is blocked, redirect to blocked page with reason
+          router.push(`/blocked?reason=${blockedStatus.reason_type || 'other'}`)
+          return
+        }
       }
 
       // Set success state before redirecting
