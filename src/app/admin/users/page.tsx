@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select"
 import { blockUser, unblockUser, isUserBlocked, BlockedUser, BlockReasonType, getBlockedUsers } from "@/lib/blocked-users"
 import { useToast } from "@/components/ui/use-toast"
+import { makeAuthUserMember } from "@/app/actions/admin-members"
 
 // Add route segment config to mark this route as dynamic
 export const dynamic = 'force-dynamic'
@@ -437,6 +438,40 @@ export default function AdminUsersPage() {
     }
   };
 
+  // Handle making a user a member
+  const handleMakeUserMember = async (userId: string, email: string) => {
+    try {
+      // Show loading state
+      toast({
+        title: "Enviando invitación...",
+        description: "Estamos enviando una invitación al usuario para ser miembro.",
+      });
+
+      const result = await makeAuthUserMember(userId, email);
+      
+      if (result.success) {
+        toast({
+          title: "Invitación enviada",
+          description: "Se ha enviado una invitación al usuario para completar su perfil de miembro.",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Ha ocurrido un error al enviar la invitación.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error making user a member:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Ha ocurrido un error al enviar la invitación.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Show loading state while checking authentication
   if (authChecking) {
     return (
@@ -754,7 +789,7 @@ export default function AdminUsersPage() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => window.alert('Funcionalidad en desarrollo')}>
+                                  <DropdownMenuItem onClick={() => handleMakeUserMember(user.id, user.email || '')}>
                                     <Mail className="h-4 w-4 mr-2" />
                                     Hacer Miembro
                                   </DropdownMenuItem>

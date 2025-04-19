@@ -108,9 +108,12 @@ function CompleteProfileContent() {
   const [authError, setAuthError] = useState<boolean>(false)
   const [missingSessionId, setMissingSessionId] = useState<boolean>(!sessionId)
 
+  // Update the useEffect to handle admin invites
   useEffect(() => {
-    // If there's no session_id, we shouldn't be on this page
-    if (!sessionId) {
+    // If there's no session_id or admin_invite, we shouldn't be on this page
+    const adminInviteToken = searchParams.get("admin_invite")
+    
+    if (!sessionId && !adminInviteToken) {
       setLoading(false)
       setMissingSessionId(true)
       return
@@ -138,7 +141,56 @@ function CompleteProfileContent() {
 
         const currentUserId = userData.user.id
 
-        // If there's a session_id, verify the checkout session
+        // If there's an admin invite token, validate it
+        if (adminInviteToken) {
+          try {
+            const { data: inviteData, error: inviteError } = await supabase
+              .from("member_invites")
+              .select("*")
+              .eq("token", adminInviteToken)
+              .eq("user_id", currentUserId)
+              .single()
+
+            if (inviteError || !inviteData) {
+              console.error("Invite validation error:", inviteError)
+              setError("Invitación no válida o expirada.")
+              setLoading(false)
+              return
+            }
+
+            // Check if the invitation has expired
+            const expiryDate = new Date(inviteData.expires_at)
+            if (expiryDate < new Date()) {
+              console.error("Invite expired")
+              setError("La invitación ha expirado.")
+              setLoading(false)
+              return
+            }
+
+            // Set the admin invite data to use when creating the member profile
+            setCheckoutData({
+              id: "admin_invite",
+              status: "complete",
+              customer_id: null,
+              subscription_id: null,
+              payment_status: "free",
+              subscription_status: "active",
+              plan_type: "infinite",
+              payment_type: "infinite",
+              last_four: null,
+            })
+
+            setLoading(false)
+            return
+          } catch (inviteValidationError) {
+            console.error("Error validating invite:", inviteValidationError)
+            setError("Error al validar la invitación.")
+            setLoading(false)
+            return
+          }
+        }
+
+        // If there's a session_id, verify the checkout session - existing code remains unchanged
         if (sessionId) {
           try {
             const response = await fetch("/api/verify-checkout-session", {
@@ -232,7 +284,7 @@ function CompleteProfileContent() {
     }
 
     initializeProfileForm()
-  }, [router, sessionId, userId])
+  }, [router, sessionId, userId, searchParams])
 
   const handleProfileSubmit = async (formData: ProfileFormValues) => {
     try {
