@@ -7,6 +7,8 @@ import Footer from "@/components/footer"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/context/AuthContext"
 import { Toaster } from "@/components/ui/use-toast"
+import CookieConsent from '@/components/cookie-consent'
+import AnalyticsProvider from '@/components/analytics-provider'
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -22,14 +24,21 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="es">
-      <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+    <html lang="es" suppressHydrationWarning>
+      <body className={inter.className} suppressHydrationWarning>
+        <ThemeProvider 
+          attribute="class" 
+          defaultTheme="light" 
+          enableSystem 
+          disableTransitionOnChange
+        >
           <AuthProvider>
             <Header />
             <main className="min-h-screen">{children}</main>
             <Footer />
             <Toaster />
+            <CookieConsent />
+            <AnalyticsProvider />
           </AuthProvider>
         </ThemeProvider>
       </body>

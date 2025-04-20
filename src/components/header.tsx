@@ -160,7 +160,7 @@ export function Header() {
           ) : user ? (
             <ProfileDropdown user={user} />
           ) : (
-            <Button asChild>
+            <Button className="hover:bg-white hover:text-black hover:border hover:border-black transition-all" asChild>
               <Link href="/login">Iniciar Sesión</Link>
             </Button>
           )}

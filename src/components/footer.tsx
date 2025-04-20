@@ -11,9 +11,9 @@ export default function Footer() {
               <Image
                 src="/logo.jpg"
                 alt="Peña Lorenzo Sanz Logo"
-                width={120}
-                height={120}
-                className="rounded-md width:auto height:auto"
+                width={100}
+                height={100}
+                className="rounded-md w-auto h-auto"
               />
             </div>
             <h3 className="text-xl font-bold mb-4">Peña Lorenzo Sanz</h3>

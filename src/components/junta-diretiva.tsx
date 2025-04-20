@@ -32,12 +32,12 @@ export default function JuntaDirectiva() {
       id: 2,
       name: "Joaquín Napoleón Calderón Barrios",
       title: "Vicepresidente",
-      description: "Apoya la dirección estratégica y representa a la peña en eventos oficiales.",
+      description: "Apoya la dirección estratégica y representa a la peña en eventos.",
       image: "/vicepresidente2.jpg",
     },
     {
       id: 3,
-      name: "Luis Yañez Sanz",
+      name: "Luis Yáñez Sanz",
       title: "Secretario",
       description: "Responsable de la documentación oficial y comunicaciones de la peña.",
       image: "/secretario.jpg",
@@ -152,12 +152,13 @@ export default function JuntaDirectiva() {
                 style={{ flex: `0 0 ${100 / visibleCards}%` }}
               >
                 <Card className="h-full transform transition-all duration-300 hover:scale-105 overflow-hidden">
-                  <CardContent className="p-6 flex flex-col items-center">
+                  <CardContent className="p-6 flex flex-col items-center h-full">
                     <div className="relative w-32 h-32 rounded-full overflow-hidden mb-4 border-2 border-primary">
                       <Image 
                         src={member.image} 
                         alt={member.name}
                         fill
+                        sizes="(max-width: 768px) 128px, 128px"
                         className="object-cover"
                         onError={(e) => {
                           // Fallback for missing images
@@ -166,11 +167,15 @@ export default function JuntaDirectiva() {
                         }}
                       />
                     </div>
-                    <h3 className="text-xl font-semibold text-center">{member.name}</h3>
-                    <div className="bg-primary text-white px-3 py-1 rounded-full text-sm mb-3 mt-1">
-                      {member.title}
+                    <div className="flex flex-col items-center flex-grow justify-between">
+                      <div className="flex flex-col items-center">
+                        <h3 className="text-xl font-semibold text-center mb-2">{member.name}</h3>
+                        <div className="bg-primary text-white px-3 py-1 rounded-full text-sm mb-4">
+                          {member.title}
+                        </div>
+                      </div>
+                      <p className="text-center text-gray-600">{member.description}</p>
                     </div>
-                    <p className="text-center text-gray-600">{member.description}</p>
                   </CardContent>
                 </Card>
               </div>
