@@ -33,7 +33,7 @@ type SubscriptionResponse = {
 
 // Define plan types
 export type PlanType = 'under25' | 'over25' | 'family';
-export type PaymentType = 'monthly' | 'annual';
+export type PaymentType = 'monthly' | 'annual' | 'decade';
 
 // Map price IDs to plan types and payment types
 const priceIdToPlanMap: Record<string, { planType: PlanType, paymentType: PaymentType }> = {

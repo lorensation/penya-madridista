@@ -101,17 +101,21 @@ function CompleteProfileContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get("session_id")
   const userId = searchParams.get("userId")
+  // Get the adminInviteToken parameter
+  const adminInviteToken = searchParams.get("admin_invite")
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [checkoutData, setCheckoutData] = useState<CheckoutSessionData | null>(null)
   const [authError, setAuthError] = useState<boolean>(false)
-  const [missingSessionId, setMissingSessionId] = useState<boolean>(!sessionId)
+
+  // Fix the condition that checks for missing parameters
+  // Set missingSessionId to true only if BOTH session_id and admin_invite are missing
+  const [missingSessionId, setMissingSessionId] = useState<boolean>(!sessionId && !adminInviteToken)
 
   // Update the useEffect to handle admin invites
   useEffect(() => {
     // If there's no session_id or admin_invite, we shouldn't be on this page
-    const adminInviteToken = searchParams.get("admin_invite")
     
     if (!sessionId && !adminInviteToken) {
       setLoading(false)
@@ -176,7 +180,7 @@ function CompleteProfileContent() {
               payment_status: "free",
               subscription_status: "active",
               plan_type: "infinite",
-              payment_type: "infinite",
+              payment_type: "decade",
               last_four: null,
             })
 
@@ -284,7 +288,7 @@ function CompleteProfileContent() {
     }
 
     initializeProfileForm()
-  }, [router, sessionId, userId, searchParams])
+  }, [router, sessionId, userId, searchParams, adminInviteToken])
 
   const handleProfileSubmit = async (formData: ProfileFormValues) => {
     try {
@@ -375,6 +379,8 @@ function CompleteProfileContent() {
         
         if (checkoutData.payment_type === 'annual') {
           endDate.setFullYear(endDate.getFullYear() + 1)
+        } else if (checkoutData.payment_type === 'decade') {
+          endDate.setFullYear(endDate.getFullYear() + 10)
         } else {
           endDate.setMonth(endDate.getMonth() + 1)
         }
@@ -448,6 +454,14 @@ function CompleteProfileContent() {
   }
 
   if (authError) {
+    // Get the admin invite token if it exists
+    const adminInviteToken = searchParams.get("admin_invite")
+    
+    // Create return URL that will include the admin_invite parameter if it exists
+    const returnUrl = adminInviteToken 
+      ? `/complete-profile?admin_invite=${adminInviteToken}` 
+      : `/complete-profile?session_id=${sessionId || ""}&userId=${userId || ""}`
+    
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
@@ -466,10 +480,11 @@ function CompleteProfileContent() {
           <Button
             onClick={() =>
               router.push(
-                `/login?returnUrl=${encodeURIComponent(`/complete-profile?session_id=${sessionId || ""}&userId=${userId || ""}`)}`,
+                `/login?returnUrl=${encodeURIComponent(returnUrl)}`
               )
             }
-            className="mt-6 w-full"
+            className="mt-6 w-full hover:bg-white hover:text-primary hover:border hover:border-black"
+            disabled={loading}
           >
             Iniciar Sesión
           </Button>
@@ -496,7 +511,7 @@ function CompleteProfileContent() {
           <p className="mt-2 text-center text-sm text-gray-600">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-6 w-full bg-primary text-white py-2 px-4 rounded hover:bg-secondary"
+            className="mt-6 w-full bg-primary text-white py-2 px-4 rounded hover:bg-white hover:text-black hover:border hover:border-black transition-all"
           >
             Intentar de nuevo
           </button>

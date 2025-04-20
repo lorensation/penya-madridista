@@ -3,7 +3,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { PostgrestError } from "@supabase/supabase-js"
 
 export type PlanType = 'under25' | 'over25' | 'family';
-export type PaymentType = 'monthly' | 'annual';
+export type PaymentType = 'monthly' | 'annual' | 'decade';
 export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'unpaid' | 'incomplete';
 
 export interface Subscription {
@@ -152,7 +152,8 @@ export const subscriptionService = {
     // Get payment type name
     const paymentTypeNames: Record<PaymentType, string> = {
       'monthly': 'Mensual',
-      'annual': 'Anual'
+      'annual': 'Anual',
+      'decade': 'Década'
     }
     
     return {
@@ -230,11 +231,19 @@ export const serverSubscriptionService = {
     try {
       const supabase = createServerSupabaseClient()
       
+      // Ensure payment type is valid - normalize to one of the allowed values
+      const normalizedPaymentType: PaymentType = 
+        paymentType === 'annual' ? 'annual' : 
+        paymentType === 'decade' ? 'decade' : 'monthly'
+      
       // Calculate end date based on payment type
       const startDate = new Date()
       const endDate = new Date()
       
-      if (paymentType === 'annual') {
+      if (normalizedPaymentType === 'decade') {
+        // Set end date to 10 years from start date for decade payment type
+        endDate.setFullYear(endDate.getFullYear() + 10)
+      } else if (normalizedPaymentType === 'annual') {
         endDate.setFullYear(endDate.getFullYear() + 1)
       } else {
         endDate.setMonth(endDate.getMonth() + 1)
@@ -245,7 +254,7 @@ export const serverSubscriptionService = {
         .insert({
           member_id: userId,
           plan_type: planType,
-          payment_type: paymentType,
+          payment_type: normalizedPaymentType,
           status: 'active',
           start_date: startDate.toISOString(),
           end_date: endDate.toISOString(),

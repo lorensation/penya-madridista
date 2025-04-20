@@ -169,13 +169,20 @@ function SuccessContent() {
           }
 
           // Create subscription record in the new subscriptions table
-          const paymentType = apiCheckoutData.metadata?.payment_type || "monthly"
+          // Ensure payment_type is exactly one of the allowed values, normalizing the input
+          let paymentType = apiCheckoutData.metadata?.payment_type?.toLowerCase() || "monthly"
+          // Force payment_type to be only one of the allowed values
+          paymentType = paymentType === 'annual' ? 'annual' : 
+                       paymentType === 'decade' ? 'decade' : 'monthly'
           
           // Calculate end date based on payment type
           const startDate = new Date()
           const endDate = new Date()
           
-          if (paymentType === 'annual') {
+          if (paymentType === 'decade') {
+            // Set end date to 10 years from start date for decade payment type
+            endDate.setFullYear(endDate.getFullYear() + 10)
+          } else if (paymentType === 'annual') {
             endDate.setFullYear(endDate.getFullYear() + 1)
           } else {
             endDate.setMonth(endDate.getMonth() + 1)
@@ -209,7 +216,10 @@ function SuccessContent() {
         console.log("Checkout session data found:", checkoutData)
 
         // Determine payment type (monthly/annual) from metadata or default to monthly
-        const paymentType = checkoutData.metadata?.payment_type || "monthly"
+        let paymentType = checkoutData.metadata?.payment_type?.toLowerCase() || "monthly"
+        // Force payment_type to be only either 'monthly' or 'annual'
+        paymentType = paymentType === 'annual' ? 'annual' : 
+                     paymentType === 'decade' ? 'decade' : 'monthly'
 
         // Member profile exists, update it with subscription details
         const { error: updateError } = await supabase
@@ -247,7 +257,10 @@ function SuccessContent() {
         const startDate = new Date()
         const endDate = new Date()
         
-        if (paymentType === 'annual') {
+        if (paymentType === 'decade') {
+          // Set end date to 10 years from start date for decade payment type
+          endDate.setFullYear(endDate.getFullYear() + 10)
+        } else if (paymentType === 'annual') {
           endDate.setFullYear(endDate.getFullYear() + 1)
         } else {
           endDate.setMonth(endDate.getMonth() + 1)
@@ -327,8 +340,9 @@ function SuccessContent() {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-gray-600">Procesando tu suscripción...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto">
+            <p className="mt-4 text-gray-600">Procesando tu suscripción...</p>
+          </div>
         </div>
       </div>
     )

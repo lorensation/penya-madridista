@@ -118,7 +118,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           
           // Try to determine payment type from price recurring interval
           if (price.recurring && price.recurring.interval) {
-            paymentType = price.recurring.interval === 'year' ? 'annual' : 'monthly';
+            paymentType = price.recurring.interval === 'year' ? 'annual' : 
+                          price.recurring.interval_count && price.recurring.interval_count >= 10 ? 'decade' : 'monthly';
           }
           
           priceId = lineItems.data[0].price.id
@@ -229,6 +230,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       
       if (paymentType === 'annual') {
         endDate.setFullYear(endDate.getFullYear() + 1)
+      } else if (paymentType === 'decade') {
+        endDate.setFullYear(endDate.getFullYear() + 10)
       } else {
         endDate.setMonth(endDate.getMonth() + 1)
       }

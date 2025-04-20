@@ -404,7 +404,11 @@ export function ProfileForm({ onSubmit, initialData }: ProfileFormProps) {
           />
         </div>
         
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
+        <Button 
+          type="submit" 
+          className="w-full transition-all hover:bg-white hover:text-black hover:border hover:border-black" 
+          disabled={isSubmitting}
+          >
           {isSubmitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

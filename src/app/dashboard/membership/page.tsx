@@ -207,7 +207,7 @@ export default function MembershipPage() {
   }
 
   // Fallback UI when no membership data is available or subscription is inactive
-  if (!membership || !membership.subscription_id || membership.subscription_status === "inactive") {
+  if (!membership || membership.subscription_status === "inactive") {
     return (
       <div className="space-y-6 p-6 md:p-8">
         <div className="text-center">
