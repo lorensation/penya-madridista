@@ -3,10 +3,14 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import JuntaDirectiva from "@/components/junta-diretiva"
 import NewsletterForm from "@/components/newsletter-form"
+import PetitionPopup from "@/components/petition-popup"
 
 export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">
+      {/* Petition Popup */}
+      <PetitionPopup />
+    
       {/* Hero Section */}
       <section className="relative bg-gradient-to-r from-primary to-secondary py-20 text-white">
         <div className="container mx-auto px-4 py-12 md:py-24">

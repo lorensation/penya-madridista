@@ -113,7 +113,7 @@ export function Header() {
         <nav className="hidden md:flex md:items-center md:gap-6">
           <Link
             href="/"
-            className={`text-sm font-medium transition-colors hover:text-primary ${
+            className={`text-sm font-medium transition-colors hover:text-primary hover:text-underline ${
               isActive("/") ? "text-primary" : "text-gray-600"
             }`}
           >
@@ -121,7 +121,7 @@ export function Header() {
           </Link>
           <Link
             href="/about"
-            className={`text-sm font-medium transition-colors hover:text-primary ${
+            className={`text-sm font-medium transition-colors hover:text-primary hover:text-underline ${
               isActive("/about") ? "text-primary" : "text-gray-600"
             }`}
           >
@@ -129,7 +129,7 @@ export function Header() {
           </Link>
           <Link
             href="/blog"
-            className={`text-sm font-medium transition-colors hover:text-primary ${
+            className={`text-sm font-medium transition-colors hover:text-primary hover:text-underline ${
               isActive("/blog") ? "text-primary" : "text-gray-600"
             }`}
           >
@@ -137,7 +137,7 @@ export function Header() {
           </Link>
           <Link
             href="/membership"
-            className={`text-sm font-medium transition-colors hover:text-primary ${
+            className={`text-sm font-medium transition-colors hover:text-primary hover:text-underline ${
               isActive("/membership") ? "text-primary" : "text-gray-600"
             }`}
           >
@@ -145,7 +145,7 @@ export function Header() {
           </Link>
           <Link
             href="/contact"
-            className={`text-sm font-medium transition-colors hover:text-primary ${
+            className={`text-sm font-medium transition-colors hover:text-primary hover:text-underline ${
               isActive("/contact") ? "text-primary" : "text-gray-600"
             }`}
           >

@@ -52,7 +52,7 @@ export default function Footer() {
           <div>
             <h3 className="text-xl font-bold mb-4">Contacto</h3>
             <p>Email: info@lorenzosanz.com</p>
-            <a href="https://wa.me/34679240500"><p>Teléfono: +34 XXX XXX XXX</p></a>
+            <a href="https://wa.me/34679240500" className="hover:underline"><p>Escríbenos por Whatsapp aquí</p></a>
             <div className="flex space-x-4 mt-4">
               <a href="#" className="text-white hover:text-accent">
                 <span className="sr-only">Twitter</span>

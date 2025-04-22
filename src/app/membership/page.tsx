@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Calendar, CreditCard } from "lucide-react"
+import { CheckCircle, Calendar, CreditCard, Award, BadgeCheck, Gift } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import type { User } from "@supabase/supabase-js"
@@ -104,17 +104,43 @@ const membershipPlans = [
 export default function Membership() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
+  const [isMember, setIsMember] = useState<boolean>(false)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
   const [selectedPaymentOption, setSelectedPaymentOption] = useState<string | null>(null)
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data } = await supabase.auth.getUser()
-      setUser(data.user)
+    const checkUserAndMembership = async () => {
+      try {
+        setIsLoading(true)
+        // Get the current user
+        const { data: userData } = await supabase.auth.getUser()
+        setUser(userData.user)
+
+        // If user is logged in, check if they are a member
+        if (userData.user) {
+          const { data: memberData, error: memberError } = await supabase
+            .from('users')
+            .select('is_member')
+            .eq('id', userData.user.id)
+            .single()
+
+          if (memberError) {
+            console.error('Error checking membership status:', memberError)
+          } else if (memberData) {
+            setIsMember(memberData.is_member)
+          }
+        }
+      } catch (err) {
+        console.error('Error checking user status:', err)
+        setError('Error checking membership status')
+      } finally {
+        setIsLoading(false)
+      }
     }
 
-    checkUser()
+    checkUserAndMembership()
   }, [])
 
   const handleSelectPlan = (planId: string) => {
@@ -151,6 +177,73 @@ export default function Membership() {
     window.location.href = paymentOption.checkoutUrl
   }
 
+  // Render loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 md:py-24">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-gray-600">Cargando información de membresía...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Render member UI if user is already a member
+  if (isMember) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12 md:py-24 border-gray-500">
+        <div className="container mx-auto px-4">
+          <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-8">
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+                <BadgeCheck className="h-8 w-8 text-green-600" />
+              </div>
+              <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">¡Gracias por ser Socio!</h1>
+              <p className="text-lg text-gray-600">
+                Eres un miembro activo de la Peña Lorenzo Sanz.
+              </p>
+            </div>
+            
+            <div className="bg-gray-50 rounded-lg p-6 mb-8">
+              <h2 className="text-xl font-bold text-primary mb-4">Beneficios de tu membresía</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-start">
+                  <Award className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
+                  <span>Acceso a eventos exclusivos organizados por la peña</span>
+                </div>
+                <div className="flex items-start">
+                  <Gift className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
+                  <span>Descuentos en viajes organizados para ver partidos</span>
+                </div>
+                <div className="flex items-start">
+                  <CheckCircle className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
+                  <span>Participación en sorteos y promociones exclusivas</span>
+                </div>
+                <div className="flex items-start">
+                  <CheckCircle className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
+                  <span>Acceso al contenido exclusivo en nuestra web</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="text-center">
+              <p className="mb-6 text-gray-600">
+                Gestiona tu membresía, actualiza tus datos o consulta información sobre renovación.
+              </p>
+              <Link href="/dashboard/membership">
+                <Button size="lg" className="px-6 py-5 text-lg hover:bg-white hover:text-black hover:border hover:border-black">
+                  Gestionar mi membresía
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Original non-member UI
   return (
     <div className="min-h-screen bg-gray-50 py-12 md:py-24">
       <div className="container mx-auto px-4">
@@ -166,7 +259,8 @@ export default function Membership() {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-
+        
+        {/* Rest of the original UI */}
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {membershipPlans.map((plan) => (
@@ -269,7 +363,7 @@ export default function Membership() {
               Estamos aquí para ayudarte. Contáctanos para obtener más información sobre los beneficios de ser socio.
             </p>
             <Link href="/contact">
-              <Button variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white">
+              <Button variant="outline" className="transition-colors duration-300 bg-black text-white hover:bg-white hover:text-black hover:border hover:border-black">
                 Contactar
               </Button>
             </Link>

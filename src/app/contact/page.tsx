@@ -97,8 +97,7 @@ export default function Contact() {
                   <div className="flex items-start">
                     <Phone className="h-5 w-5 text-primary mr-3 mt-0.5" />
                     <div>
-                      <p className="font-medium">Teléfono</p>
-                      <a href="https://wa.me/34679240500"><p className="text-gray-600 hover:underline">+34 XXX XXX XXX</p></a>
+                      <a href="https://wa.me/34679240500"><p className="font-medium hover:underline">Whatsapp</p></a>
                     </div>
                   </div>
                   <div className="flex items-start">
