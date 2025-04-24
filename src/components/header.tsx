@@ -84,33 +84,17 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white">
-      <div className="container flex h-16 items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="container flex h-16 items-center justify-between px-4 w-full max-w-full">
+        {/* Logo - always on the left */}
+        <div className="flex-shrink-0">
           <Link href="/" className="flex items-center gap-2">
             <Image src="/logo.jpg" alt="Peña Lorenzo Sanz Logo" width={40} height={40} className="rounded-full" />
             <span className="hidden font-bold sm:inline-block">Peña Lorenzo Sanz</span>
           </Link>
         </div>
 
-        {/* Mobile menu button */}
-        <button
-          className="block rounded p-2 md:hidden"
-          onClick={toggleMenu}
-          aria-expanded={isMenuOpen}
-          aria-controls="mobile-menu"
-        >
-          <span className="sr-only">Abrir menú</span>
-          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            {isMenuOpen ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            )}
-          </svg>
-        </button>
-
-        {/* Desktop navigation */}
-        <nav className="hidden md:flex md:items-center md:gap-6">
+        {/* Desktop navigation - centered */}
+        <nav className="hidden md:flex md:items-center md:justify-center md:gap-6 flex-1 mx-auto">
           <Link
             href="/"
             className={`text-sm font-medium transition-colors hover:text-primary hover:text-underline ${
@@ -153,17 +137,44 @@ export function Header() {
           </Link>
         </nav>
 
-        {/* Login/Profile button */}
-        <div className="hidden md:block">
-          {loading ? (
-            <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
-          ) : user ? (
-            <ProfileDropdown user={user} />
-          ) : (
-            <Button className="hover:bg-white hover:text-black hover:border hover:border-black transition-all" asChild>
-              <Link href="/login">Iniciar Sesión</Link>
-            </Button>
-          )}
+        {/* Right side with profile/login and mobile menu button */}
+        <div className="flex items-center flex-shrink-0">
+          {/* Login/Profile button - always on the right */}
+          <div className="hidden md:block">
+            {loading ? (
+              <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
+            ) : user ? (
+              <ProfileDropdown user={user} />
+            ) : (
+              <Button className="hover:bg-white hover:text-black hover:border hover:border-black transition-all" asChild>
+                <Link href="/login">Iniciar Sesión</Link>
+              </Button>
+            )}
+          </div>
+
+          {/* Mobile login/profile button */}
+          <div className="block md:hidden mr-2">
+            {!loading && user && (
+              <ProfileDropdown user={user} />
+            )}
+          </div>
+
+          {/* Mobile menu button - on the right */}
+          <button
+            className="block rounded p-2 md:hidden"
+            onClick={toggleMenu}
+            aria-expanded={isMenuOpen}
+            aria-controls="mobile-menu"
+          >
+            <span className="sr-only">Abrir menú</span>
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {isMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
         </div>
 
         {/* Mobile navigation */}
@@ -215,31 +226,32 @@ export function Header() {
               >
                 Contacto
               </Link>
-              {!loading && (
+              {!loading && !user && (
                 <div className="pt-2">
-                  {user ? (
-                    <div className="flex flex-col space-y-2">
-                      <Link href="/dashboard" className="text-sm font-medium text-black hover:bg-black hover:text-white" onClick={closeMenu}>
-                        Panel de Socio
-                      </Link>
-                      <Link
-                        href="/dashboard/settings"
-                        className="text-sm font-medium text-black hover:bg-black hover:text-white"
-                        onClick={closeMenu}
-                      >
-                        Configuración
-                      </Link>
-                      <Link href="/dashboard/logout" className="text-sm font-medium text-red-600" onClick={closeMenu}>
-                        Cerrar Sesión
-                      </Link>
-                    </div>
-                  ) : (
-                    <Button asChild className="w-full">
-                      <Link href="/login" onClick={closeMenu}>
-                        Iniciar Sesión
-                      </Link>
-                    </Button>
-                  )}
+                  <Button asChild className="w-full">
+                    <Link href="/login" onClick={closeMenu}>
+                      Iniciar Sesión
+                    </Link>
+                  </Button>
+                </div>
+              )}
+              {!loading && user && (
+                <div className="pt-2">
+                  <div className="flex flex-col space-y-2">
+                    <Link href="/dashboard" className="text-sm font-medium text-black hover:bg-black hover:text-white" onClick={closeMenu}>
+                      Panel de Socio
+                    </Link>
+                    <Link
+                      href="/dashboard/settings"
+                      className="text-sm font-medium text-black hover:bg-black hover:text-white"
+                      onClick={closeMenu}
+                    >
+                      Configuración
+                    </Link>
+                    <Link href="/dashboard/logout" className="text-sm font-medium text-red-600" onClick={closeMenu}>
+                      Cerrar Sesión
+                    </Link>
+                  </div>
                 </div>
               )}
             </nav>

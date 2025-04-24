@@ -446,7 +446,7 @@ export default function CookieConsent() {
       {isMounted && hasConsentSaved && (
         <button
           onClick={openCookieSettings}
-          className="fixed bottom-4 left-4 z-10 p-2 bg-white dark:bg-gray-800 rounded-full shadow-md hover:shadow-lg transition-shadow"
+          className="fixed bottom-4 left-4 z-10 p-2 bg-white dark:bg-gray-800 rounded-full shadow-md hover:shadow-lg transition-shadow hidden md:block"
           aria-label="Configurar cookies"
         >
           <svg 

@@ -1,6 +1,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import Presidente from "@/components/presidente"
 
 export default function About() {
   return (
@@ -17,7 +18,13 @@ export default function About() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center mb-16">
             <div className="relative h-96 rounded-lg overflow-hidden shadow-xl">
-              <Image src="/copa-fernandosanz-a-hombros.jpg" alt="Lorenzo Sanz" fill className="object-cover" />
+              <Image 
+                src="/copa-fernandosanz-a-hombros.jpg" 
+                alt="Lorenzo Sanz" 
+                fill 
+                sizes="(max-width: 768px) 100vw, 50vw" 
+                className="object-cover" 
+              />
             </div>
             <div className="space-y-6">
               <h2 className="text-2xl md:text-3xl font-bold text-primary">Nuestra Historia</h2>
@@ -36,6 +43,9 @@ export default function About() {
               </p>
             </div>
           </div>
+
+          {/* Presidente section */}
+          <Presidente />
 
           <div className="bg-white rounded-lg shadow-md p-8 mb-16">
             <h2 className="text-2xl md:text-3xl font-bold text-primary mb-6 text-center">Nuestra Misión</h2>
@@ -114,6 +124,7 @@ export default function About() {
                 src="/padre-hijo-rueda-prensa.jpg"
                 alt="Eventos de la Peña"
                 fill
+                sizes="(max-width: 768px) 100vw, 50vw"
                 className="object-cover"
               />
             </div>
