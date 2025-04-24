@@ -27,16 +27,26 @@ interface ContentItem {
 const exclusiveContent: ContentItem[] = [
   {
     id: 1,
-    title: "Entrevista exclusiva con Fernando Sanz",
-    description: "Fernando Sanz nos habla sobre el legado de su padre y comparte anécdotas nunca antes contadas.",
-    type: "video",
-    date: "2023-11-10",
-    duration: "45 min",
-    thumbnail: "/fernandosanz-charla.jpg",
-    url: "https://youtu.be/7hREq-thSEU?si=_ctHiXIRb-5Fso56"
+    title: "Colección de fotos históricas",
+    description: "Galería de imágenes inéditas de la época de Lorenzo Sanz como presidente del Real Madrid.",
+    type: "gallery",
+    date: "2023-07-12",
+    images: 45,
+    thumbnail: "/lorenzosanz-bufanda.jpg",
+    url: "/content/galleries/fotos-historicas"
   },
   {
     id: 2,
+    title: "Entrevista exclusiva con Lorenzo Sanz",
+    description: "Lorenzo Sanz hijo nos cuenta como su padre revolucionó el ámbito de la gestión deportiva y otros temas.",
+    type: "video",
+    date: "2025-03-08",
+    duration: "100 min",
+    thumbnail: "/LorenzoSanzjr-lagalerna.jpg",
+    url: "https://youtu.be/kp_5s00-ikw?si=s0wTeNYNvxV1ydNy"
+  },
+  {
+    id: 3,
     title: "La Séptima: El camino hacia la gloria",
     description:
       "Documental especial sobre el camino del Real Madrid hacia la Séptima Copa de Europa bajo la presidencia de Lorenzo Sanz.",
@@ -47,7 +57,17 @@ const exclusiveContent: ContentItem[] = [
     url: "https://youtu.be/jBbeZ5s04EI?si=Qdm0-UCOlbNw9XSF"
   },
   {
-    id: 3,
+    id: 4,
+    title: "Entrevista exclusiva con Fernando Sanz",
+    description: "Fernando Sanz nos habla sobre el legado de su padre y comparte anécdotas nunca antes contadas.",
+    type: "video",
+    date: "2023-11-10",
+    duration: "45 min",
+    thumbnail: "/fernandosanz-charla.jpg",
+    url: "https://youtu.be/7hREq-thSEU?si=_ctHiXIRb-5Fso56"
+  },
+  {
+    id: 5,
     title: "Guía de viaje: Santiago Bernabéu",
     description: "Todo lo que necesitas saber para disfrutar al máximo de tu visita al estadio Santiago Bernabéu.",
     type: "pdf",
@@ -57,7 +77,7 @@ const exclusiveContent: ContentItem[] = [
     url: "https://www.esmadrid.com/informacion-turistica/estadio-santiago-bernabeu"
   },
   {
-    id: 4,
+    id: 6,
     title: "Historia ilustrada del Real Madrid",
     description: "Un recorrido visual por la historia del club desde su fundación hasta la actualidad.",
     type: "pdf",
@@ -65,27 +85,7 @@ const exclusiveContent: ContentItem[] = [
     pages: 13,
     thumbnail: "/Logo-Penya-LS.jpg",
     url: "https://kuxnugwdppajyxdoygzy.supabase.co/storage/v1/object/public/pdfs//historia-real-madrid-breve.pdf"
-  },
-  {
-    id: 5,
-    title: "Colección de fotos históricas",
-    description: "Galería de imágenes inéditas de la época de Lorenzo Sanz como presidente del Real Madrid.",
-    type: "gallery",
-    date: "2023-07-12",
-    images: 45,
-    thumbnail: "/lorenzosanz-bufanda.jpg",
-    url: "/content/galleries/fotos-historicas"
-  },
-  {
-    id: 6,
-    title: "Entrevista exclusiva con Lorenzo Sanz",
-    description: "Lorenzo Sanz hijo nos cuenta como su padre revolucionó el ámbito de la gestión deportiva y otros temas.",
-    type: "video",
-    date: "2025-03-08",
-    duration: "100 min",
-    thumbnail: "/LorenzoSanzjr-lagalerna.jpg",
-    url: "https://youtu.be/kp_5s00-ikw?si=s0wTeNYNvxV1ydNy"
-  },
+  }, 
 ]
 
 // Define types for profile
