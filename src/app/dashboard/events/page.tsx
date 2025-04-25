@@ -150,11 +150,13 @@ export default function EventsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {events.map((event) => (
             <Card key={event.id} className="overflow-hidden flex flex-col h-full">
-              <div className="relative h-48">
+              <div className="relative h-48 min-h-[200px] md:h-56 lg:h-64">
                 <Image 
                   src={event.image_url || "/placeholder.svg"} 
                   alt={event.title} 
-                  fill 
+                  fill
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  priority 
                   className="object-cover" 
                 />
               </div>

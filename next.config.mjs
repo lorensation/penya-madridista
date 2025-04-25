@@ -1,6 +1,6 @@
 const nextConfig = {
   images: {
-    domains: ['kuxnugwdppajyxdoygzy.supabase.co'],
+    domains: ['kuxnugwdppajyxdoygzy.supabase.co', 'maps.googleapis.com'],
   },
 };
 

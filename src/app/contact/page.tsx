@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Mail, Phone, MapPin } from "lucide-react"
 import { submitContactForm } from "../actions/contact"
+import { CityManagers } from "@/components/city-managers"
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -97,7 +98,7 @@ export default function Contact() {
                   <div className="flex items-start">
                     <Phone className="h-5 w-5 text-primary mr-3 mt-0.5" />
                     <div>
-                      <a href="https://wa.me/34679240500"><p className="font-medium hover:underline">Whatsapp</p></a>
+                      <a href="https://wa.me/34665652251"><p className="font-medium hover:underline">WhatsApp</p></a>
                     </div>
                   </div>
                   <div className="flex items-start">
@@ -201,6 +202,11 @@ export default function Contact() {
                 </form>
               </div>
             </div>
+          </div>
+          
+          {/* City Managers Section */}
+          <div className="mt-16">
+            <CityManagers />
           </div>
         </div>
       </div>

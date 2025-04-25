@@ -5,6 +5,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { FileText } from "lucide-react"
 import Image from "next/image"
+import { DialogTitle } from "@radix-ui/react-dialog"
 
 export default function PetitionPopup() {
   const [open, setOpen] = useState(false)
@@ -60,12 +61,14 @@ export default function PetitionPopup() {
     <>
       {/* Full popup dialog */}
       <Dialog open={open && !minimized} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden" aria-describedby={undefined}>
+          <DialogTitle className="sr-only">Petición para Calle Lorenzo Sanz</DialogTitle>
           <div className="relative w-full h-40 bg-gradient-to-r from-primary to-secondary">
             <Image 
               src="/lorenzosanz-bufanda.jpg" 
               alt="Lorenzo Sanz" 
               fill
+              sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
               className="object-cover mix-blend-soft-light opacity-60"
             />
             <div className="absolute inset-0 flex items-center justify-center">
@@ -77,7 +80,8 @@ export default function PetitionPopup() {
           
           <div className="p-6 text-center">
             <p className="text-lg mb-6">
-              Ayúdanos a conseguir una calle en Madrid en honor a Lorenzo Sanz, para perpetuar el legado y nombre de un gran presidente y una gran persona que hizo tanto por nosotros.
+              Ayúdanos a conseguir una calle en Madrid en honor a Lorenzo Sanz, para perpetuar el legado y 
+              nombre de un gran presidente y una gran persona que hizo tanto por nosotros.
             </p>
             
             <Button 

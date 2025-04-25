@@ -330,7 +330,8 @@ export default function ContentPage() {
                     src={content.thumbnail} 
                     alt={content.title} 
                     fill 
-                    className="object-cover" 
+                    className="object-cover"
+                    priority={content.thumbnail === "/lorenzosanz-bufanda.jpg"} 
                   />
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                     <div className="text-white text-center p-4">
@@ -365,12 +366,12 @@ export default function ContentPage() {
           </CardDescription>
         </CardHeader>
       </Card>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {exclusiveContent.map((content) => (
           <Card key={content.id} className="overflow-hidden flex flex-col h-full">
             <div className="relative h-48">
-              <Image src={content.thumbnail || "/placeholder.svg"} alt={content.title} fill className="object-cover" />
+              <Image src={content.thumbnail || "/placeholder.svg"} alt={content.title} fill sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw" className="object-cover" priority={content.thumbnail === "/lorenzosanz-bufanda.jpg"} />
               {content.type === "video" && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                   <div className="w-16 h-16 rounded-full bg-white/80 flex items-center justify-center">

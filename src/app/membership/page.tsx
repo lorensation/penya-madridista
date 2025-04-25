@@ -252,6 +252,10 @@ export default function Membership() {
           <p className="text-lg text-gray-600">
             Únete a nuestra comunidad madridista y disfruta de beneficios exclusivos para socios.
           </p>
+          <br />
+          <p className="text-lg text-gray-600">
+            Selecciona cualquiera de los planes para ver los precios.
+          </p>
         </div>
 
         {error && (
@@ -280,6 +284,28 @@ export default function Membership() {
                   <h2 className="text-2xl font-bold">{plan.name}</h2>
                 </div>
                 <div className="p-6 flex-grow flex flex-col">
+                  {/* Price preview section */}
+                  <div className="mb-6 border-b pb-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 text-primary mr-1" />
+                        <span className="text-sm">Mensual</span>
+                      </div>
+                      <span className="font-bold">{plan.paymentOptions.find(o => o.id === "monthly")?.price}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center">
+                        <CreditCard className="h-4 w-4 text-primary mr-1" />
+                        <span className="text-sm">Anual</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-bold">{plan.paymentOptions.find(o => o.id === "annual")?.price}</span>
+                        {plan.paymentOptions.find(o => o.id === "annual")?.discount && (
+                          <div className="text-xs text-green-600">{plan.paymentOptions.find(o => o.id === "annual")?.discount}</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                   <ul className="space-y-4 mb-auto">
                     {plan.features.map((feature, index) => (
                       <li key={index} className="flex items-start">

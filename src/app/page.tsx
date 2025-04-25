@@ -22,14 +22,17 @@ export default function Home() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 mt-8">
                 <Link href="/membership" className="sm:w-auto">
-                  <Button className="bg-accent text-black hover:bg-black hover:text-secondary text-lg px-8 py-6 w-full sm:w-auto shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 font-bold">
+                  <Button 
+                    variant="outline"
+                    className="bg-accent text-black hover:bg-black hover:text-secondary text-lg px-8 py-6 w-full sm:w-auto shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 font-bold"
+                  >
                     Hazte Socio
                   </Button>
                 </Link>
                 <Link href="/about" className="sm:w-auto">
                   <Button
                     variant="outline"
-                    className="border-white text-black hover:bg-black hover:text-secondary text-lg px-8 py-6 w-full sm:w-auto transition-colors duration-300"
+                    className="bg-accent text-black hover:bg-black hover:text-secondary text-lg px-8 py-6 w-full sm:w-auto shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 font-bold"
                   >
                     Conoce Más
                   </Button>
@@ -82,7 +85,7 @@ export default function Home() {
               </div>
               <h3 className="text-xl font-bold text-primary text-center mb-3">Eventos Exclusivos</h3>
               <p className="text-gray-600 text-center">
-                Acceso a eventos exclusivos, reuniones con exjugadores y visitas especiales al estadio.
+                Acceso a eventos exclusivos, reuniones con exjugadores y comidas de socios.
               </p>
             </div>
 
@@ -98,7 +101,7 @@ export default function Home() {
               </div>
               <h3 className="text-xl font-bold text-primary text-center mb-3">Descuentos Especiales</h3>
               <p className="text-gray-600 text-center">
-                Descuentos en merchandising oficial, entradas y viajes organizados para ver al equipo.
+                Descuentos en merchandising oficial, comidas y viajes organizados para ver al equipo.
               </p>
             </div>
 

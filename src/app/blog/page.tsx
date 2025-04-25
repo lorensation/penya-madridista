@@ -45,6 +45,7 @@ export default async function Blog() {
                     src={post.image_url || "/placeholder.svg?height=400&width=600"}
                     alt={post.title}
                     fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
                     className="object-cover"
                   />
                 </div>
