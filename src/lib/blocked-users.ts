@@ -181,7 +181,9 @@ export async function getBlockedUsers(): Promise<BlockedUser[]> {
  * Server component version that checks if user is blocked (for middleware)
  */
 export async function isUserBlockedSSR(userId: string): Promise<BlockedUser | null> {
-  const supabase = createServerComponentClient({ cookies });
+  // Fix: await cookies() properly by using a cookie store
+  const cookieStore = cookies();
+  const supabase = createServerComponentClient({ cookies: () => cookieStore });
   
   try {
     const { data, error } = await supabase

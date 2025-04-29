@@ -389,7 +389,7 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-1 gap-2">
                   <div className="flex items-center">
                     <div className="w-10 h-10 relative flex-shrink-0">
-                      <Image src="/lorenzosanz-bufanda.jpg" alt="Fotos históricas" className="object-cover w-full h-full rounded-sm" />
+                      <Image src="/lorenzosanz-bufanda.jpg" alt="Fotos históricas" width={50} height={50} className="object-cover w-full h-full rounded-sm" />
                     </div>
                     <div className="ml-2 truncate">
                       <p className="text-xs font-medium line-clamp-1">Colección de fotos históricas</p>
@@ -398,7 +398,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex items-center">
                     <div className="w-10 h-10 relative flex-shrink-0">
-                      <Image src="/LorenzoSanzjr-lagalerna.jpg" alt="Entrevista" className="object-cover w-full h-full rounded-sm" />
+                      <Image src="/LorenzoSanzjr-lagalerna.jpg" alt="Entrevista" width={50} height={50} className="object-cover w-full h-full rounded-sm" />
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="w-4 h-4 rounded-full bg-white/80 flex items-center justify-center">
                           <div className="w-0 h-0 border-y-2 border-y-transparent border-l-3 border-l-primary ml-0.5"></div>

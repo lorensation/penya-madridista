@@ -8,6 +8,8 @@ import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { ProfileDropdown } from "@/components/profile-dropdown"
 import { useNavbarMenu } from "@/hooks/use-navbar-menu"
+/*import { useCartStore, initializeStore } from "@/stores/cart"
+import { ShoppingBag } from "lucide-react"*/
 
 export function Header() {
   // Use the shared navbar menu state
@@ -21,6 +23,16 @@ export function Header() {
 
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  /*const [isClient, setIsClient] = useState(false)
+  const cartStore = useCartStore()
+  const itemCount = isClient ? cartStore.getItemCount() : 0
+  
+  // Initialize cart store
+  useEffect(() => {
+    initializeStore()
+    setIsClient(true)
+  }, [])*/
+
   const pathname = usePathname()
 
   useEffect(() => {
@@ -158,6 +170,16 @@ export function Header() {
               <ProfileDropdown user={user} />
             )}
           </div>
+
+          {/* Cart link with item count 
+          <Link href="/tienda/cart" className="relative">
+            <ShoppingBag className="h-6 w-6" />
+            {itemCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-black text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                {itemCount}
+              </span>
+            )}
+          </Link>*/}
 
           {/* Mobile menu button - on the right */}
           <button

@@ -1061,7 +1061,7 @@ export default function SettingsPage() {
                 <div className="flex justify-end">
                   <Button 
                     type="submit" 
-                    className={`transition-all transition-colors hover:bg-white hover:text-primary hover:border hover:border-black ${!isMiembro ? "bg-primary" : ""}`} 
+                    className={`transition-all hover:bg-white hover:text-primary hover:border hover:border-black ${!isMiembro ? "bg-primary" : ""}`} 
                     disabled={saving}
                   >
                     {saving ? (

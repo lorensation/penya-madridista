@@ -25,6 +25,7 @@ const PUBLIC_PATHS = [
   '/_next',
   '/favicon.ico',
   '/blocked', // Allow access to blocked page
+  '/tienda', // Allow access to shop page
 ]
 
 export async function middleware(request: NextRequest) {
@@ -33,6 +34,11 @@ export async function middleware(request: NextRequest) {
     console.log("Skipping middleware for webhook endpoint")
     return NextResponse.next()
   }
+
+  // Check if the request is to the shop and is a GET request
+  const isShopRequest = request.nextUrl.pathname.startsWith("/tienda/")
+  const isGetRequest = request.method === "GET"
+  const isPublicShopRequest = isShopRequest && isGetRequest
 
   // Check if the current path should be public
   const currentPath = request.nextUrl.pathname
@@ -185,9 +191,11 @@ export async function middleware(request: NextRequest) {
   }
 
   // If no authenticated user and trying to access protected routes, redirect to login
+  // Allow public access to shop GET requests
   if (
     !authUser &&
     !isPublicPath && // Skip authentication check for public paths
+    !isPublicShopRequest && // Skip authentication check for GET shop requests
     (request.nextUrl.pathname.startsWith("/dashboard") ||
       request.nextUrl.pathname.startsWith("/admin"))
   ) {

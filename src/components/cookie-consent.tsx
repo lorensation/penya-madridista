@@ -443,7 +443,7 @@ export default function CookieConsent() {
       ) : null}
 
       {/* Cookie settings button that appears in corner after consent is given */}
-      {isMounted && hasConsentSaved && (
+      {isMounted && !hasConsentSaved && (
         <button
           onClick={openCookieSettings}
           className="fixed bottom-4 left-4 z-10 p-2 bg-white dark:bg-gray-800 rounded-full shadow-md hover:shadow-lg transition-shadow hidden md:block"

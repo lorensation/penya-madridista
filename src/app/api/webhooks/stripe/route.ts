@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
 import type { Database } from "@/types/supabase"
 import Stripe from "stripe"
 
@@ -8,6 +10,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 })
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
+const shopWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET_SHOP
 
 // Create a service role client for admin operations that need to bypass RLS
 const serviceRoleClient = createClient<Database>(
@@ -30,36 +33,71 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing stripe-signature header" }, { status: 400 })
     }
 
-    // Verify the webhook signature
+    // Determine which webhook secret to use based on the signature
+    // Try the main webhook secret first (for subscriptions)
     let event: Stripe.Event
+    let isShopEvent = false
+
     try {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
     } catch (err) {
-      console.error(`Webhook signature verification failed: ${err instanceof Error ? err.message : "Unknown error"}`)
-      return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
+      // If the main webhook secret fails, try the shop webhook secret
+      try {
+        if (shopWebhookSecret) {
+          event = stripe.webhooks.constructEvent(body, signature, shopWebhookSecret)
+          isShopEvent = true
+        } else {
+          console.error(`Webhook signature verification failed: ${err instanceof Error ? err.message : "Unknown error"}`)
+          return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
+        }
+      } catch (shopErr) {
+        console.error(`Webhook signature verification failed for both secrets: ${shopErr instanceof Error ? shopErr.message : "Unknown error"}`)
+        return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
+      }
     }
 
     console.log(`Processing Stripe event: ${event.type}`)
 
-    // Handle the event
-    switch (event.type) {
-      case "checkout.session.completed":
-        await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session)
-        break
-      case "customer.subscription.updated":
-        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription)
-        break
-      case "customer.subscription.deleted":
-        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription)
-        break
-      case "invoice.payment_succeeded":
-        await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice)
-        break
-      case "invoice.payment_failed":
-        await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice)
-        break
-      default:
-        console.log(`Unhandled event type: ${event.type}`)
+    // Handle the event based on whether it's a shop event or subscription event
+    if (isShopEvent) {
+      // Handle shop events
+      switch (event.type) {
+        case "checkout.session.completed":
+          const session = event.data.object as Stripe.Checkout.Session
+          if (session.mode === "payment") {
+            await handleShopPayment(session)
+          }
+          break
+        case "payment_intent.succeeded":
+          // Handle successful shop payment intent if needed
+          break
+        case "payment_intent.payment_failed":
+          // Handle failed shop payment intent if needed
+          break
+        default:
+          console.log(`Unhandled shop event type: ${event.type}`)
+      }
+    } else {
+      // Handle subscription events (existing functionality)
+      switch (event.type) {
+        case "checkout.session.completed":
+          await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session)
+          break
+        case "customer.subscription.updated":
+          await handleSubscriptionUpdated(event.data.object as Stripe.Subscription)
+          break
+        case "customer.subscription.deleted":
+          await handleSubscriptionDeleted(event.data.object as Stripe.Subscription)
+          break
+        case "invoice.payment_succeeded":
+          await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice)
+          break
+        case "invoice.payment_failed":
+          await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice)
+          break
+        default:
+          console.log(`Unhandled subscription event type: ${event.type}`)
+      }
     }
 
     return NextResponse.json({ received: true })
@@ -69,6 +107,99 @@ export async function POST(request: NextRequest) {
       { error: error instanceof Error ? error.message : "An unknown error occurred" },
       { status: 500 }
     )
+  }
+}
+
+async function handleShopPayment(session: Stripe.Checkout.Session) {
+  try {
+    console.log('Processing shop payment:', session.id)
+    
+    if (!session?.metadata?.cart_id) {
+      console.error('No cart_id in session metadata')
+      return
+    }
+
+    const supabase = createRouteHandlerClient({ cookies })
+    const cartId = session.metadata.cart_id
+    const userId = session.metadata.user_id || null
+
+    // 1. Create order in database
+    const { data: orderData, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        user_id: userId,
+        stripe_checkout_id: session.id,
+        amount_cents: Number(session.amount_total),
+        currency: session.currency || 'eur',
+        status: 'paid',
+        shipping: session.shipping_details,
+        metadata: {
+          customer_email: session.customer_details?.email,
+          customer_name: session.customer_details?.name,
+        }
+      })
+      .select('id')
+      .single()
+
+    if (orderError) {
+      console.error('Error creating order:', orderError)
+      return
+    }
+
+    // 2. Get cart items
+    const { data: cartItems, error: cartError } = await supabase
+      .from('cart_items_with_prices')
+      .select('*')
+      .eq('cart_id', cartId)
+
+    if (cartError || !cartItems?.length) {
+      console.error('Error getting cart items:', cartError)
+      return
+    }
+
+    // 3. Copy cart items to order_items
+    const orderItems = cartItems.map(item => ({
+      order_id: orderData.id,
+      variant_id: item.variant_id,
+      qty: item.qty,
+      price_cents: item.price_cents
+    }))
+
+    const { error: orderItemsError } = await supabase
+      .from('order_items')
+      .insert(orderItems)
+
+    if (orderItemsError) {
+      console.error('Error creating order items:', orderItemsError)
+      return
+    }
+
+    // 4. Decrement inventory (careful with race conditions)
+    for (const item of cartItems) {
+      // Use a transaction or stored procedure here in production
+      const { error: inventoryError } = await supabase.rpc('decrement_inventory', {
+        p_variant_id: item.variant_id,
+        p_quantity: item.qty
+      })
+      
+      if (inventoryError) {
+        console.error('Error updating inventory:', inventoryError)
+      }
+    }
+
+    // 5. Clear the cart (optional, some sites keep the cart)
+    const { error: clearCartError } = await supabase
+      .from('cart_items')
+      .delete()
+      .eq('cart_id', cartId)
+
+    if (clearCartError) {
+      console.error('Error clearing cart:', clearCartError)
+    }
+
+    console.log('Shop payment processed successfully for order:', orderData.id)
+  } catch (error) {
+    console.error('Error handling shop payment:', error)
   }
 }
 

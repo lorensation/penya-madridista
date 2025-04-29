@@ -115,7 +115,7 @@ export default function EventsPage() {
   const createWhatsAppLink = (eventTitle: string) => {
     // Format the message for WhatsApp
     const message = encodeURIComponent(`Hola, me gustaría reservar una plaza para el evento: ${eventTitle}`);
-    return `https://wa.me/34679240500?text=${message}`; // Replace with your actual WhatsApp number
+    return `https://wa.me/34665652251?text=${message}`; // Replace with your actual WhatsApp number
   };
 
   return (
