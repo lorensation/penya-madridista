@@ -1,7 +1,7 @@
 # Peña Lorenzo Sanz Siempre Presente - Official Website
 
 <p align="center">
-  <img src="/logo.jpg" alt="Peña Lorenzo Sanz Logo" width="250"/>
+  <img src="/public/logo.jpg" alt="Peña Lorenzo Sanz Logo" width="250"/>
 </p>
 
 This is the official repository for the Peña Lorenzo Sanz Siempre Presente website - a fan club dedicated to honoring the legacy of Lorenzo Sanz, former president of Real Madrid Club de Fútbol.
@@ -59,7 +59,7 @@ The Peña Lorenzo Sanz website serves as a digital hub for members and supporter
 ## Developed By Cineronte Digital
 
 <p align="center">
-  <img src="/CineronteLogo.png" alt="Cineronte Digital Logo" width="200"/>
+  <img src="/public/CineronteLogo.png" alt="Cineronte Digital Logo" width="200"/>
 </p>
 
 This website was designed and developed by **Cineronte S.L.**, a digital agency specializing in web development, digital consulting, and brand strategy for sports organizations and fan clubs.
