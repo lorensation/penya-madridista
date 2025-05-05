@@ -149,6 +149,7 @@ export function AddToCartForm({ product, variants, optionTypes }: AddToCartFormP
       title: "Añadido al carrito",
       description: `${product.name} añadido al carrito`,
     })
+    router.push("/tienda")
   }
   
   // Check if product is out of stock

@@ -1,7 +1,7 @@
 # Peña Lorenzo Sanz Siempre Presente - Official Website
 
 <p align="center">
-  <img src="/Logo-Penya-LS-resized.jpg" alt="Peña Lorenzo Sanz Logo" width="250"/>
+  <img src="/logo.jpg" alt="Peña Lorenzo Sanz Logo" width="250"/>
 </p>
 
 This is the official repository for the Peña Lorenzo Sanz Siempre Presente website - a fan club dedicated to honoring the legacy of Lorenzo Sanz, former president of Real Madrid Club de Fútbol.
