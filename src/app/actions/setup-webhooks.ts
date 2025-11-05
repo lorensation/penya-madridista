@@ -1,6 +1,5 @@
 "use server"
 
-import { createServerSupabaseClient } from "@/lib/supabase"
 import type { ApiResponse } from "@/types/common"
 
 export async function setupWebhooks(formData: FormData): Promise<ApiResponse> {
