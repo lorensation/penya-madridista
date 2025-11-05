@@ -8,7 +8,7 @@ import { supabaseUrl, supabaseServiceKey, adminOptions } from "./config"
  */
 export function createAdminSupabaseClient() {
   if (!supabaseServiceKey) {
-    throw new Error("SUPABASE_WEBHOOK_SECRET is required for admin operations. Please check your environment variables.")
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is required for admin operations. Please check your environment variables.")
   }
 
   return createClient<Database>(supabaseUrl, supabaseServiceKey, adminOptions)

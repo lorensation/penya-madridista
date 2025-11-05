@@ -15,31 +15,13 @@ export async function setupWebhooks(formData: FormData): Promise<ApiResponse> {
   }
 
   try {
-    // In a real implementation, we would configure the webhook with Supabase
-    // For now, we'll just simulate success and return the webhook secret
-
-    // Store the webhook configuration in our database
-    const supabase = createServerSupabaseClient()
-    const { error } = await supabase.from("webhook_configs").upsert(
-      {
-        url: webhookUrl,
-        secret: webhookSecretValue,
-        created_at: new Date().toISOString(),
-      },
-      { onConflict: "url" },
-    )
-
-    if (error) {
-      console.error("Supabase error:", error)
-      return {
-        success: false,
-        error: "Failed to save webhook configuration",
-      }
-    }
+    // Generate and return the webhook secret
+    // Note: You need to manually add this secret to your environment variables
+    // and configure it in Supabase dashboard
 
     return {
       success: true,
-      message: "Webhook configured successfully",
+      message: "Webhook secret generated successfully. Copy it and add to your environment variables and Supabase dashboard.",
       data: {
         webhookSecret: webhookSecretValue
       }

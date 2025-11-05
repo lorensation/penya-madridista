@@ -2,7 +2,15 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   //trailingSlash: false,
-  // ...otras opciones que tengas
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'maps.googleapis.com',
+        pathname: '/maps/api/staticmap/**',
+      },
+    ],
+  },
 };
 
 export default nextConfig;
