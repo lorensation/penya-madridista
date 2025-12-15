@@ -11,13 +11,13 @@ export default function TermsAndConditionsPage() {
       <h1 className="text-3xl font-bold mb-8">Términos y Condiciones</h1>
       
       <div className="prose max-w-none">
-        <p className="text-sm text-gray-500 mb-6">Última actualización: 17 de abril de 2025</p>
+        <p className="text-sm text-gray-500 mb-6">Última actualización: 15 de diciembre de 2025</p>
 
         <div className="mb-8">
           <h2 className="text-2xl font-semibold mb-4">1. Introducción</h2>
           <p>
             Estos términos y condiciones (junto con los documentos a los que se hace referencia en ellos) le informan sobre las reglas para usar nuestro sitio web 
-            penallorenzosanz.com (nuestro &quot;sitio&quot;) y para convertirse en socio de la Peña Madridista Lorenzo Sanz (&quot;la Peña&quot;, &quot;nosotros&quot;, &quot;nos&quot; o &quot;nuestro&quot;).
+            lorenzosanz.com (nuestro &quot;sitio&quot;) y para convertirse en socio de la Peña Madridista Lorenzo Sanz (&quot;la Peña&quot;, &quot;nosotros&quot;, &quot;nos&quot; o &quot;nuestro&quot;).
           </p>
           <p>
             Al usar nuestro sitio o convertirse en socio, confirma que acepta estos términos y condiciones y que acuerda cumplirlos. Si no está de acuerdo con estos términos, 
@@ -30,8 +30,17 @@ export default function TermsAndConditionsPage() {
 
         <div className="mb-8">
           <h2 className="text-2xl font-semibold mb-4">2. Información sobre nosotros</h2>
+          <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 mb-4">
+            <ul className="space-y-2">
+              <li><strong>Denominación social:</strong> PEÑA MADRIDISTA LORENZO SANZ SIEMPRE PRESENTE</li>
+              <li><strong>CIF:</strong> G22674352</li>
+              <li><strong>Naturaleza jurídica:</strong> Asociación sin ánimo de lucro</li>
+              <li><strong>Domicilio social:</strong> C/ Martín Pescador, Nº 9, 28023 Madrid</li>
+              <li><strong>Correo electrónico:</strong> info@lorenzosanz.com</li>
+            </ul>
+          </div>
           <p>
-            La Peña Madridista Lorenzo Sanz es una asociación sin ánimo de lucro, legalmente constituida y registrada en España, dedicada a unir a aficionados 
+            La Peña Madridista Lorenzo Sanz Siempre Presente es una asociación sin ánimo de lucro, legalmente constituida y registrada en España al amparo de la Ley Orgánica 1/2002, de 22 de marzo, reguladora del Derecho de Asociación. Está dedicada a unir a aficionados 
             del Real Madrid C.F. en memoria de Don Lorenzo Sanz, expresidente del club.
           </p>
           <p>
@@ -91,33 +100,73 @@ export default function TermsAndConditionsPage() {
             La Peña ofrece distintos tipos de membresía que pueden incluir cuotas anuales o mensuales. Al adquirir una membresía, usted acepta los siguientes términos:
           </p>
           
-          <h3 className="text-xl font-medium mt-4 mb-2">7.1 Duración y renovación</h3>
+          <h3 className="text-xl font-medium mt-4 mb-2">7.1 Naturaleza del servicio</h3>
+          <p>
+            La membresía de la Peña constituye un servicio de contenido digital y acceso a beneficios exclusivos. Al contratar una membresía, usted adquiere:
+          </p>
+          <ul className="list-disc pl-6 my-4 space-y-2">
+            <li>Acceso a contenido exclusivo en el sitio web.</li>
+            <li>Carnet digital de socio.</li>
+            <li>Participación en eventos, sorteos y actividades de la peña.</li>
+            <li>Descuentos y prioridad en viajes organizados.</li>
+            <li>Boletín informativo y comunicaciones exclusivas.</li>
+          </ul>
+          
+          <h3 className="text-xl font-medium mt-4 mb-2">7.2 Duración y renovación</h3>
           <ul className="list-disc pl-6 my-4 space-y-2">
             <li>Las membresías mensuales se renuevan automáticamente cada mes hasta que se cancelen.</li>
             <li>Las membresías anuales se renuevan automáticamente al final del período anual hasta que se cancelen.</li>
             <li>Debe cancelar su membresía al menos 7 días antes de la fecha de renovación para evitar cargos.</li>
-            <li>No ofrecemos reembolsos por períodos parciales o no utilizados de membresía.</li>
+            <li>La renovación se realizará al precio vigente en el momento de la renovación, que le será comunicado con al menos 30 días de antelación en caso de modificación.</li>
           </ul>
           
-          <h3 className="text-xl font-medium mt-4 mb-2">7.2 Precios y pagos</h3>
+          <h3 className="text-xl font-medium mt-4 mb-2">7.3 Precios y pagos</h3>
           <ul className="list-disc pl-6 my-4 space-y-2">
-            <li>Los precios de las membresías están claramente indicados en nuestro sitio en el momento de la compra.</li>
-            <li>Todos los pagos se procesan a través de Stripe, nuestro procesador de pagos seguro de terceros.</li>
-            <li>Nos reservamos el derecho de cambiar los precios de las membresías con un preaviso de al menos 30 días.</li>
+            <li>Los precios de las membresías están claramente indicados en nuestro sitio en el momento de la compra, con todos los impuestos incluidos.</li>
+            <li>Todos los pagos se procesan a través de <strong>Stripe Payments Europe, Ltd.</strong>, proveedor de servicios de pago autorizado y regulado por el Banco Central de Irlanda.</li>
+            <li>Los datos de su tarjeta son tratados directamente por Stripe conforme a los estándares PCI-DSS. La Peña no almacena datos de tarjetas en sus servidores.</li>
+            <li>Al realizar el pago, usted autoriza a Stripe a procesar el cargo y acepta los términos de servicio de Stripe.</li>
+            <li>Nos reservamos el derecho de cambiar los precios de las membresías con un preaviso de al menos 30 días antes de la próxima renovación.</li>
             <li>Si no podemos cobrar su pago por cualquier motivo, su membresía puede ser suspendida o cancelada.</li>
+            <li>Recibirá un recibo electrónico por cada pago realizado, enviado a su dirección de correo electrónico.</li>
           </ul>
           
-          <h3 className="text-xl font-medium mt-4 mb-2">7.3 Cancelación</h3>
+          <h3 className="text-xl font-medium mt-4 mb-2">7.4 Derecho de desistimiento y reembolsos</h3>
+          <p>
+            Conforme al artículo 103.m) del Real Decreto Legislativo 1/2007, de 16 de noviembre, por el que se aprueba el texto refundido de la Ley General para la Defensa de los Consumidores y Usuarios (TRLGDCU):
+          </p>
+          <div className="bg-amber-50 p-4 rounded-lg border border-amber-200 my-4">
+            <p className="font-medium">
+              El derecho de desistimiento no será aplicable a los contratos de suministro de contenido digital que no se preste en un soporte material cuando la ejecución haya comenzado con el previo consentimiento expreso del consumidor y usuario con el conocimiento por su parte de que en consecuencia pierde su derecho de desistimiento.
+            </p>
+          </div>
+          <p>Al contratar su membresía y acceder al contenido digital exclusivo, usted:</p>
           <ul className="list-disc pl-6 my-4 space-y-2">
-            <li>Puede cancelar su membresía en cualquier momento a través de su cuenta en nuestro sitio o contactándonos directamente.</li>
-            <li>La cancelación será efectiva al final del período de facturación actual.</li>
-            <li>Nos reservamos el derecho de cancelar su membresía en cualquier momento si viola estos términos y condiciones.</li>
+            <li>Consiente expresamente que la ejecución del contrato comience de inmediato.</li>
+            <li>Reconoce que, al comenzar la ejecución, pierde el derecho de desistimiento.</li>
+            <li>Acepta que no procederán reembolsos por períodos parciales o no utilizados de membresía.</li>
+          </ul>
+          <p>
+            No obstante lo anterior, podrá solicitar el reembolso en los siguientes casos excepcionales:
+          </p>
+          <ul className="list-disc pl-6 my-4 space-y-2">
+            <li>Error técnico demostrable que impida el acceso al servicio durante más de 7 días consecutivos, siempre que lo comunique a info@lorenzosanz.com.</li>
+            <li>Doble cargo indebido (se reembolsará el importe duplicado).</li>
+            <li>Incumplimiento grave por parte de la Peña de las prestaciones contratadas.</li>
           </ul>
           
-          <h3 className="text-xl font-medium mt-4 mb-2">7.4 Beneficios de membresía</h3>
+          <h3 className="text-xl font-medium mt-4 mb-2">7.5 Cancelación</h3>
+          <ul className="list-disc pl-6 my-4 space-y-2">
+            <li>Puede cancelar su membresía en cualquier momento a través de su cuenta en nuestro sitio (Área de Socio &gt; Membresía &gt; Cancelar) o contactándonos en info@lorenzosanz.com.</li>
+            <li>La cancelación será efectiva al final del período de facturación actual. Podrá seguir disfrutando de los beneficios hasta dicha fecha.</li>
+            <li>Recibirá confirmación por correo electrónico de la cancelación.</li>
+            <li>Nos reservamos el derecho de cancelar su membresía en cualquier momento si viola estos términos y condiciones, sin derecho a reembolso.</li>
+          </ul>
+          
+          <h3 className="text-xl font-medium mt-4 mb-2">7.6 Beneficios de membresía</h3>
           <ul className="list-disc pl-6 my-4 space-y-2">
             <li>Los beneficios específicos de cada tipo de membresía se detallan en nuestro sitio.</li>
-            <li>Nos reservamos el derecho de modificar los beneficios de las membresías con un preaviso razonable.</li>
+            <li>Nos reservamos el derecho de modificar los beneficios de las membresías con un preaviso razonable de al menos 30 días.</li>
             <li>Algunos beneficios pueden estar sujetos a disponibilidad y pueden tener términos adicionales específicos.</li>
             <li>La membresía de la Peña no implica membresía o afiliación oficial con el Real Madrid C.F.</li>
           </ul>
@@ -285,9 +334,15 @@ export default function TermsAndConditionsPage() {
         </div>
 
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">13. Ley aplicable</h2>
+          <h2 className="text-2xl font-semibold mb-4">13. Ley aplicable y jurisdicción</h2>
           <p>
-            Estos términos de uso, su tema y su formación, se rigen por la ley española. Usted y nosotros acordamos que los tribunales de España tendrán jurisdicción exclusiva.
+            Estos términos de uso, su tema y su formación, se rigen por la legislación española.
+          </p>
+          <p className="mt-4">
+            Para la resolución de cualquier controversia derivada de estos términos, las partes se someten a los Juzgados y Tribunales del domicilio del usuario, siempre que este tenga la condición de consumidor conforme al Real Decreto Legislativo 1/2007. En caso contrario, las partes se someten a los Juzgados y Tribunales de Madrid capital, con renuncia expresa a cualquier otro fuero que pudiera corresponderles.
+          </p>
+          <p className="mt-4">
+            Asimismo, le informamos de la existencia de la plataforma de resolución de litigios en línea de la Unión Europea, accesible en: <a href="https://ec.europa.eu/consumers/odr" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">https://ec.europa.eu/consumers/odr</a>
           </p>
         </div>
 

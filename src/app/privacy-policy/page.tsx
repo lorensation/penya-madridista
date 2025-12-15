@@ -11,12 +11,12 @@ export default function PrivacyPolicyPage() {
       <h1 className="text-3xl font-bold mb-8">Política de Privacidad</h1>
       
       <div className="prose max-w-none">
-        <p className="text-sm text-gray-500 mb-6">Última actualización: 17 de abril de 2025</p>
+        <p className="text-sm text-gray-500 mb-6">Última actualización: 15 de diciembre de 2025</p>
 
         <div className="mb-8">
           <h2 className="text-2xl font-semibold mb-4">1. Introducción</h2>
           <p>
-            En Peña Madridista Lorenzo Sanz (en adelante, &quot;nosotros&quot;, &quot;nuestra&quot;, &quot;nuestro&quot;, o &quot;la Peña&quot;), 
+            En Peña Madridista Lorenzo Sanz Siempre Presente (en adelante, &quot;nosotros&quot;, &quot;nuestra&quot;, &quot;nuestro&quot;, o &quot;la Peña&quot;), 
             respetamos su privacidad y nos comprometemos a proteger sus datos personales. Esta política de 
             privacidad le informará sobre cómo cuidamos sus datos personales cuando visita nuestro sitio web 
             (independientemente de dónde lo visite) y le informará sobre sus derechos de privacidad y cómo 
@@ -24,8 +24,7 @@ export default function PrivacyPolicyPage() {
           </p>
           <p>
             Esta política de privacidad se proporciona en un formato por capas para que pueda hacer clic en 
-            las áreas específicas establecidas a continuación. Alternativamente, puede descargar una versión 
-            en PDF de la política <a href="#" className="text-primary hover:underline">aquí</a>.
+            las áreas específicas establecidas a continuación.
           </p>
         </div>
 
@@ -36,9 +35,9 @@ export default function PrivacyPolicyPage() {
           </p>
           <p>
             El propósito de esta política de privacidad es proporcionarle información sobre cómo la Peña Madridista 
-            Lorenzo Sanz recopila y procesa sus datos personales a través de su uso de este sitio web, incluyendo 
+            Lorenzo Sanz Siempre Presente recopila y procesa sus datos personales a través de su uso de este sitio web, incluyendo 
             cualquier dato que pueda proporcionar a través de este sitio web cuando se registra como usuario, 
-            se suscribe a nuestra newsletter, adquiere una membresía o utiliza nuestros servicios.
+            se suscribe a nuestra newsletter, adquiere una membresía, realiza compras en nuestra tienda o utiliza nuestros servicios.
           </p>
           <p>
             Este sitio web no está destinado a niños y no recopilamos datos relacionados con niños 
@@ -53,12 +52,21 @@ export default function PrivacyPolicyPage() {
           </p>
           
           <p className="mt-4">
-            <strong>Controlador de datos</strong>
+            <strong>Responsable del tratamiento</strong>
           </p>
+          <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 mb-4">
+            <ul className="space-y-2">
+              <li><strong>Denominación social:</strong> PEÑA MADRIDISTA LORENZO SANZ SIEMPRE PRESENTE</li>
+              <li><strong>CIF:</strong> G22674352</li>
+              <li><strong>Naturaleza jurídica:</strong> Asociación sin ánimo de lucro</li>
+              <li><strong>Domicilio social:</strong> [INSERTAR DIRECCIÓN COMPLETA]</li>
+              <li><strong>Correo electrónico:</strong> info@lorenzosanz.com</li>
+            </ul>
+          </div>
           <p>
-            La Peña Madridista Lorenzo Sanz es el controlador y responsable de sus datos personales.
+            La Peña Madridista Lorenzo Sanz Siempre Presente es el responsable del tratamiento de sus datos personales conforme al Reglamento General de Protección de Datos (RGPD) y la Ley Orgánica 3/2018, de 5 de diciembre, de Protección de Datos Personales y garantía de los derechos digitales (LOPDGDD).
           </p>
-          <p>
+          <p className="mt-4">
             Hemos designado un responsable de protección de datos (DPO) que es responsable de supervisar 
             las preguntas relacionadas con esta política de privacidad. Si tiene alguna pregunta sobre esta 
             política de privacidad, incluida cualquier solicitud para ejercer sus derechos legales, contacte con 
@@ -74,7 +82,7 @@ export default function PrivacyPolicyPage() {
           <p>
             Peña Madridista Lorenzo Sanz Siempre Presente<br />
             Email: info@lorenzosanz.com<br />
-            Dirección postal: [Dirección postal completa]
+            Dirección postal: [INSERTAR DIRECCIÓN COMPLETA]
           </p>
           
           <p className="mt-4">
@@ -106,12 +114,10 @@ export default function PrivacyPolicyPage() {
               números de teléfono.
             </li>
             <li>
-              <strong>Datos financieros</strong> como detalles de tarjetas de pago (procesados de forma segura 
-              a través de nuestro proveedor de pagos, Stripe).
+              <strong>Datos financieros</strong> como detalles de tarjetas de pago. Nota importante: Los datos de su tarjeta de crédito o débito son procesados directamente por nuestro proveedor de servicios de pago, <strong>Stripe Payments Europe, Ltd.</strong>, y nunca son almacenados en nuestros servidores. Stripe es un proveedor certificado PCI-DSS Nivel 1.
             </li>
             <li>
-              <strong>Datos de transacciones</strong> como detalles sobre los pagos de y hacia usted y otros 
-              detalles de las membresías que ha adquirido con nosotros.
+              <strong>Datos de transacciones</strong> como detalles sobre los pagos de y hacia usted (importes, fechas, conceptos), historial de membresías y compras realizadas en nuestra tienda.
             </li>
             <li>
               <strong>Datos técnicos</strong> como dirección IP, datos de inicio de sesión, tipo y versión de 
@@ -181,11 +187,17 @@ export default function PrivacyPolicyPage() {
               varios terceros como se establece a continuación:
               <ul className="list-disc pl-6 my-2 space-y-1">
                 <li>Datos Técnicos de proveedores de análisis como Google Analytics;</li>
-                <li>Datos de Contacto, Financieros y de Transacciones de proveedores de servicios de pago como Stripe;</li>
+                <li>Datos de Contacto, Financieros y de Transacciones de proveedores de servicios de pago como <strong>Stripe Payments Europe, Ltd.</strong> (procesador de pagos autorizado y regulado por el Banco Central de Irlanda);</li>
                 <li>Datos de Identidad y Contacto de fuentes públicamente disponibles.</li>
               </ul>
             </li>
           </ul>
+          
+          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 my-4">
+            <h4 className="font-semibold mb-2">Información sobre Stripe como encargado del tratamiento</h4>
+            <p>Stripe Payments Europe, Ltd. actúa como encargado del tratamiento de los datos de pago en nuestro nombre. Stripe procesa los datos de su tarjeta de forma segura conforme a los estándares PCI-DSS y no comparte sus datos financieros con nosotros más allá de la información necesaria para confirmar la transacción (últimos 4 dígitos de la tarjeta, tipo de tarjeta, estado de la transacción).</p>
+            <p className="mt-2">Para más información sobre cómo Stripe trata sus datos, consulte la <a href="https://stripe.com/es/privacy" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">Política de Privacidad de Stripe</a>.</p>
+          </div>
         </div>
 
         <div className="mb-8">
@@ -205,7 +217,7 @@ export default function PrivacyPolicyPage() {
             Generalmente, no nos basamos en el consentimiento como base legal para procesar sus datos personales 
             excepto en relación con el envío de comunicaciones de marketing directo de terceros a través de correo 
             electrónico o mensajes de texto. Tiene derecho a retirar su consentimiento para el marketing en cualquier 
-            momento contactándonos en contacto@penallorenzosanz.com.
+            momento contactándonos en info@lorenzosanz.com.
           </p>
           
           <p className="mt-4">
@@ -384,7 +396,13 @@ export default function PrivacyPolicyPage() {
           </p>
           <ul className="list-disc pl-6 my-4 space-y-2">
             <li>
-              Proveedores de servicios que actúan como procesadores que proporcionan servicios de TI y administración de sistemas.
+              <strong>Stripe Payments Europe, Ltd.</strong> (Irlanda) como encargado del tratamiento para el procesamiento de pagos de membresías y compras. Stripe está autorizado y regulado por el Banco Central de Irlanda y cumple con PCI-DSS Nivel 1.
+            </li>
+            <li>
+              Proveedores de servicios que actúan como procesadores que proporcionan servicios de TI, alojamiento web y administración de sistemas (Vercel, Supabase).
+            </li>
+            <li>
+              Proveedores de servicios de correo electrónico para el envío de comunicaciones transaccionales y de marketing (Mailgun).
             </li>
             <li>
               Asesores profesionales que actúan como procesadores o controladores conjuntos, incluidos abogados, 
@@ -392,7 +410,7 @@ export default function PrivacyPolicyPage() {
               de seguros y contables.
             </li>
             <li>
-              Autoridades fiscales, autoridades reguladoras y otras autoridades que actúan como procesadores o 
+              Autoridades fiscales (Agencia Tributaria), autoridades reguladoras y otras autoridades que actúan como procesadores o 
               controladores conjuntos, que requieren la presentación de informes de actividades de procesamiento 
               en determinadas circunstancias.
             </li>

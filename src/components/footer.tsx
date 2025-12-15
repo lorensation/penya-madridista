@@ -5,7 +5,7 @@ export default function Footer() {
   return (
     <footer className="bg-primary text-white py-8">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
             <div className="mb-4">
               <Image
@@ -17,7 +17,9 @@ export default function Footer() {
               />
             </div>
             <h3 className="text-xl font-bold mb-4">Peña Lorenzo Sanz</h3>
-            <p>Una peña madridista dedicada a honrar el legado de Lorenzo Sanz.</p>
+            <p className="text-sm">Una peña madridista dedicada a honrar el legado de Lorenzo Sanz.</p>
+            <p className="text-xs mt-2 text-white/70">PEÑA MADRIDISTA LORENZO SANZ SIEMPRE PRESENTE</p>
+            <p className="text-xs text-white/70">CIF: G22674352</p>
           </div>
           <div>
             <h3 className="text-xl font-bold mb-4">Enlaces</h3>
@@ -84,6 +86,11 @@ export default function Footer() {
             <div className="mt-4">
               <ul className="space-y-2">
                 <li>
+                  <Link href="/aviso-legal" className="hover:text-accent hover:underline">
+                    Aviso Legal
+                  </Link>
+                </li>
+                <li>
                   <Link href="/privacy-policy" className="hover:text-accent hover:underline">
                     Política de Privacidad
                   </Link>
@@ -103,7 +110,8 @@ export default function Footer() {
           </div>
         </div>
         <div className="mt-8 border-t border-white/20 pt-8 text-center">
-          <p>&copy; {new Date().getFullYear()} Peña Lorenzo Sanz. Todos los derechos reservados.</p>
+          <p className="text-sm">&copy; {new Date().getFullYear()} Peña Madridista Lorenzo Sanz Siempre Presente. Todos los derechos reservados.</p>
+          <p className="text-xs mt-2 text-white/60">Pagos seguros procesados por Stripe Payments Europe, Ltd.</p>
         </div>
       </div>
     </footer>

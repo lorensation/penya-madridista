@@ -19,9 +19,26 @@ export default function FAQPage() {
               <h3 className="text-lg font-medium mb-2">¿Qué es la Peña Madridista Lorenzo Sanz Siempre Presente?</h3>
               <div className="text-gray-700">
                 <p>
-                  La Peña Madridista Lorenzo Sanz Siempre Presente es una asociación de aficionados del Real Madrid creada en honor a Don Lorenzo Sanz, expresidente del club entre 1995 y 2000, 
+                  La Peña Madridista Lorenzo Sanz Siempre Presente es una asociación sin ánimo de lucro de aficionados del Real Madrid, creada en honor a Don Lorenzo Sanz, expresidente del club entre 1995 y 2000, 
                   período en el que el equipo ganó 2 Copas de Europa (1998 y 2000). Nuestro objetivo es unir a los madridistas que admiran el legado de Lorenzo Sanz y 
                   compartir la pasión por el Real Madrid.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+              <h3 className="text-lg font-medium mb-2">¿Cuál es la naturaleza jurídica de la Peña?</h3>
+              <div className="text-gray-700">
+                <p>
+                  Somos una asociación sin ánimo de lucro, legalmente constituida al amparo de la Ley Orgánica 1/2002, de 22 de marzo, reguladora del Derecho de Asociación.
+                </p>
+                <ul className="list-disc pl-6 mt-2 space-y-1">
+                  <li><strong>Denominación:</strong> PEÑA MADRIDISTA LORENZO SANZ SIEMPRE PRESENTE</li>
+                  <li><strong>CIF:</strong> G22674352</li>
+                  <li><strong>País:</strong> España</li>
+                </ul>
+                <p className="mt-2">
+                  Todos los ingresos obtenidos se destinan íntegramente a los fines de la asociación y al mantenimiento de sus actividades.
                 </p>
               </div>
             </div>
@@ -124,12 +141,24 @@ export default function FAQPage() {
               <h3 className="text-lg font-medium mb-2">¿Cómo puedo cancelar mi suscripción?</h3>
               <div className="text-gray-700">
                 <p>
-                  Puedes cancelar tu suscripción en cualquier momento a través de tu área personal en la web o contactando directamente con nosotros.
+                  Puedes cancelar tu suscripción en cualquier momento a través de tu área personal en la web (Área de Socio &gt; Membresía &gt; Cancelar) o contactando directamente con nosotros en info@lorenzosanz.com.
                   La cancelación será efectiva al final del período de facturación actual, por lo que podrás seguir disfrutando de los beneficios
-                  hasta ese momento.
+                  hasta ese momento. Recibirás un correo electrónico de confirmación de la cancelación.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+              <h3 className="text-lg font-medium mb-2">¿Puedo solicitar un reembolso?</h3>
+              <div className="text-gray-700">
+                <p>
+                  Conforme a la legislación española (artículo 103.m del TRLGDCU), el derecho de desistimiento no es aplicable a los contratos de suministro de contenido digital cuando la ejecución ha comenzado con el consentimiento expreso del usuario.
                 </p>
                 <p className="mt-2">
-                  No ofrecemos reembolsos por períodos parciales o no utilizados de membresía.
+                  Al contratar tu membresía y acceder al contenido exclusivo, consientes que la ejecución comience de inmediato y reconoces que pierdes el derecho de desistimiento. Por tanto, no proceden reembolsos por períodos parciales o no utilizados.
+                </p>
+                <p className="mt-2">
+                  No obstante, podrás solicitar un reembolso en casos excepcionales: error técnico que impida el acceso durante más de 7 días, doble cargo indebido, o incumplimiento grave por nuestra parte.
                 </p>
               </div>
             </div>
@@ -138,8 +167,19 @@ export default function FAQPage() {
               <h3 className="text-lg font-medium mb-2">¿Es seguro el pago de la membresía?</h3>
               <div className="text-gray-700">
                 <p>
-                  Sí, todos los pagos se procesan a través de Stripe, uno de los procesadores de pago más seguros y reconocidos del mundo. 
-                  No almacenamos tus datos de tarjeta en nuestros servidores, garantizando así la máxima seguridad en todas las transacciones.
+                  Sí, todos los pagos se procesan a través de <strong>Stripe Payments Europe, Ltd.</strong>, proveedor de servicios de pago autorizado y regulado por el Banco Central de Irlanda. Stripe cumple con los estándares de seguridad PCI-DSS Nivel 1, el nivel más alto de certificación disponible.
+                </p>
+                <p className="mt-2">
+                  No almacenamos tus datos de tarjeta en nuestros servidores. Estos son tratados directamente por Stripe, garantizando la máxima seguridad en todas las transacciones.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+              <h3 className="text-lg font-medium mb-2">¿Recibiré factura o recibo de mis pagos?</h3>
+              <div className="text-gray-700">
+                <p>
+                  Sí, recibirás un recibo electrónico por cada pago realizado, enviado automáticamente a tu dirección de correo electrónico. Si necesitas una factura con datos fiscales específicos, puedes solicitarla a través de info@lorenzosanz.com indicando tus datos de facturación.
                 </p>
               </div>
             </div>
@@ -245,6 +285,75 @@ export default function FAQPage() {
                   Si tienes algún problema con tu cuenta o suscripción, por favor envía un email a <a href="mailto:info@lorenzosanz.com" className="text-primary hover:underline">info@lorenzosanz.com</a> con 
                   todos los detalles posibles. Nuestro equipo de soporte te responderá en un plazo máximo de 48 horas. Para problemas urgentes relacionados con pagos, 
                   puedes usar el formulario de contacto especial en la sección de &quot;Ayuda&quot; de nuestra web.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="text-2xl font-semibold mb-6 text-primary">Información Legal y Transparencia</h2>
+          
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+              <h3 className="text-lg font-medium mb-2">¿Dónde puedo consultar la información legal de la Peña?</h3>
+              <div className="text-gray-700">
+                <p>
+                  Toda la información legal está disponible en nuestro sitio web:
+                </p>
+                <ul className="list-disc pl-6 mt-2 space-y-1">
+                  <li><a href="/aviso-legal" className="text-primary hover:underline">Aviso Legal</a> - Identificación del titular, CIF, naturaleza jurídica</li>
+                  <li><a href="/privacy-policy" className="text-primary hover:underline">Política de Privacidad</a> - Tratamiento de datos personales, derechos RGPD</li>
+                  <li><a href="/terms-and-conditions" className="text-primary hover:underline">Términos y Condiciones</a> - Condiciones de uso, membresías, pagos</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+              <h3 className="text-lg font-medium mb-2">¿Cómo puedo ejercer mis derechos de protección de datos?</h3>
+              <div className="text-gray-700">
+                <p>
+                  Conforme al Reglamento General de Protección de Datos (RGPD) y la LOPDGDD, tienes derecho a:
+                </p>
+                <ul className="list-disc pl-6 mt-2 space-y-1">
+                  <li>Acceder a tus datos personales</li>
+                  <li>Rectificar datos inexactos</li>
+                  <li>Solicitar la supresión de tus datos</li>
+                  <li>Oponerte al tratamiento</li>
+                  <li>Solicitar la limitación del tratamiento</li>
+                  <li>Solicitar la portabilidad de tus datos</li>
+                </ul>
+                <p className="mt-2">
+                  Para ejercer estos derechos, envía un correo a <a href="mailto:info@lorenzosanz.com" className="text-primary hover:underline">info@lorenzosanz.com</a> indicando tu solicitud y adjuntando copia de tu DNI.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+              <h3 className="text-lg font-medium mb-2">¿Ante quién puedo reclamar si tengo un problema?</h3>
+              <div className="text-gray-700">
+                <p>
+                  Te recomendamos que primero contactes con nosotros en info@lorenzosanz.com para intentar resolver cualquier incidencia.
+                </p>
+                <p className="mt-2">
+                  Si no quedas satisfecho, puedes:
+                </p>
+                <ul className="list-disc pl-6 mt-2 space-y-1">
+                  <li>Presentar una reclamación ante la <strong>Agencia Española de Protección de Datos (AEPD)</strong> en www.aepd.es para cuestiones de privacidad.</li>
+                  <li>Utilizar la <strong>Plataforma de Resolución de Litigios en Línea de la UE</strong>: <a href="https://ec.europa.eu/consumers/odr" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">https://ec.europa.eu/consumers/odr</a></li>
+                  <li>Acudir a los Juzgados y Tribunales de tu domicilio si eres consumidor.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
+              <h3 className="text-lg font-medium mb-2">¿Qué empresa procesa los pagos?</h3>
+              <div className="text-gray-700">
+                <p>
+                  Todos los pagos son procesados por <strong>Stripe Payments Europe, Ltd.</strong>, con domicilio en Irlanda. Stripe es un proveedor de servicios de pago autorizado y regulado por el Banco Central de Irlanda, y cumple con los más altos estándares de seguridad (PCI-DSS Nivel 1).
+                </p>
+                <p className="mt-2">
+                  Para más información, puedes consultar la <a href="https://stripe.com/es/privacy" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">Política de Privacidad de Stripe</a>.
                 </p>
               </div>
             </div>
