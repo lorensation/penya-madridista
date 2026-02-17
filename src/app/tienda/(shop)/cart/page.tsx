@@ -18,15 +18,16 @@ import {
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useCartStore, initializeStore } from "@/stores/cart"
-import { createCheckoutSession } from "@/app/actions/shop-checkout"
 import { formatShopPrice } from "@/lib/utils"
 
 export default function CartPage() {
   //const router = useRouter()
   const { toast } = useToast()
   const [isClient, setIsClient] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [isSubmitting, _setIsSubmitting] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [error, _setError] = useState<string | null>(null)
   
   const { items, removeItem, updateQuantity, getTotal, clearCart } = useCartStore()
   
@@ -55,34 +56,8 @@ export default function CartPage() {
       return
     }
     
-    setIsSubmitting(true)
-    setError(null)
-    
-    try {
-      const result = await createCheckoutSession(items)
-      
-      if (result.error) {
-        setError(result.error)
-        toast({
-          title: "Error al procesar el pago",
-          description: result.error,
-          variant: "destructive"
-        })
-      } else if (result.url) {
-        // Redirect to Stripe
-        window.location.href = result.url
-      }
-    } catch (err) {
-      console.error("Error during checkout:", err)
-      setError("Ha ocurrido un error al procesar tu pedido. Por favor, inténtalo de nuevo.")
-      toast({
-        title: "Error de procesamiento",
-        description: "Ha ocurrido un error al procesar tu pedido. Por favor, inténtalo de nuevo.",
-        variant: "destructive"
-      })
-    } finally {
-      setIsSubmitting(false)
-    }
+    // Navigate to checkout page (InSite payment form)
+    window.location.href = "/tienda/checkout"
   }
   
   // Calculate total
@@ -162,7 +137,7 @@ export default function CartPage() {
                     <TableCell>
                       <div className="relative aspect-square w-20 rounded-md bg-white border overflow-hidden">
                         <Image
-                          src={item.product.imageUrl}
+                          src={item.product.imageUrl || "/placeholder-product.png"}
                           alt={item.product.name}
                           fill
                           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -193,7 +168,7 @@ export default function CartPage() {
                           onClick={() => handleQuantityChange(
                             item.variant.id, 
                             item.qty - 1, 
-                            item.variant.inventory
+                            item.variant.inventory ?? 0
                           )}
                           disabled={item.qty <= 1}
                         >
@@ -203,13 +178,13 @@ export default function CartPage() {
                         <Input
                           type="number"
                           min="1"
-                          max={item.variant.inventory}
+                          max={item.variant.inventory ?? 0}
                           value={item.qty}
                           onChange={(e) =>
                             handleQuantityChange(
                               item.variant.id,
                               parseInt(e.target.value) || 1,
-                              item.variant.inventory
+                              item.variant.inventory ?? 0
                             )
                           }
                           className="h-8 w-14 text-center mx-2"
@@ -221,9 +196,9 @@ export default function CartPage() {
                           onClick={() => handleQuantityChange(
                             item.variant.id,
                             item.qty + 1,
-                            item.variant.inventory
+                            item.variant.inventory ?? 0
                           )}
-                          disabled={item.qty >= item.variant.inventory}
+                          disabled={item.qty >= (item.variant.inventory ?? 0)}
                         >
                           <Plus className="h-3 w-3" />
                           <span className="sr-only">Aumentar cantidad</span>

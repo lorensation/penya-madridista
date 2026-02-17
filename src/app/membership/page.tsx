@@ -1,36 +1,26 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Calendar, CreditCard, Award, BadgeCheck, Gift } from "lucide-react"
+import { CheckCircle, Calendar, CreditCard, Award, BadgeCheck, Gift, Loader2, ShieldCheck, AlertCircle, ArrowLeft } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import type { User } from "@supabase/supabase-js"
+import { RedsysInSiteForm } from "@/components/shop/redsys-insite-form"
+import { prepareMembershipPayment, executePayment } from "@/app/actions/payment"
+import type { PlanType, PaymentInterval } from "@/lib/redsys"
 
-// Define membership plans with direct checkout links
+// ── Membership Plans (amounts managed server-side in config.ts) ──────────────
+
 const membershipPlans = [
   {
-    id: "under25",
+    id: "under25" as PlanType,
     name: "Membresía Joven (Menores de 25)",
-    productId: process.env.NEXT_PUBLIC_STRIPE_UNDER25_PRODUCT_ID,
     paymentOptions: [
-      {
-        id: "monthly",
-        name: "Mensual",
-        price: "€5",
-        period: "/mes",
-        checkoutUrl: "https://buy.stripe.com/test_3cs3ch5c6aQN6E86ox",
-      },
-      {
-        id: "annual",
-        name: "Anual",
-        price: "€50",
-        period: "/año",
-        checkoutUrl: "https://buy.stripe.com/test_4gw9AF6ga5wtd2w7sv",
-        discount: "¡Ahorra 2 meses!"
-      }
+      { id: "monthly" as PaymentInterval, name: "Mensual", price: "€5", period: "/mes" },
+      { id: "annual" as PaymentInterval, name: "Anual", price: "€50", period: "/año", discount: "¡Ahorra 2 meses!" },
     ],
     features: [
       "Acceso a eventos exclusivos organizados por la peña",
@@ -41,25 +31,11 @@ const membershipPlans = [
     ],
   },
   {
-    id: "over25",
+    id: "over25" as PlanType,
     name: "Membresía Adulto (Mayores de 25)",
-    productId: process.env.NEXT_PUBLIC_STRIPE_OVER25_PRODUCT_ID,
     paymentOptions: [
-      {
-        id: "monthly",
-        name: "Mensual",
-        price: "€10",
-        period: "/mes",
-        checkoutUrl: "https://buy.stripe.com/test_bIY149dIC6AxgeI6ou",
-      },
-      {
-        id: "annual",
-        name: "Anual",
-        price: "€100",
-        period: "/año",
-        checkoutUrl: "https://buy.stripe.com/test_4gw5kpcEy6Ax9Qk7sx",
-        discount: "¡Ahorra 2 meses!"
-      }
+      { id: "monthly" as PaymentInterval, name: "Mensual", price: "€10", period: "/mes" },
+      { id: "annual" as PaymentInterval, name: "Anual", price: "€100", period: "/año", discount: "¡Ahorra 2 meses!" },
     ],
     features: [
       "Acceso a eventos exclusivos organizados por la peña",
@@ -71,25 +47,11 @@ const membershipPlans = [
     popular: true,
   },
   {
-    id: "family",
+    id: "family" as PlanType,
     name: "Membresía Familiar (Un adulto y un menor)",
-    productId: process.env.NEXT_PUBLIC_STRIPE_FAMILY_PRODUCT_ID,
     paymentOptions: [
-      {
-        id: "monthly",
-        name: "Mensual",
-        price: "€15",
-        period: "/mes",
-        checkoutUrl: "https://buy.stripe.com/test_14k149fQK2kh4w06ow",
-      },
-      {
-        id: "annual",
-        name: "Anual",
-        price: "€150",
-        period: "/año",
-        checkoutUrl: "https://buy.stripe.com/test_dR67sx8oi0c99Qk6ov",
-        discount: "¡Ahorra 2 meses!"
-      }
+      { id: "monthly" as PaymentInterval, name: "Mensual", price: "€15", period: "/mes" },
+      { id: "annual" as PaymentInterval, name: "Anual", price: "€150", period: "/año", discount: "¡Ahorra 2 meses!" },
     ],
     features: [
       "Todos los beneficios de la membresía individual",
@@ -101,6 +63,8 @@ const membershipPlans = [
   },
 ]
 
+type PageStep = "select" | "payment" | "processing" | "success"
+
 export default function Membership() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
@@ -110,15 +74,17 @@ export default function Membership() {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
   const [selectedPaymentOption, setSelectedPaymentOption] = useState<string | null>(null)
 
+  // Payment flow state
+  const [step, setStep] = useState<PageStep>("select")
+  const [orderNumber, setOrderNumber] = useState<string | null>(null)
+
   useEffect(() => {
     const checkUserAndMembership = async () => {
       try {
         setIsLoading(true)
-        // Get the current user
         const { data: userData } = await supabase.auth.getUser()
         setUser(userData.user)
 
-        // If user is logged in, check if they are a member
         if (userData.user) {
           const { data: memberData, error: memberError } = await supabase
             .from('users')
@@ -145,14 +111,17 @@ export default function Membership() {
 
   const handleSelectPlan = (planId: string) => {
     setSelectedPlan(planId)
-    setSelectedPaymentOption(null) // Reset payment option when plan changes
+    setSelectedPaymentOption(null)
+    setStep("select")
+    setError(null)
   }
 
   const handleSelectPaymentOption = (optionId: string) => {
     setSelectedPaymentOption(optionId)
   }
 
-  const handleSubscribe = () => {
+  // Initiate payment — prepare order and show InSite form
+  const handleSubscribe = async () => {
     if (!selectedPlan || !selectedPaymentOption) return
 
     if (!user) {
@@ -160,22 +129,58 @@ export default function Membership() {
       return
     }
 
-    // Get the selected plan and payment option
-    const plan = membershipPlans.find((p) => p.id === selectedPlan)
-    if (!plan) {
-      setError("Plan not found")
-      return
-    }
+    setError(null)
+    setStep("processing")
 
-    const paymentOption = plan.paymentOptions.find((o) => o.id === selectedPaymentOption)
-    if (!paymentOption) {
-      setError("Payment option not found")
-      return
-    }
+    try {
+      const result = await prepareMembershipPayment(
+        selectedPlan as PlanType,
+        selectedPaymentOption as PaymentInterval,
+      )
 
-    // Redirect to the direct Stripe checkout URL
-    window.location.href = paymentOption.checkoutUrl
+      if (!result.success || !result.order) {
+        setError(result.error || "Error al preparar el pago")
+        setStep("select")
+        return
+      }
+
+      setOrderNumber(result.order)
+      setStep("payment")
+    } catch (err) {
+      console.error("Error preparing membership payment:", err)
+      setError("Error al preparar el pago. Inténtalo de nuevo.")
+      setStep("select")
+    }
   }
+
+  // Handle idOper from InSite → execute payment with tokenization
+  const handleIdOperReceived = useCallback(
+    async (idOper: string) => {
+      if (!orderNumber) return
+      setStep("processing")
+      setError(null)
+
+      try {
+        const result = await executePayment(idOper, orderNumber, "membership")
+
+        if (result.success) {
+          setStep("success")
+        } else {
+          setError(result.error || "Pago denegado. Por favor, revisa los datos de tu tarjeta.")
+          setStep("payment")
+        }
+      } catch (err) {
+        console.error("Error executing membership payment:", err)
+        setError("Error al procesar el pago")
+        setStep("payment")
+      }
+    },
+    [orderNumber],
+  )
+
+  const handlePaymentError = useCallback((message: string) => {
+    setError(message)
+  }, [])
 
   // Render loading state
   if (isLoading) {
@@ -243,7 +248,107 @@ export default function Membership() {
     )
   }
 
-  // Original non-member UI
+  // ── Success view ──────────────────────────────────────────────────────────
+  if (step === "success") {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12 md:py-24">
+        <div className="container mx-auto px-4">
+          <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-8 text-center">
+            <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+            <h1 className="text-3xl font-bold text-primary mb-4">¡Bienvenido a la Peña!</h1>
+            <p className="text-lg text-gray-600 mb-6">
+              Tu suscripción se ha activado correctamente. Ya eres socio de la Peña Lorenzo Sanz.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link href="/dashboard/membership">
+                <Button size="lg" className="px-6">Gestionar mi membresía</Button>
+              </Link>
+              <Link href="/dashboard">
+                <Button size="lg" variant="outline" className="px-6">Ir al panel</Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Get selected plan/option helpers ─────────────────────────────────────
+  const selectedPlanData = membershipPlans.find((p) => p.id === selectedPlan)
+  const selectedOptionData = selectedPlanData?.paymentOptions.find((o) => o.id === selectedPaymentOption)
+
+  // ── Payment view (InSite card form) ─────────────────────────────────────
+  if (step === "payment" && orderNumber && selectedPlanData && selectedOptionData) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12 md:py-24">
+        <div className="container mx-auto px-4">
+          <div className="max-w-xl mx-auto">
+
+            {/* Back button */}
+            <button
+              type="button"
+              onClick={() => { setStep("select"); setOrderNumber(null); setError(null) }}
+              className="flex items-center gap-2 text-gray-600 hover:text-primary mb-6 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" /> Volver a selección de plan
+            </button>
+
+            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+              <h2 className="text-xl font-bold text-primary mb-2">Resumen de tu suscripción</h2>
+              <div className="flex justify-between items-center py-3 border-b">
+                <span className="text-gray-600">{selectedPlanData.name}</span>
+                <span className="font-semibold">
+                  {selectedOptionData.price}
+                  <span className="text-sm font-normal text-gray-500">{selectedOptionData.period}</span>
+                </span>
+              </div>
+              {selectedOptionData.discount && (
+                <p className="text-sm text-green-600 mt-2">{selectedOptionData.discount}</p>
+              )}
+            </div>
+
+            {error && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-bold mb-4">Introduce los datos de tu tarjeta</h3>
+              <RedsysInSiteForm
+                order={orderNumber}
+                onIdOperReceived={handleIdOperReceived}
+                onError={handlePaymentError}
+                buttonText="Suscribirse y pagar"
+              />
+            </div>
+
+            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-gray-500">
+              <ShieldCheck className="h-4 w-4" />
+              <span>Pago seguro procesado por Redsys</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Processing spinner ──────────────────────────────────────────────────
+  if (step === "processing") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 md:py-24">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+          <p className="mt-4 text-gray-600">Procesando tu pago...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Plan selection (default) ────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 py-12 md:py-24">
       <div className="container mx-auto px-4">
@@ -260,11 +365,11 @@ export default function Membership() {
 
         {error && (
           <Alert variant="destructive" className="max-w-3xl mx-auto mb-8">
+            <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        
-        {/* Rest of the original UI */}
+
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {membershipPlans.map((plan) => (
@@ -275,7 +380,7 @@ export default function Membership() {
                 } ${selectedPlan === plan.id ? "ring-2 ring-primary" : ""}`}
                 onClick={() => handleSelectPlan(plan.id)}
               >
-                <div className={`${plan.popular ? "bg-primary text-white" : "bg-primary text-white"} p-6 text-center relative`}>
+                <div className={`bg-primary text-white p-6 text-center relative`}>
                   {plan.popular && (
                     <div className="absolute top-0 right-0 bg-accent text-primary text-xs font-bold px-3 py-1 transform translate-y-2 rotate-45">
                       POPULAR
@@ -284,7 +389,7 @@ export default function Membership() {
                   <h2 className="text-2xl font-bold">{plan.name}</h2>
                 </div>
                 <div className="p-6 flex-grow flex flex-col">
-                  {/* Price preview section */}
+                  {/* Price preview */}
                   <div className="mb-6 border-b pb-4">
                     <div className="flex justify-between items-center mb-2">
                       <div className="flex items-center">
@@ -319,9 +424,7 @@ export default function Membership() {
                       className={`w-full ${
                         selectedPlan === plan.id
                           ? "bg-primary"
-                          : plan.popular
-                            ? "bg-gray-200 text-black hover:bg-primary hover:text-white"
-                            : "bg-gray-200 text-black hover:bg-primary hover:text-white"
+                          : "bg-gray-200 text-black hover:bg-primary hover:text-white"
                       }`}
                       onClick={() => handleSelectPlan(plan.id)}
                     >
@@ -373,13 +476,17 @@ export default function Membership() {
           )}
 
           <div className="mt-8 text-center">
-            <Button 
-              size="lg" 
-              onClick={handleSubscribe} 
-              disabled={!selectedPlan || !selectedPaymentOption} 
+            <Button
+              size="lg"
+              onClick={handleSubscribe}
+              disabled={!selectedPlan || !selectedPaymentOption || (step as PageStep) === "processing"}
               className="px-8 py-6 text-lg"
             >
-              {user ? "Continuar con el pago" : "Iniciar Sesión para Suscribirse"}
+              {!user
+                ? "Iniciar Sesión para Suscribirse"
+                : (step as PageStep) === "processing"
+                  ? <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Preparando pago...</>
+                  : "Continuar con el pago"}
             </Button>
           </div>
 

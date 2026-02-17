@@ -7,8 +7,8 @@ interface ProductCardProps {
   id: string
   name: string
   slug: string
-  description: string
-  imageUrl: string
+  description: string | null
+  imageUrl: string | null
   price: string
   category?: string
   className?: string

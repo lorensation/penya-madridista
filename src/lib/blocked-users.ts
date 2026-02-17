@@ -3,24 +3,22 @@
 import { createAdminSupabaseClient } from "@/lib/supabase";
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
+import type { Database } from "@/types/supabase";
 
 export type BlockReasonType = 
   | 'spam'
-  | 'harassment'
-  | 'inappropriate_content'
-  | 'fake_account'
-  | 'payment_issues'
-  | 'multiple_accounts'
+  | 'inappropriate_behavior'
   | 'violation_of_terms'
+  | 'security_risk'
   | 'other';
 
 export interface BlockedUser {
   id: string;
   user_id: string;
   reason_type: BlockReasonType;
-  reason?: string | null;
-  blocked_by?: string | null;
-  blocked_at: string;
+  reason: string;
+  blocked_by: string;
+  created_at: string;
   notes?: string | null;
 }
 
@@ -81,8 +79,8 @@ export async function blockUser(
       const { error } = await supabase
         .from('blocked_users')
         .update({
-          reason_type: reasonType,
-          reason: reasonDetails || null,
+          reason_type: reasonType as Database["public"]["Enums"]["block_reason_type"],
+          reason: reasonDetails || "Blocked by administrator",
           notes: notes || null,
           blocked_by: adminId,
           created_at: new Date().toISOString()
@@ -99,8 +97,8 @@ export async function blockUser(
         .from('blocked_users')
         .insert({
           user_id: userId,
-          reason_type: reasonType,
-          reason: reasonDetails || null,
+          reason_type: reasonType as Database["public"]["Enums"]["block_reason_type"],
+          reason: reasonDetails || "Blocked by administrator",
           notes: notes || null,
           blocked_by: adminId
         });
@@ -170,7 +168,7 @@ export async function getBlockedUsers(): Promise<BlockedUser[]> {
       return [];
     }
     
-    return data || [];
+    return (data || []) as BlockedUser[];
   } catch (error) {
     console.error("Unexpected error in getBlockedUsers:", error);
     return [];

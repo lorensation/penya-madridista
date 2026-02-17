@@ -63,12 +63,12 @@ const supabase = createAdminSupabaseClient()
 
 ### 3. Database Schema (Key Tables)
 - **`users`**: Basic auth user info (id, email, name, is_member)
-- **`miembros`**: Full member profiles (personal data, subscription, role, stripe_customer_id)
+- **`miembros`**: Full member profiles (personal data, subscription, role, redsys_token)
   - `role`: 'member' | 'admin' - Admin routes check this field
   - `subscription_status`: 'active' | 'inactive' | 'trialing' | 'canceled' | 'expired'
 - **`blocked_users`**: User bans (user_id, reason_type, reason, blocked_at, notes)
 - **`site_settings`**: Global config (maintenance_mode, etc.)
-- **`checkout_sessions`**: Track Stripe checkout sessions
+- **`payment_transactions`**: Central payment ledger (redsys_order, redsys_token, cof_txn_id, status)
 - **`member_invites`**: Admin invitations with tokens
 
 ### 4. Authentication & Authorization Flow
@@ -98,40 +98,44 @@ const { data: member } = await supabase
 if (member?.role !== "admin") { /* deny */ }
 ```
 
-### 5. Stripe Integration
+### 5. Payment Integration (RedSys / Getnet)
 
-**Two Payment Systems:**
+**Two Payment Contexts:**
 1. **Subscriptions** (membership plans):
-   - Webhook: `STRIPE_WEBHOOK_SECRET` (main)
-   - Handled by `src/app/api/webhooks/stripe/route.ts`
-   - Events: `checkout.session.completed`, `customer.subscription.*`, `invoice.*`
+   - Server action: `src/app/actions/payment.ts` (`prepareMembershipPayment`, `executePayment`)
+   - Notification webhook: `src/app/api/payments/redsys/notification/route.ts`
+   - Inline payment via RedSys InSite iframe on the membership page
 
 2. **E-commerce** (shop products):
-   - Webhook: `STRIPE_WEBHOOK_SECRET_SHOP`
+   - Server action: `src/app/actions/payment.ts` (`prepareShopCheckout`, `executePayment`)
    - Cart stored in Zustand (`stores/cart.ts`)
-   - Products have variants with `stripePriceId`
+   - Products have variants; payment via RedSys InSite
 
 **Payment Flow**:
 ```typescript
-// Create checkout session (server action)
-import { stripe } from "@/lib/stripe-server"
-const session = await stripe.checkout.sessions.create({
-  customer: customerId,
-  line_items: [{ price: priceId, quantity: 1 }],
-  mode: "subscription", // or "payment" for shop
-  success_url: `${baseUrl}/success`,
-  cancel_url: `${baseUrl}/cancel`,
-})
+// 1. Prepare payment (server action)
+import { prepareMembershipPayment, executePayment } from "@/app/actions/payment"
+const { order, merchantParams, signature } = await prepareMembershipPayment(planType, interval)
+
+// 2. Client-side: Collect card via RedSys InSite iframe
+// 3. Execute payment (server action)
+const result = await executePayment(order, cardToken)
 ```
+
+**Key library files:**
+- `src/lib/redsys/` — crypto, types, request building, signature verification
+- `src/app/api/payments/redsys/notification/route.ts` — server-to-server callback
+- DB table: `payment_transactions` — central payment ledger
 
 ### 6. Environment Variables (Required)
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=          # Admin operations
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=               # Subscriptions
-STRIPE_WEBHOOK_SECRET_SHOP=          # E-commerce
+REDSYS_MERCHANT_CODE=               # e.g. 048190003
+REDSYS_TERMINAL=                     # e.g. 1
+REDSYS_SECRET_KEY=                   # SHA-256 merchant key
+REDSYS_ENV=test                      # 'test' or 'production'
 NEXT_PUBLIC_BASE_URL=                # For redirects
 ```
 
@@ -164,9 +168,13 @@ Components auto-install to `src/components/ui/` with proper aliases.
 2. Regenerate types: Export schema → update `src/types/supabase.ts`
 3. Update `src/types/common.ts` for app-level types
 
-### Testing Webhooks Locally
+### Testing Payments Locally
+Use RedSys test environment (sandbox). Test cards are available at https://pagosonline.redsys.es/funcionalidades-702702702702.html
+The notification URL must be publicly reachable — use ngrok or similar for local testing:
 ```powershell
-stripe listen --forward-to localhost:3000/api/webhooks/stripe
+# Expose local Next.js for RedSys notifications
+ngrok http 3000
+# Then set NEXT_PUBLIC_BASE_URL to the ngrok URL
 ```
 
 ## Common Gotchas
@@ -175,7 +183,7 @@ stripe listen --forward-to localhost:3000/api/webhooks/stripe
 2. **Blocked users MUST be signed out** - middleware handles this with explicit cookie deletion
 3. **Admin checks use `miembros.role`** not `users` table
 4. **Shop routes (`/tienda/`) allow public GET requests** - no auth required for browsing
-5. **Complete-profile requires `session_id` param** - redirect to `/membership` if missing
+5. **Complete-profile requires `session_id` or `admin_invite` param** - redirect to `/membership` if missing
 6. **Use `revalidatePath()` after mutations** to update Server Components
 7. **Analytics TODO**: Replace placeholder GA ID in `components/analytics-provider.tsx`
 
@@ -183,7 +191,9 @@ stripe listen --forward-to localhost:3000/api/webhooks/stripe
 
 - **Auth flow**: `middleware.ts`, `src/app/actions/auth.ts`, `src/context/AuthContext.tsx`
 - **Admin operations**: `src/app/actions/admin-members.ts`, `src/lib/blocked-users.ts`
-- **Stripe webhooks**: `src/app/api/webhooks/stripe/route.ts` (843 lines - handles all events)
+- **Payment actions**: `src/app/actions/payment.ts` (RedSys InSite flow)
+- **RedSys notification**: `src/app/api/payments/redsys/notification/route.ts`
+- **RedSys library**: `src/lib/redsys/` (crypto, types, request building)
 - **Cart logic**: `src/stores/cart.ts` (Zustand with localStorage persistence)
 - **Email templates**: `src/lib/email.ts` (Mailgun integration)
 - **Type definitions**: `src/types/supabase.ts` (database), `src/types/common.ts` (app)
@@ -228,4 +238,4 @@ All admin pages use shared layout (`src/app/admin/layout.tsx`) with navigation -
 
 ---
 
-**Developed by Cineronte S.L.** - When modifying core flows (auth, payments, blocked users), test thoroughly across middleware, actions, and webhooks.
+**Developed by Cineronte S.L.** - When modifying core flows (auth, payments, blocked users), test thoroughly across middleware, actions, and notification webhooks.

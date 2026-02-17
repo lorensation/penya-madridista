@@ -195,7 +195,7 @@ export default function SettingsPage() {
             .from("users")
             .insert({
               id: userData.user.id,
-              email: userData.user.email,
+              email: userData.user.email!,
               name: userData.user.user_metadata?.name || "",
               is_member: false,
               created_at: new Date().toISOString(),
@@ -235,13 +235,16 @@ export default function SettingsPage() {
             console.log("User marked as member but no member data found, creating basic member record")
             const newMemberData = {
               user_uuid: userData.user.id,
-              auth_id: userData.user.id, // Add both ID fields for compatibility
               email: userData.user.email || "",
               name: publicUserData.name || userData.user.user_metadata?.name || "",
               email_notifications: true,
               marketing_emails: true,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
+              es_socio_realmadrid: false,
+              fecha_nacimiento: "1990-01-01",
+              socio_carnet_madridista: false,
+              telefono: 0,
             }
             
             try {
@@ -390,7 +393,7 @@ export default function SettingsPage() {
       name: formData.name,
       apellido1: formData.apellido1,
       apellido2: formData.apellido2,
-      telefono: formData.phone ? Number.parseInt(formData.phone, 10) : null,
+      telefono: formData.phone ? Number.parseInt(formData.phone, 10) : undefined,
       direccion: formData.address,
       poblacion: formData.city,
       cp: formData.postalCode ? Number.parseInt(formData.postalCode, 10) : null,
@@ -541,11 +544,14 @@ export default function SettingsPage() {
         // Create a new member record
         const newMemberData = {
           user_uuid: user.id,
-          auth_id: user.id, // Add both ID fields for compatibility
           email: user?.email || userData?.email || "",
           name: formData.name || user?.user_metadata?.name || "",
           email_notifications: formData.emailNotifications,
           marketing_emails: formData.marketingEmails,
+          es_socio_realmadrid: false,
+          fecha_nacimiento: "1990-01-01",
+          socio_carnet_madridista: false,
+          telefono: 0,
         }
 
         const { error: createMemberError } = await supabase

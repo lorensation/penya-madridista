@@ -44,7 +44,7 @@ export function AddToCartButton({
   return (
     <Button 
       onClick={handleAddToCart}
-      disabled={adding || productVariant.inventory <= 0}
+      disabled={adding || (productVariant.inventory ?? 0) <= 0}
       className={className}
       variant={buttonVariant}
     >
@@ -53,7 +53,7 @@ export function AddToCartButton({
           {showIcon && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {showLabel && "Añadiendo..."}
         </>
-      ) : productVariant.inventory <= 0 ? (
+      ) : (productVariant.inventory ?? 0) <= 0 ? (
         <>
           {showLabel && "Agotado"}
         </>

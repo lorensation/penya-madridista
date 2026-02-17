@@ -138,39 +138,6 @@ export async function getMemberData() {
 }
 
 /**
- * Get subscription status for the current user
- * @returns Subscription information or default values if not found
- */
-export async function getSubscriptionStatus() {
-  try {
-    const memberData = await getMemberData();
-    
-    if (!memberData) {
-      return {
-        status: 'unknown',
-        plan: null,
-        lastUpdated: null
-      };
-    }
-    
-    return {
-      status: memberData.subscription_status || 'inactive',
-      plan: memberData.subscription_plan,
-      lastUpdated: memberData.subscription_updated_at,
-      customerId: memberData.stripe_customer_id,
-      lastFour: memberData.last_four
-    };
-  } catch (error) {
-    console.error("Error getting subscription status:", error);
-    return {
-      status: 'error',
-      plan: null,
-      lastUpdated: null
-    };
-  }
-}
-
-/**
  * Helper function to get a member profile using multiple lookup methods
  * @param userId The user's ID
  * @param email The user's email

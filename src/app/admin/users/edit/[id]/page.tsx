@@ -170,7 +170,7 @@ export default function UserDetailsPage() {
           apellido1: miembro.apellido1,
           apellido2: miembro.apellido2,
           email: miembro.email,
-          telefono: miembro.telefono ? Number(miembro.telefono) : null,
+          telefono: miembro.telefono ? Number(miembro.telefono) : undefined,
           dni_pasaporte: miembro.dni_pasaporte,
           es_socio_realmadrid: miembro.es_socio_realmadrid,
           num_socio: miembro.num_socio ? Number(miembro.num_socio) : null,
@@ -185,7 +185,7 @@ export default function UserDetailsPage() {
           fecha_nacimiento: miembro.fecha_nacimiento,
           role: miembro.role, // This handles the admin role change
         })
-        .eq('user_uuid', miembro.user_uuid)
+        .eq('user_uuid', miembro.user_uuid!)
       
       if (error) {
         setTimeout(() => {
@@ -225,7 +225,7 @@ export default function UserDetailsPage() {
       const { error } = await supabase
         .from('miembros')
         .delete()
-        .eq('user_uuid', miembro.user_uuid)
+        .eq('user_uuid', miembro.user_uuid!)
       
       if (error) {
         throw new Error("Error al eliminar el miembro: " + error.message)
@@ -259,7 +259,7 @@ export default function UserDetailsPage() {
           subscription_plan: 'infinite', // Special plan type that indicates permanent subscription
           subscription_updated_at: new Date().toISOString()
         })
-        .eq('user_uuid', miembro.user_uuid)
+        .eq('user_uuid', miembro.user_uuid!)
       
       if (error) {
         throw new Error("Error al establecer la suscripción infinita: " + error.message)
@@ -302,7 +302,7 @@ export default function UserDetailsPage() {
           role: 'admin',
           updated_at: new Date().toISOString()
         })
-        .eq('user_uuid', miembro.user_uuid)
+        .eq('user_uuid', miembro.user_uuid!)
       
       if (error) {
         throw new Error("Error al establecer el rol de administrador: " + error.message)
@@ -722,14 +722,24 @@ export default function UserDetailsPage() {
                   </div>
                 )}
                 
-                {miembro.stripe_customer_id && (
+                {miembro.redsys_token && (
                   <div className="space-y-2">
-                    <Label>ID de Cliente en Stripe</Label>
+                    <Label>Token de pago (RedSys)</Label>
                     <div className="flex items-center">
                       <CreditCard className="h-4 w-4 mr-2 text-gray-500" />
                       <code className="bg-gray-100 px-2 py-1 rounded text-sm">
-                        {miembro.stripe_customer_id}
+                        {miembro.redsys_token}
                       </code>
+                    </div>
+                  </div>
+                )}
+                
+                {miembro.last_four && (
+                  <div className="space-y-2">
+                    <Label>Últimos 4 dígitos de tarjeta</Label>
+                    <div className="flex items-center">
+                      <CreditCard className="h-4 w-4 mr-2 text-gray-500" />
+                      <span className="text-sm">**** **** **** {miembro.last_four}</span>
                     </div>
                   </div>
                 )}

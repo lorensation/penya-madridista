@@ -11,7 +11,7 @@ export default function PrivacyPolicyPage() {
       <h1 className="text-3xl font-bold mb-8">Política de Privacidad</h1>
       
       <div className="prose max-w-none">
-        <p className="text-sm text-gray-500 mb-6">Última actualización: 15 de diciembre de 2025</p>
+        <p className="text-sm text-gray-500 mb-6">Última actualización: 16 de febrero de 2026</p>
 
         <div className="mb-8">
           <h2 className="text-2xl font-semibold mb-4">1. Introducción</h2>
@@ -114,7 +114,7 @@ export default function PrivacyPolicyPage() {
               números de teléfono.
             </li>
             <li>
-              <strong>Datos financieros</strong> como detalles de tarjetas de pago. Nota importante: Los datos de su tarjeta de crédito o débito son procesados directamente por nuestro proveedor de servicios de pago, <strong>Stripe Payments Europe, Ltd.</strong>, y nunca son almacenados en nuestros servidores. Stripe es un proveedor certificado PCI-DSS Nivel 1.
+              <strong>Datos financieros</strong> como detalles de tarjetas de pago. Nota importante: Los datos de su tarjeta de crédito o débito son procesados directamente por nuestro proveedor de servicios de pago, <strong>Redsys Servicios de Procesamiento, S.L.</strong> (en adelante, &quot;RedSys&quot;), a través de su pasarela de pago segura, y nunca son almacenados en nuestros servidores. RedSys es un proveedor certificado PCI-DSS Nivel 1, regulado por el Banco de España.
             </li>
             <li>
               <strong>Datos de transacciones</strong> como detalles sobre los pagos de y hacia usted (importes, fechas, conceptos), historial de membresías y compras realizadas en nuestra tienda.
@@ -187,16 +187,16 @@ export default function PrivacyPolicyPage() {
               varios terceros como se establece a continuación:
               <ul className="list-disc pl-6 my-2 space-y-1">
                 <li>Datos Técnicos de proveedores de análisis como Google Analytics;</li>
-                <li>Datos de Contacto, Financieros y de Transacciones de proveedores de servicios de pago como <strong>Stripe Payments Europe, Ltd.</strong> (procesador de pagos autorizado y regulado por el Banco Central de Irlanda);</li>
+                <li>Datos de Contacto, Financieros y de Transacciones de proveedores de servicios de pago como <strong>Redsys Servicios de Procesamiento, S.L.</strong> (pasarela de pago autorizada y regulada por el Banco de España);</li>
                 <li>Datos de Identidad y Contacto de fuentes públicamente disponibles.</li>
               </ul>
             </li>
           </ul>
           
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 my-4">
-            <h4 className="font-semibold mb-2">Información sobre Stripe como encargado del tratamiento</h4>
-            <p>Stripe Payments Europe, Ltd. actúa como encargado del tratamiento de los datos de pago en nuestro nombre. Stripe procesa los datos de su tarjeta de forma segura conforme a los estándares PCI-DSS y no comparte sus datos financieros con nosotros más allá de la información necesaria para confirmar la transacción (últimos 4 dígitos de la tarjeta, tipo de tarjeta, estado de la transacción).</p>
-            <p className="mt-2">Para más información sobre cómo Stripe trata sus datos, consulte la <a href="https://stripe.com/es/privacy" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">Política de Privacidad de Stripe</a>.</p>
+            <h4 className="font-semibold mb-2">Información sobre RedSys como encargado del tratamiento</h4>
+            <p>Redsys Servicios de Procesamiento, S.L. actúa como encargado del tratamiento de los datos de pago en nuestro nombre. RedSys procesa los datos de su tarjeta de forma segura conforme a los estándares PCI-DSS a través de su pasarela de pago con autenticación 3D Secure (EMV 3DS), y no comparte sus datos financieros con nosotros más allá de la información necesaria para confirmar la transacción (últimos 4 dígitos de la tarjeta, tipo de tarjeta, estado de la transacción).</p>
+            <p className="mt-2">Para más información sobre cómo RedSys trata sus datos, consulte la <a href="https://www.redsys.es/en/data-protection.html" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">Política de Protección de Datos de RedSys</a>.</p>
           </div>
         </div>
 
@@ -396,7 +396,7 @@ export default function PrivacyPolicyPage() {
           </p>
           <ul className="list-disc pl-6 my-4 space-y-2">
             <li>
-              <strong>Stripe Payments Europe, Ltd.</strong> (Irlanda) como encargado del tratamiento para el procesamiento de pagos de membresías y compras. Stripe está autorizado y regulado por el Banco Central de Irlanda y cumple con PCI-DSS Nivel 1.
+              <strong>Redsys Servicios de Procesamiento, S.L.</strong> (España) como encargado del tratamiento para el procesamiento de pagos de membresías y compras a través de su pasarela de pago segura. RedSys está autorizado y regulado por el Banco de España y cumple con PCI-DSS Nivel 1.
             </li>
             <li>
               Proveedores de servicios que actúan como procesadores que proporcionan servicios de TI, alojamiento web y administración de sistemas (Vercel, Supabase).

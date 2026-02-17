@@ -20,7 +20,7 @@ The Peña Lorenzo Sanz website serves as a digital hub for members and supporter
 ### Membership System
 - **Tiered Membership Plans**: Various membership options (Under 25, Over 25, Family plans)
 - **Subscription Management**: Monthly and annual subscription options
-- **Payment Processing**: Secure payment processing via Stripe
+- **Payment Processing**: Secure payment processing via RedSys / Getnet
 - **Digital Membership Cards**: For verified members
 
 ### Content Management
@@ -47,12 +47,12 @@ The Peña Lorenzo Sanz website serves as a digital hub for members and supporter
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14, React.js, TypeScript, Tailwind CSS
+- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
 - **Backend**: Server-side components, Serverless functions
 - **Authentication**: Supabase Auth
 - **Database**: PostgreSQL (via Supabase)
 - **File Storage**: Supabase Storage
-- **Payment Processing**: Stripe API
+- **Payment Processing**: RedSys / Getnet (Comercia Global Payments)
 - **Email Service**: Custom email service
 - **Hosting**: Vercel
 

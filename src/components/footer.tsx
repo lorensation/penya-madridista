@@ -111,7 +111,7 @@ export default function Footer() {
         </div>
         <div className="mt-8 border-t border-white/20 pt-8 text-center">
           <p className="text-sm">&copy; {new Date().getFullYear()} Peña Madridista Lorenzo Sanz Siempre Presente. Todos los derechos reservados.</p>
-          <p className="text-xs mt-2 text-white/60">Pagos seguros procesados por Stripe Payments Europe, Ltd.</p>
+          <p className="text-xs mt-2 text-white/60">Pagos seguros procesados a través de RedSys / Getnet (Comercia Global Payments), entidad de pago autorizada por el Banco de España.</p>
         </div>
       </div>
     </footer>

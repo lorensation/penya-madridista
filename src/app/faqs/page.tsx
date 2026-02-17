@@ -167,10 +167,10 @@ export default function FAQPage() {
               <h3 className="text-lg font-medium mb-2">¿Es seguro el pago de la membresía?</h3>
               <div className="text-gray-700">
                 <p>
-                  Sí, todos los pagos se procesan a través de <strong>Stripe Payments Europe, Ltd.</strong>, proveedor de servicios de pago autorizado y regulado por el Banco Central de Irlanda. Stripe cumple con los estándares de seguridad PCI-DSS Nivel 1, el nivel más alto de certificación disponible.
+                  Sí, todos los pagos se procesan a través de <strong>RedSys / Getnet (Comercia Global Payments)</strong>, plataforma de pago autorizada y regulada por el Banco de España. RedSys cumple con los estándares de seguridad PCI-DSS Nivel 1, el nivel más alto de certificación disponible.
                 </p>
                 <p className="mt-2">
-                  No almacenamos tus datos de tarjeta en nuestros servidores. Estos son tratados directamente por Stripe, garantizando la máxima seguridad en todas las transacciones.
+                  No almacenamos tus datos de tarjeta en nuestros servidores. Estos son tratados directamente por RedSys, garantizando la máxima seguridad en todas las transacciones.
                 </p>
               </div>
             </div>
@@ -350,10 +350,10 @@ export default function FAQPage() {
               <h3 className="text-lg font-medium mb-2">¿Qué empresa procesa los pagos?</h3>
               <div className="text-gray-700">
                 <p>
-                  Todos los pagos son procesados por <strong>Stripe Payments Europe, Ltd.</strong>, con domicilio en Irlanda. Stripe es un proveedor de servicios de pago autorizado y regulado por el Banco Central de Irlanda, y cumple con los más altos estándares de seguridad (PCI-DSS Nivel 1).
+                  Todos los pagos son procesados por <strong>RedSys / Getnet (Comercia Global Payments)</strong>, entidad de pago autorizada y regulada por el Banco de España, y cumple con los más altos estándares de seguridad (PCI-DSS Nivel 1).
                 </p>
                 <p className="mt-2">
-                  Para más información, puedes consultar la <a href="https://stripe.com/es/privacy" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">Política de Privacidad de Stripe</a>.
+                  Para más información, puedes consultar la <a href="https://www.redsys.es/" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">página web de RedSys</a>.
                 </p>
               </div>
             </div>

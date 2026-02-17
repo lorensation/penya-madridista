@@ -1,6 +1,15 @@
 const nextConfig = {
   images: {
-    domains: ['kuxnugwdppajyxdoygzy.supabase.co', 'maps.googleapis.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'dlijdwtlrmutbcdyeugq.supabase.co',
+      },
+      {
+        protocol: 'https',
+        hostname: 'maps.googleapis.com',
+      },
+    ],
   },
 };
 

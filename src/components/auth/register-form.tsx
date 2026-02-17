@@ -83,14 +83,17 @@ export function RegisterForm() {
 
       // Create a record in the users table
       try {
-        await supabase.from("users").insert({
-          id: (await supabase.auth.getUser()).data.user?.id,
-          email: values.email,
-          name: values.name,
-          is_member: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
+        if (currentUser?.id) {
+          await supabase.from("users").insert({
+            id: currentUser.id,
+            email: values.email,
+            name: values.name,
+            is_member: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        }
       } catch (userError) {
         console.error("Error creating user record:", userError);
         // Continue even if this fails, as the auth user was created successfully

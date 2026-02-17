@@ -16,16 +16,15 @@ interface AddToCartFormProps {
     id: string
     name: string
     slug: string
-    description: string
-    image_url: string
+    description: string | null
+    image_url: string | null
     category: string
   }
   variants: {
     id: string
-    sku: string
+    sku: string | null
     price_cents: number
-    inventory: number
-    stripe_price_id: string
+    inventory: number | null
     option: Record<string, string>
     active: boolean
   }[]
@@ -37,10 +36,9 @@ export function AddToCartForm({ product, variants, optionTypes }: AddToCartFormP
   const [quantity, setQuantity] = useState(1)
   const [selectedVariant, setSelectedVariant] = useState<{
     id: string
-    sku: string
+    sku: string | null
     price_cents: number
-    inventory: number
-    stripe_price_id: string
+    inventory: number | null
     option: Record<string, string>
     active: boolean
   } | null>(null)
@@ -103,7 +101,7 @@ export function AddToCartForm({ product, variants, optionTypes }: AddToCartFormP
 
   // Increment quantity
   const incrementQuantity = () => {
-    if (selectedVariant && quantity < selectedVariant.inventory) {
+    if (selectedVariant && quantity < (selectedVariant.inventory ?? 0)) {
       setQuantity(prev => prev + 1)
     }
   }
@@ -133,7 +131,6 @@ export function AddToCartForm({ product, variants, optionTypes }: AddToCartFormP
       id: selectedVariant.id,
       sku: selectedVariant.sku,
       priceCents: selectedVariant.price_cents,
-      stripePriceId: selectedVariant.stripe_price_id,
       inventory: selectedVariant.inventory,
       option: selectedVariant.option || {},
       productId: product.id,
@@ -153,7 +150,7 @@ export function AddToCartForm({ product, variants, optionTypes }: AddToCartFormP
   }
   
   // Check if product is out of stock
-  const isOutOfStock = !selectedVariant || selectedVariant.inventory <= 0
+  const isOutOfStock = !selectedVariant || (selectedVariant.inventory ?? 0) <= 0
   
   // Check if we need to show the options selectors
   const hasOptions = optionTypes.length > 0
@@ -204,9 +201,9 @@ export function AddToCartForm({ product, variants, optionTypes }: AddToCartFormP
           <p className="text-red-500">Agotado</p>
         ) : selectedVariant ? (
           <p className="text-green-600">
-            {selectedVariant.inventory > 10 
+            {(selectedVariant.inventory ?? 0) > 10 
               ? "En stock" 
-              : `¡Solo quedan ${selectedVariant.inventory}!`}
+              : `¡Solo quedan ${selectedVariant.inventory ?? 0}!`}
           </p>
         ) : hasOptions ? (
           <p className="text-gray-500">Selecciona las opciones</p>
@@ -239,7 +236,7 @@ export function AddToCartForm({ product, variants, optionTypes }: AddToCartFormP
               value={quantity}
               onChange={(e) => {
                 const val = parseInt(e.target.value)
-                if (val > 0 && (!selectedVariant || val <= selectedVariant.inventory)) {
+                if (val > 0 && (!selectedVariant || val <= (selectedVariant.inventory ?? 0))) {
                   setQuantity(val)
                 }
               }}
@@ -250,7 +247,7 @@ export function AddToCartForm({ product, variants, optionTypes }: AddToCartFormP
               variant="ghost" 
               size="icon" 
               onClick={incrementQuantity}
-              disabled={!selectedVariant || quantity >= selectedVariant.inventory}
+              disabled={!selectedVariant || quantity >= (selectedVariant.inventory ?? 0)}
               className="h-9 w-9"
             >
               <PlusIcon className="h-3 w-3" />

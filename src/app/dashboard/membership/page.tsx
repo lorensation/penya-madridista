@@ -1,199 +1,210 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { createBillingPortalSession, cancelSubscription } from "@/app/actions/stripe"
+import {
+  cancelMembershipSubscription,
+  prepareCardUpdate,
+  executeCardUpdate,
+} from "@/app/actions/payment"
 import { createBrowserSupabaseClient } from "@/lib/supabase"
-import { CheckCircle, AlertCircle } from "lucide-react"
+import { RedsysInSiteForm } from "@/components/shop/redsys-insite-form"
+import { CheckCircle, AlertCircle, CreditCard, Loader2, ShieldCheck, X } from "lucide-react"
 
-// Define types for membership data
+// Membership data from miembros table
 interface Membership {
-  id: string;
-  user_uuid: string;
-  stripe_customer_id?: string;
-  subscription_status?: "active" | "trialing" | "canceled" | "incomplete" | "past_due" | "inactive";
-  subscription_plan?: string;
-  subscription_id?: string;
-  subscription_updated_at?: string;
-  last_four?: string;
-  // Add other membership fields as needed
+  id: string
+  user_uuid: string
+  subscription_status?: "active" | "trialing" | "canceled" | "incomplete" | "past_due" | "expired" | "inactive"
+  subscription_plan?: string
+  subscription_updated_at?: string
+  last_four?: string
+  redsys_token?: string
+  redsys_token_expiry?: string
 }
 
-// Import these types from your stripe.ts file or define them here
-/*interface PortalSessionError {
-  error: string;
-  message: string;
-  url?: never;
+// Subscription data
+interface SubscriptionData {
+  id: string
+  plan_type: string
+  payment_type: string
+  status: string
+  start_date: string
+  end_date: string
+  cancel_at_period_end?: boolean
+  canceled_at?: string
 }
-
-interface PortalSessionSuccess {
-  url: string;
-  error?: never;
-  message?: never;
-}
-
-type PortalSessionResponse = PortalSessionSuccess | PortalSessionError;*/
 
 export default function MembershipPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [membership, setMembership] = useState<Membership | null>(null)
-  const [managingSubscription, setManagingSubscription] = useState(false)
+  const [subscription, setSubscription] = useState<SubscriptionData | null>(null)
+  const [canceling, setCanceling] = useState(false)
+
+  // Card update flow
+  const [showCardUpdate, setShowCardUpdate] = useState(false)
+  const [cardUpdateOrder, setCardUpdateOrder] = useState<string | null>(null)
+  const [cardUpdateLoading, setCardUpdateLoading] = useState(false)
 
   const supabase = createBrowserSupabaseClient()
 
-  const success = searchParams?.get("success") === "true"
-  const canceled = searchParams?.get("canceled") === "true"
-  const errorParam = searchParams?.get("error")
+  const successParam = searchParams?.get("success") === "true"
 
   useEffect(() => {
-    if (errorParam) {
-      if (errorParam === "no-customer") {
-        setError("No se encontró información de cliente en Stripe")
-      } else {
-        setError("Ocurrió un error al procesar tu solicitud")
-      }
+    if (successParam) {
+      setSuccessMsg("¡Tu suscripción se ha procesado correctamente! Ya eres miembro oficial de la Peña Lorenzo Sanz.")
     }
-  }, [errorParam])
+  }, [successParam])
 
   useEffect(() => {
-    async function loadUserAndMembership() {
+    async function loadData() {
       try {
         setLoading(true)
-        
-        // Get current user
+
         const { data: userData, error: userError } = await supabase.auth.getUser()
-        
-        if (userError) {
-          console.error("Error fetching user:", userError)
-          setError("No se pudo cargar la información del usuario")
-          setLoading(false)
-          return
-        }
-        
-        if (!userData.user) {
+        if (userError || !userData.user) {
           router.push("/login?redirect=/dashboard/membership")
           return
         }
-        
-        // Get membership data
-        try {
-          // Try to find by user_uuid first
-          const { data: memberData, error: memberError } = await supabase
+
+        // Fetch membership
+        const { data: memberData } = await supabase
+          .from("miembros")
+          .select("*")
+          .eq("user_uuid", userData.user.id)
+          .single()
+
+        if (!memberData) {
+          // Fallback: try by id
+          const { data: memberById } = await supabase
             .from("miembros")
             .select("*")
-            .eq("user_uuid", userData.user.id)
+            .eq("id", userData.user.id)
             .single()
-          
-          // If not found, try by id
-          if (memberError || !memberData) {
-            console.log("Not found by user_uuid, trying with id")
-            const { data: memberDataById, error: memberErrorById } = await supabase
-              .from("miembros")
-              .select("*")
-              .eq("id", userData.user.id)
-              .single()
-              
-            if (memberErrorById) {
-              console.error("Error fetching membership by id:", memberErrorById)
-              setError("No se pudo encontrar información de membresía")
-              setLoading(false)
-              return
-            }
-            
-            setMembership(memberDataById as Membership)
-          } else {
-            setMembership(memberData as Membership)
-          }
-        } catch (err) {
-          console.error("Error in membership fetch:", err)
-          setError("Ocurrió un error al cargar los datos de membresía")
+
+          setMembership((memberById as Membership) ?? null)
+        } else {
+          setMembership(memberData as Membership)
+        }
+
+        // Fetch subscription details
+        const { data: subData } = await supabase
+          .from("subscriptions")
+          .select("*")
+          .eq("member_id", userData.user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single()
+
+        if (subData) {
+          setSubscription(subData as SubscriptionData)
         }
       } catch (err) {
-        console.error("Error in loadUserAndMembership:", err)
-        setError("Ocurrió un error al cargar los datos")
+        console.error("Error loading membership data:", err)
+        setError("Ocurrió un error al cargar los datos de membresía")
       } finally {
         setLoading(false)
       }
     }
 
-    loadUserAndMembership()
+    loadData()
   }, [router, supabase])
 
-  const handleManageSubscription = async () => {
-    if (!membership?.stripe_customer_id) {
-      setError("No se encontró información de cliente en Stripe")
-      return
-    }
-
-    try {
-      setManagingSubscription(true)
-      
-      // Pass the customer ID directly to the server action
-      // This avoids authentication issues with server actions
-      const result = await createBillingPortalSession(membership.stripe_customer_id)
-      
-      // Type guard to check if we have a success response with URL
-      if ('url' in result) {
-        window.location.href = result.url ?? "/dashboard/membership"
-      } 
-      // Type guard to check if we have an error response
-      else if ('error' in result) {
-        console.error("Error from server action:", result.error, result.message)
-        
-        // Handle specific error cases
-        if (result.error === "auth-error") {
-          // Refresh the page or redirect to login
-          router.push("/login?redirect=/dashboard/membership")
-        } else if (result.error === "no-customer") {
-          setError("No se encontró información de cliente en Stripe")
-        } else {
-          setError(`No se pudo acceder al portal de facturación: ${result.message || 'Error desconocido'}`)
-        }
-      } else {
-        throw new Error("Respuesta inesperada del servidor")
-      }
-    } catch (error) {
-      console.error("Error managing subscription:", error)
-      setError("No se pudo acceder al portal de facturación")
-    } finally {
-      setManagingSubscription(false)
-    }
-  }
-
+  // ── Cancel subscription ─────────────────────────────────────────────────
   const handleCancelSubscription = async () => {
-    if (!membership?.subscription_id) {
-      setError("No se encontró información de suscripción")
+    if (!confirm("¿Estás seguro de que deseas cancelar tu suscripción? Seguirá activa hasta el final del período actual.")) {
       return
     }
 
     try {
-      const result = await cancelSubscription(membership.subscription_id)
-      
+      setCanceling(true)
+      setError(null)
+
+      const result = await cancelMembershipSubscription()
       if (result.success) {
-        // Update the local state to reflect the cancellation
-        setMembership({
-          ...membership,
-          subscription_status: "canceled"
-        })
-        
-        // Show success message
-        setError(null)
-        alert("Tu suscripción se cancelará al final del período de facturación actual.")
+        setMembership((prev) =>
+          prev ? { ...prev, subscription_status: "canceled" } : null,
+        )
+        if (subscription) {
+          setSubscription({ ...subscription, status: "canceled", cancel_at_period_end: true })
+        }
+        setSuccessMsg("Tu suscripción se cancelará al final del período de facturación actual.")
       } else {
-        setError(`No se pudo cancelar la suscripción: ${result.error}`)
+        setError(result.error || "No se pudo cancelar la suscripción")
       }
-    } catch (error) {
-      console.error("Error canceling subscription:", error)
+    } catch (err) {
+      console.error("Error canceling subscription:", err)
       setError("No se pudo cancelar la suscripción")
+    } finally {
+      setCanceling(false)
     }
   }
+
+  // ── Card update flow ────────────────────────────────────────────────────
+  const handleStartCardUpdate = async () => {
+    setError(null)
+    setCardUpdateLoading(true)
+
+    try {
+      const result = await prepareCardUpdate()
+      if (!result.success || !result.order) {
+        setError(result.error || "Error al preparar la actualización de tarjeta")
+        setCardUpdateLoading(false)
+        return
+      }
+
+      setCardUpdateOrder(result.order)
+      setShowCardUpdate(true)
+    } catch (err) {
+      console.error("Error preparing card update:", err)
+      setError("Error al preparar la actualización de tarjeta")
+    } finally {
+      setCardUpdateLoading(false)
+    }
+  }
+
+  const handleCardUpdateIdOper = useCallback(
+    async (idOper: string) => {
+      if (!cardUpdateOrder) return
+      setCardUpdateLoading(true)
+      setError(null)
+
+      try {
+        const result = await executeCardUpdate(idOper, cardUpdateOrder)
+        if (result.success) {
+          setSuccessMsg("¡Tarjeta actualizada correctamente!")
+          setShowCardUpdate(false)
+          setCardUpdateOrder(null)
+          // Update displayed last_four
+          if (result.lastFour) {
+            setMembership((prev) =>
+              prev ? { ...prev, last_four: result.lastFour } : null,
+            )
+          }
+        } else {
+          setError(result.error || "No se pudo actualizar la tarjeta")
+        }
+      } catch (err) {
+        console.error("Error executing card update:", err)
+        setError("Error al actualizar la tarjeta")
+      } finally {
+        setCardUpdateLoading(false)
+      }
+    },
+    [cardUpdateOrder],
+  )
+
+  const handleCardUpdateError = useCallback((message: string) => {
+    setError(message)
+  }, [])
 
   if (loading) {
     return (
@@ -206,7 +217,7 @@ export default function MembershipPage() {
     )
   }
 
-  // Fallback UI when no membership data is available or subscription is inactive
+  // No active membership
   if (!membership || membership.subscription_status === "inactive") {
     return (
       <div className="space-y-6 p-6 md:p-8">
@@ -238,14 +249,14 @@ export default function MembershipPage() {
             </Alert>
           </CardContent>
           <CardFooter className="flex flex-col md:flex-row justify-between">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => router.push("/dashboard")}
               className="transition-all border-black hover:bg-primary hover:text-white mb-2 md:mb-0"
             >
               Volver al Dashboard
             </Button>
-            <Button 
+            <Button
               onClick={() => router.push("/membership")}
               className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
             >
@@ -260,28 +271,7 @@ export default function MembershipPage() {
             <CardDescription>Disfruta de estos beneficios exclusivos como miembro</CardDescription>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-2">
-              <li className="flex items-start">
-                <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                <span>Acceso a eventos exclusivos organizados por la peña</span>
-              </li>
-              <li className="flex items-start">
-                <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                <span>Descuentos en viajes organizados para ver partidos</span>
-              </li>
-              <li className="flex items-start">
-                <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                <span>Participación en sorteos y promociones exclusivas</span>
-              </li>
-              <li className="flex items-start">
-                <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                <span>Acceso al contenido exclusivo en nuestra web</span>
-              </li>
-              <li className="flex items-start">
-                <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                <span>Carnet oficial de socio de la Peña Lorenzo Sanz</span>
-              </li>
-            </ul>
+            <BenefitsList />
           </CardContent>
         </Card>
       </div>
@@ -290,16 +280,20 @@ export default function MembershipPage() {
 
   const isActive = membership.subscription_status === "active" || membership.subscription_status === "trialing"
   const isCanceled = membership.subscription_status === "canceled"
-  
-  // Calculate renewal date from subscription_updated_at if available
+  const isPastDue = membership.subscription_status === "past_due"
+
+  // Format renewal / end date from subscription
   let renewalDate = "No disponible"
-  if (membership.subscription_updated_at) {
-    // Assuming subscription is monthly, add 30 days to the updated_at date
-    const updatedAtDate = new Date(membership.subscription_updated_at)
-    const renewalDateObj = new Date(updatedAtDate)
-    renewalDateObj.setDate(renewalDateObj.getDate() + 30)
-    renewalDate = renewalDateObj.toLocaleDateString("es-ES")
+  if (subscription?.end_date) {
+    renewalDate = new Date(subscription.end_date).toLocaleDateString("es-ES", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
   }
+
+  // Plan display name
+  const planLabel = formatPlanLabel(membership.subscription_plan)
 
   return (
     <div className="space-y-6 p-6 md:p-8">
@@ -310,19 +304,10 @@ export default function MembershipPage() {
         </div>
       </div>
 
-      {success && (
+      {successMsg && (
         <Alert className="bg-green-50 border-green-200">
           <CheckCircle className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-800">
-            ¡Tu suscripción se ha procesado correctamente! Ya eres miembro oficial de la Peña Lorenzo Sanz.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {canceled && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>El proceso de suscripción ha sido cancelado.</AlertDescription>
+          <AlertDescription className="text-green-800">{successMsg}</AlertDescription>
         </Alert>
       )}
 
@@ -333,6 +318,7 @@ export default function MembershipPage() {
         </Alert>
       )}
 
+      {/* Subscription status card */}
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
@@ -340,13 +326,11 @@ export default function MembershipPage() {
             {isActive ? (
               <Badge className="bg-green-500">Activa</Badge>
             ) : isCanceled ? (
-              <Badge variant="outline" className="text-orange-500 border-orange-200">
-                Cancelada
-              </Badge>
+              <Badge variant="outline" className="text-orange-500 border-orange-200">Cancelada</Badge>
+            ) : isPastDue ? (
+              <Badge variant="outline" className="text-yellow-600 border-yellow-200">Pago pendiente</Badge>
             ) : (
-              <Badge variant="outline" className="text-red-500 border-red-200">
-                Inactiva
-              </Badge>
+              <Badge variant="outline" className="text-red-500 border-red-200">Inactiva</Badge>
             )}
           </div>
           <CardDescription>Detalles de tu membresía actual</CardDescription>
@@ -355,16 +339,20 @@ export default function MembershipPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <h3 className="text-sm font-medium text-gray-500">Plan</h3>
-              <p className="text-lg font-semibold">{membership.subscription_plan || "Plan Estándar"}</p>
+              <p className="text-lg font-semibold">{planLabel}</p>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-500">Fecha de renovación</h3>
+              <h3 className="text-sm font-medium text-gray-500">
+                {isCanceled ? "Activa hasta" : "Próxima renovación"}
+              </h3>
               <p className="text-lg font-semibold">{renewalDate}</p>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500">Método de pago</h3>
               <p className="text-lg font-semibold">
-                {membership.last_four ? `Tarjeta terminada en ${membership.last_four}` : "No disponible"}
+                {membership.last_four
+                  ? `Tarjeta terminada en ${membership.last_four}`
+                  : "No disponible"}
               </p>
             </div>
             <div>
@@ -373,69 +361,135 @@ export default function MembershipPage() {
                 {membership.subscription_status === "active"
                   ? "Activa"
                   : membership.subscription_status === "trialing"
-                  ? "Periodo de prueba"
-                  : membership.subscription_status === "canceled"
-                  ? "Cancelada"
-                  : membership.subscription_status || "No disponible"}
+                    ? "Periodo de prueba"
+                    : membership.subscription_status === "canceled"
+                      ? "Cancelada (activa hasta fin de periodo)"
+                      : membership.subscription_status === "past_due"
+                        ? "Pago pendiente"
+                        : membership.subscription_status || "No disponible"}
               </p>
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col md:flex-row justify-between">
+        <CardFooter className="flex flex-col md:flex-row gap-3 justify-between">
           {isCanceled ? (
-            <p className="text-orange-500">Tu suscripción se cancelará al final del período de facturación actual.</p>
+            <p className="text-orange-500 text-sm">
+              Tu suscripción se cancelará el {renewalDate}. Hasta entonces sigues disfrutando de todos los beneficios.
+            </p>
           ) : (
             <>
-              <Button 
-                onClick={handleCancelSubscription} 
+              <Button
+                onClick={handleCancelSubscription}
                 variant="outline"
-                className="text-red-500 border-red-200 hover:bg-red-500 hover:text-white mb-2 md:mb-0"
-                disabled={managingSubscription || !isActive}
+                className="text-red-500 border-red-200 hover:bg-red-500 hover:text-white"
+                disabled={canceling || !isActive}
               >
-                Cancelar Suscripción
+                {canceling ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Cancelando...</> : "Cancelar Suscripción"}
               </Button>
-              <Button 
-                onClick={handleManageSubscription} 
-                disabled={managingSubscription || !isActive}
-                className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
+              <Button
+                onClick={handleStartCardUpdate}
+                variant="outline"
+                disabled={cardUpdateLoading || !isActive}
+                className="border-primary text-primary hover:bg-primary hover:text-white"
               >
-                {managingSubscription ? "Procesando..." : "Gestionar Suscripción"}
+                {cardUpdateLoading
+                  ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Preparando...</>
+                  : <><CreditCard className="h-4 w-4 mr-2" /> Actualizar tarjeta</>}
               </Button>
             </>
           )}
         </CardFooter>
       </Card>
 
+      {/* Card update InSite form (shown inline) */}
+      {showCardUpdate && cardUpdateOrder && (
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-lg">Actualizar tarjeta de pago</CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setShowCardUpdate(false); setCardUpdateOrder(null) }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <CardDescription>
+              Introduce los datos de tu nueva tarjeta. Se guardará para los próximos cobros automáticos.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RedsysInSiteForm
+              order={cardUpdateOrder}
+              onIdOperReceived={handleCardUpdateIdOper}
+              onError={handleCardUpdateError}
+              buttonText="Guardar nueva tarjeta"
+            />
+            <div className="mt-3 flex items-center justify-center gap-2 text-sm text-gray-500">
+              <ShieldCheck className="h-4 w-4" />
+              <span>Datos procesados de forma segura por Redsys</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Past due warning */}
+      {isPastDue && (
+        <Alert className="border-yellow-200 bg-yellow-50">
+          <AlertCircle className="h-4 w-4 text-yellow-600" />
+          <AlertDescription className="text-yellow-800">
+            No se pudo procesar tu último pago. Actualiza tu tarjeta para evitar la cancelación de tu membresía.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Benefits card */}
       <Card>
         <CardHeader>
           <CardTitle>Beneficios de Membresía</CardTitle>
           <CardDescription>Disfruta de estos beneficios exclusivos como miembro</CardDescription>
         </CardHeader>
         <CardContent>
-          <ul className="space-y-2">
-            <li className="flex items-start">
-              <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-              <span>Acceso a eventos exclusivos organizados por la peña</span>
-            </li>
-            <li className="flex items-start">
-              <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-              <span>Descuentos en viajes organizados para ver partidos</span>
-            </li>
-            <li className="flex items-start">
-              <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-              <span>Participación en sorteos y promociones exclusivas</span>
-            </li>
-            <li className="flex items-start">
-              <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-              <span>Acceso al contenido exclusivo en nuestra web</span>
-            </li>
-            <li className="flex items-start">
-              <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-              <span>Carnet oficial de socio de la Peña Lorenzo Sanz</span>
-            </li>
-          </ul>
+          <BenefitsList />
         </CardContent>
       </Card>
     </div>
   )
+}
+
+// ── Helper Components ──────────────────────────────────────────────────────
+
+function BenefitsList() {
+  const benefits = [
+    "Acceso a eventos exclusivos organizados por la peña",
+    "Descuentos en viajes organizados para ver partidos",
+    "Participación en sorteos y promociones exclusivas",
+    "Acceso al contenido exclusivo en nuestra web",
+    "Carnet oficial de socio de la Peña Lorenzo Sanz",
+  ]
+
+  return (
+    <ul className="space-y-2">
+      {benefits.map((b, i) => (
+        <li key={i} className="flex items-start">
+          <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+          <span>{b}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function formatPlanLabel(plan?: string): string {
+  if (!plan) return "Plan Estándar"
+  const labels: Record<string, string> = {
+    under25_monthly: "Joven — Mensual",
+    under25_annual: "Joven — Anual",
+    over25_monthly: "Adulto — Mensual",
+    over25_annual: "Adulto — Anual",
+    family_monthly: "Familiar — Mensual",
+    family_annual: "Familiar — Anual",
+  }
+  return labels[plan] || plan
 }

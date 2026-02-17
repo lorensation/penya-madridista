@@ -17,8 +17,8 @@ interface Profile {
   id: string
   name?: string
   auth_id?: string
-  subscription_status?: string
-  subscription_plan?: "annual" | "family" | null
+  subscription_status?: string | null
+  subscription_plan?: string | null
 }
 
 interface Event {

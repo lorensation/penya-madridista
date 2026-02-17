@@ -9,36 +9,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    // Create webuser entry
+    // Create user entry
     try {
-      const { error: webusersError } = await supabase.from("webusers").insert({
+      const { error: usersError } = await supabase.from("users").insert({
+        id: userId,
         email: email,
         name: name || email.split("@")[0],
-        is_miembro: false,
         is_member: false,
         created_at: new Date().toISOString(),
       })
 
-      if (webusersError) {
-        console.error("Webusers insert error:", webusersError)
-        return NextResponse.json({ error: "Failed to create webuser" }, { status: 500 })
-      }
-
-      // Get the newly created webuser to get its ID
-      const { data: newUser, error: fetchError } = await supabase
-        .from("webusers")
-        .select("id")
-        .eq("email", email)
-        .single()
-
-      if (fetchError || !newUser) {
-        console.error("Error fetching new user:", fetchError)
-        return NextResponse.json({ error: "Failed to fetch new user" }, { status: 500 })
+      if (usersError) {
+        console.error("Users insert error:", usersError)
+        return NextResponse.json({ error: "Failed to create user" }, { status: 500 })
       }
 
       return NextResponse.json({
         success: true,
-        userId: newUser.id,
+        userId: userId,
       })
     } catch (error) {
       console.error("Profile creation error:", error)

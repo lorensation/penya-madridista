@@ -18,7 +18,7 @@ export function Header() {
   interface User {
     id: string
     email?: string
-    name?: string
+    name?: string | null
   }
 
   const [user, setUser] = useState<User | null>(null)

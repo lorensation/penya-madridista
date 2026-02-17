@@ -5,27 +5,21 @@ import { cache } from "react"
 export interface SiteSettings {
   id?: number;
   site_name: string;
-  site_description: string;
-  contact_email: string;
-  support_email: string;
-  logo_url: string;
-  favicon_url: string;
-  primary_color: string;
-  secondary_color: string;
-  enable_blog: boolean;
-  enable_subscriptions: boolean;
-  subscription_price: number;
-  subscription_currency: string;
-  footer_text: string;
-  privacy_policy: string;
-  terms_of_service: string;
-  meta_description: string;
-  meta_keywords: string;
-  social_twitter: string;
-  social_facebook: string;
-  social_instagram: string;
-  maintenance_mode: boolean;
-  updated_at?: string;
+  site_description?: string | null;
+  contact_email?: string | null;
+  support_email?: string | null;
+  logo_url?: string | null;
+  favicon_url?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
+  enable_blog?: boolean | null;
+  enable_subscriptions?: boolean | null;
+  footer_text?: string | null;
+  meta_description?: string | null;
+  meta_keywords?: string | null;
+  maintenance_mode?: boolean | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 // Default settings
@@ -40,16 +34,9 @@ export const defaultSettings: SiteSettings = {
   secondary_color: "#ffffff",
   enable_blog: true,
   enable_subscriptions: true,
-  subscription_price: 30,
-  subscription_currency: "EUR",
   footer_text: "© Peña Lorenzo Sanz. Todos los derechos reservados.",
-  privacy_policy: "",
-  terms_of_service: "",
   meta_description: "Peña Madridista Lorenzo Sanz - Aficionados del Real Madrid",
   meta_keywords: "real madrid, peña, lorenzo sanz, madridistas",
-  social_twitter: "",
-  social_facebook: "",
-  social_instagram: "",
   maintenance_mode: false
 }
 
@@ -96,17 +83,16 @@ export async function useSiteSettings() {
 
 // Function to format currency based on site settings
 export async function formatCurrency(amount: number): Promise<string> {
-  const currency = await getSetting('subscription_currency', 'EUR')
-  
   return new Intl.NumberFormat('es-ES', {
     style: 'currency',
-    currency: currency,
+    currency: 'EUR',
   }).format(amount)
 }
 
 // Check if maintenance mode is enabled
 export async function isMaintenanceMode(): Promise<boolean> {
-  return await getSetting('maintenance_mode', false)
+  const settings = await getSiteSettings()
+  return settings.maintenance_mode === true
 }
 
 // Get site metadata for SEO
@@ -122,12 +108,11 @@ export async function getSiteMetadata() {
 
 // Get social media links
 export async function getSocialLinks() {
-  const settings = await getSiteSettings()
-  
+  // Social links are not currently stored in site_settings
   return {
-    twitter: settings.social_twitter,
-    facebook: settings.social_facebook,
-    instagram: settings.social_instagram,
+    twitter: "",
+    facebook: "",
+    instagram: "",
   }
 }
 
@@ -147,18 +132,17 @@ export async function getSubscriptionInfo() {
   
   return {
     enabled: settings.enable_subscriptions,
-    price: settings.subscription_price,
-    currency: settings.subscription_currency,
+    price: 30,
+    currency: "EUR",
   }
 }
 
 // Get legal documents
 export async function getLegalDocuments() {
-  const settings = await getSiteSettings()
-  
+  // Legal documents are served from dedicated pages, not settings
   return {
-    privacyPolicy: settings.privacy_policy,
-    termsOfService: settings.terms_of_service,
+    privacyPolicy: "/privacy-policy",
+    termsOfService: "/terms-and-conditions",
   }
 }
 

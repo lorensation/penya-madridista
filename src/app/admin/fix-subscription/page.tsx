@@ -73,26 +73,23 @@ export default function FixSubscriptionPage() {
     setResult(null)
 
     try {
-      const response = await fetch("/api/admin/update-subscription", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId,
-          subscriptionId: subscriptionId || undefined,
-        }),
-      })
+      // Update subscription status directly in the database
+      const { error: updateError } = await supabase
+        .from("miembros")
+        .update({
+          subscription_status: "active",
+          subscription_id: subscriptionId || undefined,
+          subscription_updated_at: new Date().toISOString(),
+        })
+        .eq("user_uuid", userId)
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to update subscription")
+      if (updateError) {
+        throw new Error(updateError.message)
       }
 
       setResult({
         success: true,
-        message: data.message || "Subscription updated successfully",
+        message: "Subscription updated successfully",
       })
     } catch (error) {
       setResult({
@@ -164,7 +161,7 @@ export default function FixSubscriptionPage() {
                 id="subscriptionId"
                 value={subscriptionId}
                 onChange={(e) => setSubscriptionId(e.target.value)}
-                placeholder="Enter Stripe subscription ID if known"
+                placeholder="Enter subscription ID if known"
               />
               <p className="text-sm text-gray-500">
                 If left blank, the system will try to find the subscription automatically

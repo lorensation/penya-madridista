@@ -15,10 +15,9 @@ import { ArrowLeft } from "lucide-react";
 
 interface ProductVariant {
   id: string;
-  sku: string;
+  sku: string | null;
   price_cents: number;
-  inventory: number;
-  stripe_price_id: string;
+  inventory: number | null;
   option: Record<string, string>;
   active: boolean;
 }
@@ -27,8 +26,8 @@ interface Product {
   id: string;
   name: string;
   slug: string;
-  description: string;
-  image_url: string;
+  description: string | null;
+  image_url: string | null;
   category: string;
   product_variants: ProductVariant[];
 }
@@ -37,8 +36,8 @@ interface RelatedProduct {
   id: string;
   name: string;
   slug: string;
-  description: string;
-  image_url: string;
+  description: string | null;
+  image_url: string | null;
   category: string;
   min_price_cents: number | null;
 }
@@ -82,7 +81,6 @@ async function getProduct(slug: string): Promise<Product | null> {
         sku,
         price_cents,
         inventory,
-        stripe_price_id,
         option,
         active
       )
@@ -95,10 +93,10 @@ async function getProduct(slug: string): Promise<Product | null> {
   if (error || !data) return null;
 
   const variants = (data.product_variants || [])
-    .filter((v: ProductVariant) => v.active)
-    .map((v: ProductVariant) => ({ ...v, option: v.option || {} }));
+    .filter((v: { active: boolean }) => v.active)
+    .map((v: { option?: unknown; [key: string]: unknown }) => ({ ...v, option: (v.option as Record<string, string>) || {} }));
 
-  return { ...data, product_variants: variants };
+  return { ...data, product_variants: variants } as unknown as Product;
 }
 
 async function getRelatedProducts(
@@ -156,7 +154,7 @@ export default async function ProductPage({ params }: PageProps) {
     ...product.product_variants.map((v) => v.price_cents)
   );
   const isOutOfStock = product.product_variants.every(
-    (v) => v.inventory <= 0
+    (v) => (v.inventory ?? 0) <= 0
   );
 
   return (
@@ -178,7 +176,7 @@ export default async function ProductPage({ params }: PageProps) {
           {/* Image */}
           <div className="aspect-square relative bg-white rounded-lg overflow-hidden border">
             <Image
-              src={product.image_url}
+              src={product.image_url || "/placeholder.svg?height=600&width=600"}
               alt={product.name}
               fill
               className="object-contain"
@@ -233,7 +231,7 @@ export default async function ProductPage({ params }: PageProps) {
               >
                 <div className="aspect-square relative bg-white rounded-lg overflow-hidden border mb-3">
                   <Image
-                    src={r.image_url}
+                    src={r.image_url || "/placeholder.svg?height=400&width=400"}
                     alt={r.name}
                     fill
                     className="object-contain group-hover:scale-105 transition-transform"

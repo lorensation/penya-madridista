@@ -3,22 +3,21 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 
 export interface ProductVariant {
   id: string
-  sku: string
+  sku: string | null
   option: Record<string, string>
   priceCents: number
-  stripePriceId: string
-  inventory: number
-  productId: string  // Added for cart page compatibility
-  image: string      // Added for cart page compatibility
-  productName: string // Added for cart page compatibility
+  inventory: number | null
+  productId: string
+  image: string | null
+  productName: string
 }
 
 export interface Product {
   id: string
   name: string
   slug: string
-  description: string
-  imageUrl: string
+  description: string | null
+  imageUrl: string | null
 }
 
 export interface CartItem {
@@ -79,7 +78,6 @@ export const useCartStore = create<CartState>()(
                   sku: variant.sku,
                   option: variant.option || {},
                   priceCents: variant.priceCents,
-                  stripePriceId: variant.stripePriceId,
                   inventory: variant.inventory,
                   productId: variant.productId || product.id,
                   image: product.imageUrl || '',

@@ -14,12 +14,13 @@ import { Button } from "@/components/ui/button"
 interface CheckoutSessionData {
   id: string
   status: string
-  customer_id: string | null
-  subscription_id: string | null
+  redsys_token?: string | null
+  redsys_token_expiry?: string | null
+  cof_txn_id?: string | null
   payment_status: string
   subscription_status: string | null
   plan_type?: string
-  payment_type?: string // Added payment type (monthly/annual)
+  payment_type?: string // monthly / annual / decade
   last_four?: string | null
 }
 
@@ -80,7 +81,8 @@ interface ProcessedMemberData {
   subscription_plan?: string
   subscription_id?: string
   subscription_updated_at?: string
-  stripe_customer_id?: string
+  redsys_token?: string | null
+  redsys_token_expiry?: string | null
   last_four?: string | null
 }
 
@@ -175,8 +177,9 @@ function CompleteProfileContent() {
             setCheckoutData({
               id: "admin_invite",
               status: "complete",
-              customer_id: null,
-              subscription_id: null,
+              redsys_token: null,
+              redsys_token_expiry: null,
+              cof_txn_id: null,
               payment_status: "free",
               subscription_status: "active",
               plan_type: "infinite",
@@ -194,86 +197,40 @@ function CompleteProfileContent() {
           }
         }
 
-        // If there's a session_id, verify the checkout session - existing code remains unchanged
+        // If there's a session_id (legacy) or payment reference, look up the payment from our DB
         if (sessionId) {
           try {
-            const response = await fetch("/api/verify-checkout-session", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "x-user-id": currentUserId,
-              },
-              body: JSON.stringify({
-                sessionId,
-                userId: currentUserId,
-              }),
-            })
+            // Try to find a completed payment transaction for this user
+            const { data: txnData, error: txnError } = await supabase
+              .from("payment_transactions")
+              .select("id, redsys_order, redsys_token, redsys_token_expiry, cof_txn_id, status, context, amount_cents, last_four, metadata")
+              .eq("member_id", currentUserId)
+              .eq("status", "authorized")
+              .eq("context", "membership")
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle()
 
-            if (!response.ok) {
-              const errorData = await response.json()
-              console.error("Checkout session verification failed:", errorData)
-
-              // If the error is about missing user ID but we have the user ID, retry with explicit user ID
-              if (errorData.error === "User ID not found in session" && currentUserId) {
-                try {
-                  const retryResponse = await fetch("/api/verify-checkout-session", {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                      sessionId,
-                      userId: currentUserId,
-                      retry: true,
-                    }),
-                  })
-
-                  if (retryResponse.ok) {
-                    const sessionData = await retryResponse.json()
-                    // Continue with the successful response
-                    if (sessionData.status === "complete") {
-                      setCheckoutData({
-                        id: sessionId,
-                        status: "complete",
-                        customer_id: sessionData.customerId,
-                        subscription_id: sessionData.subscriptionId,
-                        payment_status: "paid",
-                        subscription_status: "active",
-                        plan_type: sessionData.plan,
-                        payment_type: sessionData.paymentType || "monthly", // Default to monthly if not specified
-                        last_four: sessionData.lastFour,
-                      })
-                    }
-                  } else {
-                    console.error("Retry failed:", await retryResponse.json())
-                  }
-                } catch (retryError) {
-                  console.error("Retry error:", retryError)
-                }
-              } else {
-                console.error("Failed to verify checkout session:", errorData.error)
-              }
+            if (txnData && !txnError) {
+              const meta = txnData.metadata as Record<string, unknown> | null
+              setCheckoutData({
+                id: txnData.redsys_order || sessionId,
+                status: "complete",
+                redsys_token: txnData.redsys_token,
+                redsys_token_expiry: txnData.redsys_token_expiry,
+                cof_txn_id: txnData.cof_txn_id,
+                payment_status: "paid",
+                subscription_status: "active",
+                plan_type: (meta?.planType as string) || "over25",
+                payment_type: (meta?.interval as string) || "monthly",
+                last_four: txnData.last_four,
+              })
             } else {
-              const sessionData = await response.json()
-
-              if (sessionData.status === "complete") {
-                setCheckoutData({
-                  id: sessionId,
-                  status: "complete",
-                  customer_id: sessionData.customerId,
-                  subscription_id: sessionData.subscriptionId,
-                  payment_status: "paid",
-                  subscription_status: "active",
-                  plan_type: sessionData.plan,
-                  payment_type: sessionData.paymentType || "monthly", // Default to monthly if not specified
-                  last_four: sessionData.lastFour,
-                })
-              } else {
-                console.warn("Payment not completed:", sessionData.status)
-              }
+              console.warn("No authorized membership payment found for user:", currentUserId)
+              // Continue without checkout data — profile can still be created
             }
           } catch (sessionError) {
-            console.error("Error verifying session:", sessionError)
+            console.error("Error looking up payment transaction:", sessionError)
             // Continue anyway, we'll just not have the checkout data
           }
         }
@@ -340,14 +297,16 @@ function CompleteProfileContent() {
       if (checkoutData) {
         processedData.subscription_status = checkoutData.subscription_status || "active"
         processedData.subscription_plan = checkoutData.plan_type
-        processedData.subscription_id = checkoutData.subscription_id ?? undefined
+        processedData.subscription_id = checkoutData.id ?? undefined
         processedData.subscription_updated_at = new Date().toISOString()
-        processedData.stripe_customer_id = checkoutData.customer_id ?? undefined
+        processedData.redsys_token = checkoutData.redsys_token ?? null
+        processedData.redsys_token_expiry = checkoutData.redsys_token_expiry ?? null
         processedData.last_four = checkoutData.last_four
       }
 
       // Insert the new member profile
-      const { error: insertError } = await supabase.from("miembros").insert(processedData)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: insertError } = await supabase.from("miembros").insert(processedData as any)
 
       if (insertError) {
         console.error("Error creating profile:", insertError)
@@ -390,10 +349,11 @@ function CompleteProfileContent() {
           .insert({
             member_id: userData.user.id,
             plan_type: checkoutData.plan_type,
-            payment_type: checkoutData.payment_type || "monthly", // Default to monthly if not specified
-            stripe_customer_id: checkoutData.customer_id,
-            stripe_subscription_id: checkoutData.subscription_id,
-            stripe_checkout_session_id: checkoutData.id,
+            payment_type: checkoutData.payment_type || "monthly",
+            redsys_token: checkoutData.redsys_token ?? null,
+            redsys_token_expiry: checkoutData.redsys_token_expiry ?? null,
+            redsys_cof_txn_id: checkoutData.cof_txn_id ?? null,
+            redsys_last_order: checkoutData.id,
             start_date: startDate.toISOString(),
             end_date: endDate.toISOString(),
             status: checkoutData.subscription_status || "active",

@@ -54,11 +54,11 @@ export default async function Blog() {
                     <span>{post.category}</span>
                     <span className="mx-2">•</span>
                     <span>
-                      {new Date(post.created_at).toLocaleDateString("es-ES", {
+                      {post.created_at ? new Date(post.created_at).toLocaleDateString("es-ES", {
                         day: "numeric",
                         month: "long",
                         year: "numeric",
-                      })}
+                      }) : ""}
                     </span>
                   </div>
                   <h2 className="text-xl font-bold text-primary mb-2 line-clamp-2">{post.title}</h2>

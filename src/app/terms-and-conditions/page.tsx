@@ -11,7 +11,7 @@ export default function TermsAndConditionsPage() {
       <h1 className="text-3xl font-bold mb-8">Términos y Condiciones</h1>
       
       <div className="prose max-w-none">
-        <p className="text-sm text-gray-500 mb-6">Última actualización: 15 de diciembre de 2025</p>
+        <p className="text-sm text-gray-500 mb-6">Última actualización: 16 de febrero de 2026</p>
 
         <div className="mb-8">
           <h2 className="text-2xl font-semibold mb-4">1. Introducción</h2>
@@ -123,9 +123,9 @@ export default function TermsAndConditionsPage() {
           <h3 className="text-xl font-medium mt-4 mb-2">7.3 Precios y pagos</h3>
           <ul className="list-disc pl-6 my-4 space-y-2">
             <li>Los precios de las membresías están claramente indicados en nuestro sitio en el momento de la compra, con todos los impuestos incluidos.</li>
-            <li>Todos los pagos se procesan a través de <strong>Stripe Payments Europe, Ltd.</strong>, proveedor de servicios de pago autorizado y regulado por el Banco Central de Irlanda.</li>
-            <li>Los datos de su tarjeta son tratados directamente por Stripe conforme a los estándares PCI-DSS. La Peña no almacena datos de tarjetas en sus servidores.</li>
-            <li>Al realizar el pago, usted autoriza a Stripe a procesar el cargo y acepta los términos de servicio de Stripe.</li>
+            <li>Todos los pagos se procesan a través de la pasarela de pago segura de <strong>Redsys Servicios de Procesamiento, S.L.</strong> (RedSys), proveedor de servicios de pago autorizado y regulado por el Banco de España.</li>
+            <li>Los datos de su tarjeta son tratados directamente por RedSys conforme a los estándares PCI-DSS y con autenticación reforzada 3D Secure (EMV 3DS). La Peña no almacena datos de tarjetas en sus servidores.</li>
+            <li>Al realizar el pago, usted autoriza el procesamiento del cargo a través de la pasarela segura de RedSys.</li>
             <li>Nos reservamos el derecho de cambiar los precios de las membresías con un preaviso de al menos 30 días antes de la próxima renovación.</li>
             <li>Si no podemos cobrar su pago por cualquier motivo, su membresía puede ser suspendida o cancelada.</li>
             <li>Recibirá un recibo electrónico por cada pago realizado, enviado a su dirección de correo electrónico.</li>

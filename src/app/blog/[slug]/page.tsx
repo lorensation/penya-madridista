@@ -66,7 +66,7 @@ export async function generateMetadata({ params }: BlogPostProps): Promise<Metad
     title: post.title,
     description: post.excerpt,
     openGraph: {
-      images: [post.image_url],
+      images: post.image_url ? [post.image_url] : [],
     },
   }
 }
@@ -101,11 +101,11 @@ export default async function BlogPost({ params }: BlogPostProps) {
               <span className="bg-primary/10 text-primary px-3 py-1 rounded-full">{post.category}</span>
               <span className="mx-2">•</span>
               <span>
-                {new Date(post.created_at).toLocaleDateString("es-ES", {
+                {post.created_at ? new Date(post.created_at).toLocaleDateString("es-ES", {
                   day: "numeric",
                   month: "long",
                   year: "numeric",
-                })}
+                }) : ""}
               </span>
             </div>
 
@@ -113,16 +113,7 @@ export default async function BlogPost({ params }: BlogPostProps) {
 
             <div className="flex items-center mb-8">
               <div className="w-10 h-10 rounded-full bg-gray-200 mr-3 overflow-hidden relative">
-                {post.author_image ? (
-                  <Image
-                    src={post.author_image || "/placeholder.svg"}
-                    alt={post.author}
-                    fill
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">{post.author.charAt(0)}</div>
-                )}
+                <div className="flex items-center justify-center h-full text-gray-500">{post.author.charAt(0)}</div>
               </div>
               <span className="text-gray-700">Por {post.author}</span>
             </div>
@@ -198,11 +189,11 @@ export default async function BlogPost({ params }: BlogPostProps) {
                       <span>{relatedPost.category}</span>
                       <span className="mx-2">•</span>
                       <span>
-                        {new Date(relatedPost.created_at).toLocaleDateString("es-ES", {
+                        {relatedPost.created_at ? new Date(relatedPost.created_at).toLocaleDateString("es-ES", {
                           day: "numeric",
                           month: "long",
                           year: "numeric",
-                        })}
+                        }) : ""}
                       </span>
                     </div>
 

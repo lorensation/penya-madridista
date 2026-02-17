@@ -24,10 +24,14 @@ export async function GET(request: NextRequest) {
           const { error: insertError } = await supabase.from("miembros").insert({
             id: data.user.id, // This links to auth.users(id)
             user_uuid: data.user.id, // This links to users(id)
-            email: data.user.email,
-            name: data.user.user_metadata?.name || data.user.email.split("@")[0] || "",
+            email: data.user.email!,
+            name: data.user.user_metadata?.name || data.user.email!.split("@")[0] || "",
             role: "user",
             created_at: new Date().toISOString(),
+            es_socio_realmadrid: false,
+            fecha_nacimiento: "1990-01-01",
+            socio_carnet_madridista: false,
+            telefono: 0,
           })
 
           if (insertError) {

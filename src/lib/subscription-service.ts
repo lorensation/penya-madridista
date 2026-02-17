@@ -11,12 +11,16 @@ export interface Subscription {
   member_id: string;
   plan_type: PlanType;
   payment_type: PaymentType;
-  stripe_customer_id?: string;
-  stripe_subscription_id?: string;
-  stripe_checkout_session_id?: string;
   start_date?: string;
   end_date?: string;
   status: SubscriptionStatus;
+  cancel_at_period_end?: boolean;
+  canceled_at?: string;
+  redsys_token?: string;
+  redsys_token_expiry?: string;
+  redsys_cof_txn_id?: string;
+  redsys_last_order?: string;
+  renewal_failures?: number;
   created_at: string;
   updated_at: string;
 }
@@ -222,10 +226,11 @@ export const serverSubscriptionService = {
     userId: string, 
     planType: PlanType, 
     paymentType: PaymentType,
-    stripeData?: {
-      customerId?: string,
-      subscriptionId?: string,
-      checkoutSessionId?: string
+    redsysData?: {
+      token?: string,
+      tokenExpiry?: string,
+      cofTxnId?: string,
+      lastOrder?: string,
     }
   ): Promise<{ success: boolean; error?: SubscriptionError; subscription?: Subscription }> {
     try {
@@ -241,7 +246,6 @@ export const serverSubscriptionService = {
       const endDate = new Date()
       
       if (normalizedPaymentType === 'decade') {
-        // Set end date to 10 years from start date for decade payment type
         endDate.setFullYear(endDate.getFullYear() + 10)
       } else if (normalizedPaymentType === 'annual') {
         endDate.setFullYear(endDate.getFullYear() + 1)
@@ -258,9 +262,10 @@ export const serverSubscriptionService = {
           status: 'active',
           start_date: startDate.toISOString(),
           end_date: endDate.toISOString(),
-          stripe_customer_id: stripeData?.customerId,
-          stripe_subscription_id: stripeData?.subscriptionId,
-          stripe_checkout_session_id: stripeData?.checkoutSessionId
+          redsys_token: redsysData?.token,
+          redsys_token_expiry: redsysData?.tokenExpiry,
+          redsys_cof_txn_id: redsysData?.cofTxnId,
+          redsys_last_order: redsysData?.lastOrder,
         })
         .select()
         .single()

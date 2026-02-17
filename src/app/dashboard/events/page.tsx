@@ -27,7 +27,7 @@ interface Event {
 
 interface Profile {
   id: string
-  subscription_status?: string
+  subscription_status?: string | null
   [key: string]: string | number | boolean | null | undefined
 }
 

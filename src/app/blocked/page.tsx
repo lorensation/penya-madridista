@@ -11,12 +11,9 @@ import { BlockReasonType } from "@/lib/blocked-users"
 // Map block reason types to user-friendly messages
 const reasonMessages: Record<BlockReasonType, string> = {
   'spam': 'Tu cuenta ha sido bloqueada por comportamiento considerado como spam.',
-  'harassment': 'Tu cuenta ha sido bloqueada por comportamiento de acoso.',
-  'inappropriate_content': 'Tu cuenta ha sido bloqueada por compartir contenido inapropiado.',
-  'fake_account': 'Esta cuenta ha sido identificada como una cuenta falsa o suplantadora.',
-  'payment_issues': 'Tu cuenta ha sido bloqueada por problemas de pago recurrentes.',
-  'multiple_accounts': 'Tu cuenta ha sido bloqueada por crear múltiples cuentas.',
+  'inappropriate_behavior': 'Tu cuenta ha sido bloqueada por comportamiento inapropiado.',
   'violation_of_terms': 'Tu cuenta ha sido bloqueada por violar nuestros términos de servicio.',
+  'security_risk': 'Tu cuenta ha sido bloqueada por motivos de seguridad.',
   'other': 'Tu cuenta ha sido bloqueada. Para más información, ponte en contacto con nosotros.'
 };
 
@@ -145,7 +142,9 @@ function LoadingForm() {
 }
 
 export default function BlockedPage() {
-    <Suspense fallback={<LoadingForm />}>
-      <BlockedPageContent />
-    </Suspense>
+    return (
+      <Suspense fallback={<LoadingForm />}>
+        <BlockedPageContent />
+      </Suspense>
+    )
 }

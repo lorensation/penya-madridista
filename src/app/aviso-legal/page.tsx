@@ -11,7 +11,7 @@ export default function AvisoLegalPage() {
       <h1 className="text-3xl font-bold mb-8">Aviso Legal</h1>
       
       <div className="prose max-w-none">
-        <p className="text-sm text-gray-500 mb-6">Última actualización: 15 de diciembre de 2025</p>
+        <p className="text-sm text-gray-500 mb-6">Última actualización: 16 de febrero de 2026</p>
 
         <div className="mb-8">
           <h2 className="text-2xl font-semibold mb-4">1. Identificación del Titular</h2>
@@ -87,11 +87,11 @@ export default function AvisoLegalPage() {
 
         <div className="mb-8">
           <h2 className="text-2xl font-semibold mb-4">6. Pagos y Transacciones Electrónicas</h2>
-          <p>El sitio web ofrece la posibilidad de contratar membresías y adquirir productos mediante pago electrónico. Todos los pagos se procesan a través de <strong>Stripe Payments Europe, Ltd.</strong>, proveedor de servicios de pago autorizado y regulado por el Banco Central de Irlanda.</p>
+          <p>El sitio web ofrece la posibilidad de contratar membresías y adquirir productos mediante pago electrónico. Todos los pagos se procesan a través de la pasarela de pago segura de <strong>Redsys Servicios de Procesamiento, S.L.</strong> (RedSys), proveedor de servicios de pago autorizado y regulado por el Banco de España.</p>
           
-          <p className="mt-4">La asociación no almacena datos de tarjetas de crédito o débito en sus servidores. Dichos datos son tratados directamente por Stripe conforme a los estándares de seguridad PCI-DSS (Payment Card Industry Data Security Standard).</p>
+          <p className="mt-4">La asociación no almacena datos de tarjetas de crédito o débito en sus servidores. Dichos datos son tratados directamente por RedSys conforme a los estándares de seguridad PCI-DSS (Payment Card Industry Data Security Standard) y con autenticación reforzada mediante 3D Secure (EMV 3DS).</p>
           
-          <p className="mt-4">Al realizar un pago, el usuario acepta los términos de servicio de Stripe y autoriza el cargo correspondiente. Para más información sobre el tratamiento de datos de pago, consulte nuestra <a href="/privacy-policy" className="text-primary hover:underline">Política de Privacidad</a> y los <a href="/terms-and-conditions" className="text-primary hover:underline">Términos y Condiciones</a>.</p>
+          <p className="mt-4">Al realizar un pago, el usuario autoriza el cargo correspondiente a través de la pasarela de RedSys. Para más información sobre el tratamiento de datos de pago, consulte nuestra <a href="/privacy-policy" className="text-primary hover:underline">Política de Privacidad</a> y los <a href="/terms-and-conditions" className="text-primary hover:underline">Términos y Condiciones</a>.</p>
         </div>
 
         <div className="mb-8">

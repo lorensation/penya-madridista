@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     // Check if user exists
     const { data: userExists, error: userError } = await supabase
-      .from("auth.users")
+      .from("users")
       .select("id")
       .eq("id", userId)
       .maybeSingle()

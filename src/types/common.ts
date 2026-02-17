@@ -59,37 +59,26 @@ export interface Event {
   [key: string]: unknown
 }
 
-// Stripe session type
-export interface StripeSession {
-  id: string
-  url: string
-  [key: string]: unknown
-}
-
-// Webhook event type
-export interface WebhookEvent {
-  id: string
-  type: string
-  data: {
-    object: {
-      id: string
-      [key: string]: unknown
-    }
-    [key: string]: unknown
-  }
-  [key: string]: unknown
+// Payment transaction result (RedSys)
+export interface PaymentResult {
+  success: boolean
+  order?: string
+  dsResponse?: string
+  authorizationCode?: string
+  error?: string
+  errorCode?: string
 }
 
 // Define an interface for the member data
 export interface MemberData {
   user_id?: number
   id?: string // This should match the auth.users(id)
-  user_uuid?: string // This should match users(id)
+  user_uuid?: string | null // This should match users(id)
   temp_auth_id?: string
   dni_pasaporte?: string
   name?: string
   apellido1?: string
-  apellido2?: string
+  apellido2?: string | null
   telefono?: string | number | null
   email?: string
   fecha_nacimiento?: string | Date | null
@@ -98,24 +87,26 @@ export interface MemberData {
   socio_carnet_madridista?: boolean
   num_carnet?: string | number | null
   direccion?: string
-  direccion_extra?: string
-  poblacion?: string
+  direccion_extra?: string | null
+  poblacion?: string | null
   cp?: string | number | null
-  provincia?: string
-  pais?: string
+  provincia?: string | null
+  pais?: string | null
   nacionalidad?: string
-  cargo_directivo?: string
+  cargo_directivo?: string | null
   created_at?: string | Date
-  role?: string
+  role?: string | null
   // Subscription related fields
-  subscription_status?: string
-  subscription_plan?: string
-  subscription_id?: string
-  subscription_updated_at?: string | Date
-  stripe_customer_id?: string
-  last_four?: string
-  email_notifications?: boolean
-  marketing_emails?: boolean
+  subscription_status?: string | null
+  subscription_plan?: string | null
+  subscription_id?: string | null
+  subscription_updated_at?: string | Date | null
+  last_four?: string | null
+  redsys_token?: string | null
+  redsys_token_expiry?: string | null
+  email_notifications?: boolean | null
+  marketing_emails?: boolean | null
+  auth_id?: string // For compatibility
   [key: string]: unknown // Allow for additional properties
 }
 

@@ -81,8 +81,8 @@ export default function NewBlogPostPage() {
         slug: formData.slug,
         content: formData.content,
         excerpt: formData.excerpt || null,
-        author: formData.author || null,
-        category: formData.category || null,
+        author: formData.author || "Admin",
+        category: formData.category || "General",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })

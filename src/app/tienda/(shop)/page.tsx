@@ -32,8 +32,8 @@ interface Product {
   id: string
   name: string
   slug: string
-  description: string
-  image_url: string
+  description: string | null
+  image_url: string | null
   category: string
   min_price_cents: number | null
 }

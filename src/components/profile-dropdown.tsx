@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabase"
 interface User {
   id: string
   email?: string
-  name?: string
+  name?: string | null
 }
 
 interface ProfileDropdownProps {

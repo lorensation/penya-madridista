@@ -73,30 +73,12 @@ export async function createMember(memberData: MemberData) {
   // Create the member record
   const { data, error } = await client
     .from("miembros")
-    .insert(preparedData)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .insert(preparedData as any)
     .select()
 
   if (error) {
     console.error("Error creating member:", error)
-  } else if (data && data.length > 0 && (preparedData.subscription_id || preparedData.stripe_customer_id)) {
-    try {
-      // Call the admin API to update subscription status
-      const response = await fetch("/api/admin/update-subscription", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId: authUser.user.id,
-        }),
-      })
-
-      if (!response.ok) {
-        console.error("Failed to update subscription via admin API:", await response.text())
-      }
-    } catch (subscriptionErr) {
-      console.error("Error calling subscription update API:", subscriptionErr)
-    }
   }
 
   return { data, error }
@@ -141,7 +123,8 @@ export async function updateMember(updates: Partial<MemberData>) {
   // Update member by user_uuid
   const { data, error } = await client
     .from("miembros")
-    .update(updates)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .update(updates as any)
     .eq("user_uuid", authUser.user.id)
     .select()
 
