@@ -69,7 +69,7 @@ export async function generateMetadata(
 }
 
 async function getProduct(slug: string): Promise<Product | null> {
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   const { data, error } = await supabase
     .from("products")
@@ -103,7 +103,7 @@ async function getRelatedProducts(
   productId: string,
   category: string
 ): Promise<RelatedProduct[]> {
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   const { data, error } = await supabase
     .from("products")

@@ -5,17 +5,17 @@ import { baseUrl } from "./config"
 /**
  * Get the appropriate Supabase client based on the environment
  */
-function getClient() {
+async function getClient() {
   return typeof window !== "undefined" 
     ? createBrowserSupabaseClient() 
-    : createServerSupabaseClient()
+    : await createServerSupabaseClient()
 }
 
 /**
  * Register a new user with email and password
  */
 export async function signUp(email: string, password: string, name: string) {
-  const client = getClient()
+  const client = await getClient()
   
   return await client.auth.signUp({
     email,
@@ -33,7 +33,7 @@ export async function signUp(email: string, password: string, name: string) {
  * Sign in with email and password
  */
 export async function signIn(email: string, password: string) {
-  const client = getClient()
+  const client = await getClient()
   
   return await client.auth.signInWithPassword({
     email,
@@ -45,7 +45,7 @@ export async function signIn(email: string, password: string) {
  * Sign out the current user
  */
 export async function signOut() {
-  const client = getClient()
+  const client = await getClient()
   
   return await client.auth.signOut()
 }
@@ -54,7 +54,7 @@ export async function signOut() {
  * Send a password reset email
  */
 export async function resetPassword(email: string) {
-  const client = getClient()
+  const client = await getClient()
   
   return await client.auth.resetPasswordForEmail(email, {
     redirectTo: `${baseUrl}/reset-password`,
@@ -65,6 +65,6 @@ export async function resetPassword(email: string) {
  * Get the current authenticated user
  */
 export async function getCurrentUser() {
-  const client = getClient()
+  const client = await getClient()
   return await client.auth.getUser()
 }

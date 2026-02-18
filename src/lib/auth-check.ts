@@ -19,7 +19,7 @@ export async function checkUserBlocked(userId: string): Promise<{
   blocked: boolean; 
   info?: BlockedUserInfo;
 }> {
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
   
   // Check if the user exists in the blocked_users table
   const { data, error } = await supabase

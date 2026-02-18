@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
 
     // Get current user (admin)
     const { data: { user: admin }, error: authError } = await supabase.auth.getUser()

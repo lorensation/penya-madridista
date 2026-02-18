@@ -1,9 +1,7 @@
 //lib/auth.ts
 "use server"
 
-import { supabase } from "@/lib/supabase";
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 /**
  * Checks if the current user has admin privileges
@@ -11,6 +9,7 @@ import { cookies } from 'next/headers';
  */
 export async function checkAdminStatus() {
   try {
+    const supabase = await createServerSupabaseClient();
     // Get the current user session
     const {
       data: { session },
@@ -60,6 +59,7 @@ export async function checkAdminStatus() {
  */
 export async function checkUserRole(role: string) {
   try {
+    const supabase = await createServerSupabaseClient();
     const {
       data: { session },
       error: sessionError,
@@ -95,6 +95,7 @@ export async function checkUserRole(role: string) {
  */
 export async function getBasicUserData() {
   try {
+    const supabase = await createServerSupabaseClient();
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return null;
     
@@ -127,6 +128,7 @@ export async function getBasicUserData() {
  */
 export async function getMemberData() {
   try {
+    const supabase = await createServerSupabaseClient();
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return null;
     
@@ -144,6 +146,8 @@ export async function getMemberData() {
  * @returns Member profile or null if not found
  */
 async function getMemberProfile(userId: string, email?: string) {
+  const supabase = await createServerSupabaseClient();
+
   // 1. Try by user_uuid
   const { data: profileByUuid, error: uuidError } = await supabase
     .from("miembros")
@@ -188,15 +192,11 @@ async function getMemberProfile(userId: string, email?: string) {
 }
 
 /**
- * Server component version of the auth check functions
- * These use the createServerComponentClient for use in React Server Components
- */
-
-/**
  * Get basic user data from the users table (Server Component version)
+ * Now unified: uses the same createServerSupabaseClient as all server contexts.
  */
 export async function getBasicUserDataSSR() {
-  const supabase = createServerComponentClient({ cookies });
+  const supabase = await createServerSupabaseClient();
   
   try {
     const { data: { session } } = await supabase.auth.getSession();
@@ -227,9 +227,10 @@ export async function getBasicUserDataSSR() {
 
 /**
  * Get detailed member data from the miembros table (Server Component version)
+ * Now unified: uses the same createServerSupabaseClient as all server contexts.
  */
 export async function getMemberDataSSR() {
-  const supabase = createServerComponentClient({ cookies });
+  const supabase = await createServerSupabaseClient();
   
   try {
     const { data: { session } } = await supabase.auth.getSession();

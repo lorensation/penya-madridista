@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
 export async function POST(request: Request) {
@@ -10,6 +10,7 @@ export async function POST(request: Request) {
     }
 
     // Use standard sign-up method instead of admin API
+    const supabase = await createServerSupabaseClient()
     const { data, error } = await supabase.auth.signUp({
       email,
       password,

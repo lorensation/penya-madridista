@@ -1,10 +1,13 @@
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { supabase } from "@/lib/supabase"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
+
+export const dynamic = 'force-dynamic'
 
 async function getBlogPosts() {
   try {
+    const supabase = await createServerSupabaseClient()
     const { data, error } = await supabase.from("posts").select("*").eq("published", true).order("created_at", { ascending: false })
 
     if (error) {

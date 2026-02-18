@@ -1,7 +1,5 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { Database } from '@/types/supabase';
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,9 +9,8 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10');
     const search = searchParams.get('search') || '';
     
-    // Create Supabase client - IMPORTANT: await the cookies()
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    // Create Supabase client
+    const supabase = await createServerSupabaseClient();
     
     // Calculate pagination
     const from = (page - 1) * limit;

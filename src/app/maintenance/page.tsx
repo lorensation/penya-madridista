@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 // Function to get site settings
 async function getSiteSettings() {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   
   const { data } = await supabase
     .from('site_settings')

@@ -6,7 +6,7 @@ import type { ApiResponse } from "@/types/common"
 import type { User } from "@supabase/supabase-js"
 
 export async function signUp(formData: FormData) {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   const email = formData.get("email") as string
   const password = formData.get("password") as string
   const name = formData.get("name") as string
@@ -40,7 +40,7 @@ export async function signUp(formData: FormData) {
 }
 
 export async function signIn(formData: FormData): Promise<ApiResponse> {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   const email = formData.get("email") as string
   const password = formData.get("password") as string
 
@@ -69,13 +69,13 @@ export async function signIn(formData: FormData): Promise<ApiResponse> {
 }
 
 export async function signOut() {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   await supabase.auth.signOut()
   redirect("/login")
 }
 
 export async function resetPassword(formData: FormData) {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   const email = formData.get("email") as string
 
   if (!email) {
@@ -104,7 +104,7 @@ export async function resetPassword(formData: FormData) {
 }
 
 export async function updatePassword(formData: FormData) {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   const password = formData.get("password") as string
 
   if (!password) {
@@ -129,12 +129,12 @@ export async function updatePassword(formData: FormData) {
 }
 
 export async function getSession() {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   return supabase.auth.getSession()
 }
 
 export async function getUser(): Promise<User | null> {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   const { data } = await supabase.auth.getUser()
   return data.user
 }

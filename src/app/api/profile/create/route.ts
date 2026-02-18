@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
 export async function POST(request: Request) {
@@ -11,6 +11,7 @@ export async function POST(request: Request) {
 
     // Create user entry
     try {
+      const supabase = await createServerSupabaseClient()
       const { error: usersError } = await supabase.from("users").insert({
         id: userId,
         email: email,

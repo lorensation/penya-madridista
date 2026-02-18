@@ -32,12 +32,14 @@ import {
 } from "./supabase/member-service"
 
 /**
- * Legacy Supabase client instance for backward compatibility
- * Automatically selects browser or server client based on environment
+ * Legacy Supabase client for backward compatibility (CLIENT-SIDE ONLY).
+ *
+ * In server contexts (server components, server actions, API routes)
+ * use `const supabase = await createServerSupabaseClient()` instead.
  */
 export const supabase = typeof window !== "undefined" 
   ? createBrowserSupabaseClient() 
-  : createServerSupabaseClient()
+  : (null as unknown as ReturnType<typeof createBrowserSupabaseClient>)
 
 /**
  * Legacy function to get admin Supabase client for backward compatibility
@@ -71,13 +73,13 @@ export {
 }
 
 /**
- * Creates appropriate Supabase client based on environment
- * @returns Supabase client instance
+ * Creates appropriate Supabase client based on environment (async).
+ * Server contexts return a Promise; browser contexts return sync.
  */
-export function createSupabaseClient() {
+export async function createSupabaseClient() {
   return typeof window !== "undefined"
     ? createBrowserSupabaseClient()
-    : createServerSupabaseClient()
+    : await createServerSupabaseClient()
 }
 
 /**
@@ -105,13 +107,13 @@ export function isServerSide(): boolean {
 }
 
 /**
- * Utility function to get the appropriate client based on context
- * Useful for functions that need to work in both environments
+ * Utility function to get the appropriate client based on context (async).
+ * Useful for functions that need to work in both environments.
  */
-export function getClient() {
+export async function getClient() {
   return isClientSide() 
     ? createBrowserSupabaseClient() 
-    : createServerSupabaseClient()
+    : await createServerSupabaseClient()
 }
 
 /**

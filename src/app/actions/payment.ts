@@ -54,7 +54,7 @@ export async function prepareShopPayment(
   }
 
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     // Calculate total from DB prices (don't trust client-side prices)
@@ -146,7 +146,7 @@ export async function prepareMembershipPayment(
   interval: PaymentInterval,
 ): Promise<PreparePaymentResult> {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
 
     if (authErr || !user) {
@@ -467,7 +467,7 @@ export async function cancelMembershipSubscription(): Promise<{
   error?: string
 }> {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
 
     if (authErr || !user) {
@@ -528,7 +528,7 @@ export async function cancelMembershipSubscription(): Promise<{
  */
 export async function prepareCardUpdate(): Promise<PreparePaymentResult> {
   try {
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
     const { data: { user }, error: authErr } = await supabase.auth.getUser()
 
     if (authErr || !user) {

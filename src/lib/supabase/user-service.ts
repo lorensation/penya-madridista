@@ -5,17 +5,17 @@ import { getCurrentUser } from "./auth-service"
 /**
  * Get the appropriate Supabase client based on the environment
  */
-function getClient() {
+async function getClient() {
   return typeof window !== "undefined" 
     ? createBrowserSupabaseClient() 
-    : createServerSupabaseClient()
+    : await createServerSupabaseClient()
 }
 
 /**
  * Get the current user's profile data
  */
 export async function getUserProfile() {
-  const client = getClient()
+  const client = await getClient()
   
   // Get the auth user
   const { data: authUser, error: authError } = await getCurrentUser()
@@ -38,7 +38,7 @@ export async function getUserProfile() {
  * Update the current user's profile data
  */
 export async function updateUserProfile(updates: Record<string, unknown>) {
-  const client = getClient()
+  const client = await getClient()
   
   // Get the auth user
   const { data: authUser, error: authError } = await getCurrentUser()
@@ -61,7 +61,7 @@ export async function updateUserProfile(updates: Record<string, unknown>) {
  * Check if the current user is a member
  */
 export async function checkMembershipStatus() {
-  const client = getClient()
+  const client = await getClient()
   
   // Get the auth user
   const { data: authUser, error: authError } = await getCurrentUser()

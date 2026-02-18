@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createHmac } from "crypto"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
@@ -40,6 +40,7 @@ export async function POST(request: Request) {
 
       try {
         // Use a separate supabase client for this operation to avoid transaction issues
+        const supabase = await createServerSupabaseClient()
         const { error: insertError } = await supabase.from("users").insert({
           id: user.id,
           email: user.email || "",
@@ -50,7 +51,6 @@ export async function POST(request: Request) {
         if (insertError) {
           console.error("User creation error in webhook:", insertError)
 
-          // Try a raw SQL approach as a fallback
           try {
             const { error: rpcError } = await supabase.rpc("create_user_safely", {
               user_uuid: user.id,

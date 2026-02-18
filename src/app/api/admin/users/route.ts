@@ -1,13 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getServiceSupabase } from "@/lib/supabase"
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
-import type { Database } from "@/types/supabase"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
   try {
     // Get the current user to verify they're an admin
-    const supabaseClient = createRouteHandlerClient<Database>({ cookies })
+    const supabaseClient = await createServerSupabaseClient()
     const {
       data: { user },
     } = await supabaseClient.auth.getUser()

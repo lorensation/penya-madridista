@@ -1,8 +1,7 @@
 "use server"
 
 import { createAdminSupabaseClient } from "@/lib/supabase";
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/supabase";
 
 export type BlockReasonType = 
@@ -179,9 +178,7 @@ export async function getBlockedUsers(): Promise<BlockedUser[]> {
  * Server component version that checks if user is blocked (for middleware)
  */
 export async function isUserBlockedSSR(userId: string): Promise<BlockedUser | null> {
-  // Fix: await cookies() properly by using a cookie store
-  const cookieStore = cookies();
-  const supabase = createServerComponentClient({ cookies: () => cookieStore });
+  const supabase = await createServerSupabaseClient();
   
   try {
     const { data, error } = await supabase

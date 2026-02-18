@@ -1,10 +1,12 @@
 import Image from "next/image"
 import Link from "next/link"
-import { supabase } from "@/lib/supabase"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import type { Metadata } from "next"
+
+export const dynamic = 'force-dynamic'
 
 // Updated type for the page props to use Promise-based params for Next.js 15+
 type BlogPostProps = {
@@ -15,6 +17,7 @@ type BlogPostProps = {
 
 async function getBlogPost(slug: string) {
   try {
+    const supabase = await createServerSupabaseClient()
     const { data, error } = await supabase.from("posts").select("*").eq("slug", slug).single()
 
     if (error || !data) {
@@ -31,6 +34,7 @@ async function getBlogPost(slug: string) {
 
 async function getRelatedPosts(currentPostId: string, category: string) {
   try {
+    const supabase = await createServerSupabaseClient()
     const { data, error } = await supabase
       .from("posts")
       .select("*")

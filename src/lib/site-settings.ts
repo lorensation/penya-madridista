@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { cache } from "react"
 
 // Define the settings interface
@@ -44,6 +44,7 @@ export const defaultSettings: SiteSettings = {
 export const getSiteSettings = cache(async (): Promise<SiteSettings> => {
   try {
     // Fetch settings
+    const supabase = await createServerSupabaseClient()
     const { data, error } = await supabase
       .from('site_settings')
       .select('*')

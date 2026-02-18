@@ -1,6 +1,5 @@
 import Link from "next/link"
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,7 +9,7 @@ import { Package, ShoppingBag, BarChart3, ClipboardList } from "lucide-react"
 export const dynamic = "force-dynamic";
 
 async function getProductCount() {
-  const supabase = createServerComponentClient({ cookies })
+  const supabase = await createServerSupabaseClient()
   const { count, error } = await supabase
     .from('products')
     .select('*', { count: 'exact', head: true })
@@ -24,7 +23,7 @@ async function getProductCount() {
 }
 
 async function getOrderCount() {
-  const supabase = createServerComponentClient({ cookies })
+  const supabase = await createServerSupabaseClient()
   const { count, error } = await supabase
     .from('orders')
     .select('*', { count: 'exact', head: true })
@@ -38,7 +37,7 @@ async function getOrderCount() {
 }
 
 async function getRecentOrders() {
-  const supabase = createServerComponentClient({ cookies })
+  const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase
     .from('orders')
     .select('*, order_items(*)')
@@ -54,7 +53,7 @@ async function getRecentOrders() {
 }
 
 async function getLowInventoryProducts() {
-  const supabase = createServerComponentClient({ cookies })
+  const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase
     .from('product_variants')
     .select('*, products(*)')
@@ -177,7 +176,7 @@ export default async function ShopAdminPage() {
                           #{order.id.substring(0, 8)}
                         </Link>
                       </div>
-                      <div>{new Date(order.created_at).toLocaleDateString()}</div>
+                      <div>{order.created_at ? new Date(order.created_at as string).toLocaleDateString() : '-'}</div>
                       <div>
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           order.status === 'paid' ? 'bg-green-100 text-green-800' :
@@ -233,7 +232,10 @@ export default async function ShopAdminPage() {
                     <div className="text-right">Stock</div>
                   </div>
                   
-                  {lowInventoryProducts.map((variant) => (
+                  {lowInventoryProducts.map((variant) => {
+                    const opt = variant.option as Record<string, string> | null
+                    const inv = variant.inventory ?? 0
+                    return (
                     <div key={variant.id} className="grid grid-cols-4 text-sm">
                       <div className="font-medium">
                         <Link href={`/admin/shop/products/${variant.products?.slug}`} className="text-blue-600 hover:underline">
@@ -241,17 +243,18 @@ export default async function ShopAdminPage() {
                         </Link>
                       </div>
                       <div>
-                        {variant.option?.size} 
-                        {variant.option?.color && ` / ${variant.option.color}`}
+                        {opt?.size} 
+                        {opt?.color && ` / ${opt.color}`}
                       </div>
                       <div>{variant.sku}</div>
                       <div className="text-right font-medium">
-                        <span className={`${variant.inventory <= 0 ? 'text-red-600' : 'text-orange-600'}`}>
+                        <span className={`${inv <= 0 ? 'text-red-600' : 'text-orange-600'}`}>
                           {variant.inventory}
                         </span>
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <p className="text-center py-4 text-muted-foreground">

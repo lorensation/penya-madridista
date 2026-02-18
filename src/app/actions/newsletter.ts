@@ -15,7 +15,7 @@ export type ApiResponse = {
 export async function addUserToNewsletter(email: string, name?: string): Promise<boolean> {
   try {
     // Store subscriber in database
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
 
     // First check if the email already exists
     const { data: existingSubscriber } = await supabase
@@ -81,7 +81,7 @@ export async function subscribeToNewsletter(formData: FormData): Promise<ApiResp
     }
 
     // Store subscriber in database
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
     
     try {
       // First check if the email already exists

@@ -6,10 +6,10 @@ import type { MemberData } from "@/types/common"
 /**
  * Get the appropriate Supabase client based on the environment
  */
-function getClient() {
+async function getClient() {
   return typeof window !== "undefined" 
     ? createBrowserSupabaseClient() 
-    : createServerSupabaseClient()
+    : await createServerSupabaseClient()
 }
 
 /**
@@ -45,7 +45,7 @@ function prepareMemberData(memberData: MemberData, userId: string): MemberData {
  * Create a new member record for the current user
  */
 export async function createMember(memberData: MemberData) {
-  const client = getClient()
+  const client = await getClient()
   
   // Get the auth user
   const { data: authUser, error: authError } = await getCurrentUser()
@@ -88,7 +88,7 @@ export async function createMember(memberData: MemberData) {
  * Get the member record for the current user
  */
 export async function getMember() {
-  const client = getClient()
+  const client = await getClient()
   
   // Get the auth user
   const { data: authUser, error: authError } = await getCurrentUser()
@@ -111,7 +111,7 @@ export async function getMember() {
  * Update the member record for the current user
  */
 export async function updateMember(updates: Partial<MemberData>) {
-  const client = getClient()
+  const client = await getClient()
   
   // Get the auth user
   const { data: authUser, error: authError } = await getCurrentUser()

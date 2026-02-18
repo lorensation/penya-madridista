@@ -178,7 +178,7 @@ export const serverSubscriptionService = {
    * Get a user's active subscription
    */
   async getUserSubscription(userId: string): Promise<Subscription | null> {
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
     
     const { data, error } = await supabase
       .from('subscriptions')
@@ -203,7 +203,7 @@ export const serverSubscriptionService = {
    * Get all subscriptions for a user
    */
   async getAllUserSubscriptions(userId: string): Promise<Subscription[]> {
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
     
     const { data, error } = await supabase
       .from('subscriptions')
@@ -234,7 +234,7 @@ export const serverSubscriptionService = {
     }
   ): Promise<{ success: boolean; error?: SubscriptionError; subscription?: Subscription }> {
     try {
-      const supabase = createServerSupabaseClient()
+      const supabase = await createServerSupabaseClient()
       
       // Ensure payment type is valid - normalize to one of the allowed values
       const normalizedPaymentType: PaymentType = 
@@ -293,7 +293,7 @@ export const serverSubscriptionService = {
     updates: Partial<Subscription>
   ): Promise<{ success: boolean; error?: SubscriptionError }> {
     try {
-      const supabase = createServerSupabaseClient()
+      const supabase = await createServerSupabaseClient()
       
       const { error } = await supabase
         .from('subscriptions')
@@ -325,7 +325,7 @@ export const serverSubscriptionService = {
     subscriptionId: string
   ): Promise<{ success: boolean; error?: SubscriptionError }> {
     try {
-      const supabase = createServerSupabaseClient()
+      const supabase = await createServerSupabaseClient()
       
       const { error } = await supabase
         .from('subscriptions')

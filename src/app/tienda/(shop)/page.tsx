@@ -39,7 +39,7 @@ interface Product {
 }
 
 async function getProducts(category?: string): Promise<Product[]> {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   
   try {
     // Build query to fetch products
@@ -97,7 +97,7 @@ async function getProducts(category?: string): Promise<Product[]> {
 }
 
 async function getCategories(): Promise<string[]> {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   
   try {
     // Fetch distinct categories from the products table
