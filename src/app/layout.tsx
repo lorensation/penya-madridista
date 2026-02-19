@@ -9,6 +9,7 @@ import { AuthProvider } from "@/context/AuthContext"
 import { Toaster } from "@/components/ui/use-toast"
 import CookieConsent from '@/components/cookie-consent'
 import AnalyticsProvider from '@/components/analytics-provider'
+import { Analytics as VercelAnalytics } from '@vercel/analytics/next';
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -39,6 +40,7 @@ export default function RootLayout({
             <Toaster />
             <CookieConsent />
             <AnalyticsProvider />
+            <VercelAnalytics />
           </AuthProvider>
         </ThemeProvider>
       </body>

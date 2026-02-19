@@ -26,6 +26,10 @@ const INSITE_ERRORS: Record<string, string> = {
   msg17: "Validación incorrecta por parte del comercio",
 }
 
+/** Maximum time (ms) to poll for idOper after storeIdOper is called */
+const IDOPER_POLL_TIMEOUT = 3000
+const IDOPER_POLL_INTERVAL = 80
+
 // ── Props ────────────────────────────────────────────────────────────────────
 
 export interface RedsysInSiteFormProps {
@@ -53,18 +57,13 @@ export interface RedsysInSiteFormProps {
 
 declare global {
   interface Window {
-    getInSiteFormJSON?: (config: Record<string, unknown>) => void
+    getInSiteFormJSON?: (config: Record<string, string>) => void
     storeIdOper?: (
       event: MessageEvent,
       tokenInputId: string,
       errorInputId: string,
       validationFn: () => boolean,
     ) => void
-    /** Our custom namespace to avoid collisions */
-    __redsysCallbacks?: {
-      onIdOper: ((idOper: string) => void) | null
-      onError: ((error: string) => void) | null
-    }
   }
 }
 
@@ -88,6 +87,7 @@ export function RedsysInSiteForm({
   const tokenRef = useRef<HTMLInputElement>(null)
   const errorRef = useRef<HTMLInputElement>(null)
   const initRef = useRef(false)
+  const idOperHandledRef = useRef(false)
 
   // Stable callback refs to avoid re-initializing the iframe
   const onIdOperRef = useRef(onIdOperReceived)
@@ -115,7 +115,10 @@ export function RedsysInSiteForm({
     const script = document.createElement("script")
     script.src = scriptUrl
     script.async = true
-    script.onload = () => setScriptLoaded(true)
+    script.onload = () => {
+      console.log("[RedsysInSite] Script loaded successfully")
+      setScriptLoaded(true)
+    }
     script.onerror = () => {
       setInternalError("No se pudo cargar el módulo de pago. Recarga la página.")
       onErrorRef.current("Script load failed")
@@ -127,64 +130,108 @@ export function RedsysInSiteForm({
     }
   }, [isTest])
 
+  // ── Poll for idOper value (robust alternative to fixed timeout) ─────────
+
+  const pollForIdOper = useCallback(() => {
+    if (idOperHandledRef.current) return
+    const started = Date.now()
+
+    const poll = () => {
+      if (idOperHandledRef.current) return
+
+      const tokenEl = document.getElementById("redsys-token") as HTMLInputElement | null
+      const errorEl = document.getElementById("redsys-error") as HTMLInputElement | null
+
+      // Also check via refs as fallback
+      const tokenValue = tokenEl?.value || tokenRef.current?.value || ""
+      const errorValue = errorEl?.value || errorRef.current?.value || ""
+
+      console.log("[RedsysInSite] Polling — token:", JSON.stringify(tokenValue), "error:", JSON.stringify(errorValue))
+
+      if (tokenValue && tokenValue !== "" && tokenValue !== "-1") {
+        idOperHandledRef.current = true
+        console.log("[RedsysInSite] idOper received:", tokenValue)
+        setInternalError(null)
+        onIdOperRef.current(tokenValue)
+        return
+      }
+
+      if (tokenValue === "-1") {
+        idOperHandledRef.current = true
+        const msg = "Número de pedido repetido. Inténtalo de nuevo."
+        console.warn("[RedsysInSite] Duplicate order:", msg)
+        setInternalError(msg)
+        onErrorRef.current(msg)
+        return
+      }
+
+      if (errorValue) {
+        idOperHandledRef.current = true
+        const msg = INSITE_ERRORS[errorValue] || `Error en el formulario de pago (${errorValue})`
+        console.warn("[RedsysInSite] Form error:", errorValue, msg)
+        setInternalError(msg)
+        onErrorRef.current(msg)
+        return
+      }
+
+      // Keep polling until timeout
+      if (Date.now() - started < IDOPER_POLL_TIMEOUT) {
+        setTimeout(poll, IDOPER_POLL_INTERVAL)
+      } else {
+        console.warn("[RedsysInSite] Timed out waiting for idOper")
+      }
+    }
+
+    poll()
+  }, [])
+
   // ── Merchant validation callback ────────────────────────────────────────
 
   const merchantValidation = useCallback((): boolean => {
-    // This is called by storeIdOper BEFORE storing the idOper.
-    // Schedule a microtask to read the stored value AFTER storeIdOper finishes.
-    setTimeout(() => {
-      const tokenEl = tokenRef.current
-      const errorEl = errorRef.current
-
-      if (tokenEl?.value && tokenEl.value !== "" && tokenEl.value !== "-1") {
-        setInternalError(null)
-        onIdOperRef.current(tokenEl.value)
-      } else if (tokenEl?.value === "-1") {
-        const msg = "Número de pedido repetido. Inténtalo de nuevo."
-        setInternalError(msg)
-        onErrorRef.current(msg)
-      } else if (errorEl?.value) {
-        const errorCode = errorEl.value
-        const msg = INSITE_ERRORS[errorCode] || `Error en el formulario de pago (${errorCode})`
-        setInternalError(msg)
-        onErrorRef.current(msg)
-      }
-    }, 50)
-
+    console.log("[RedsysInSite] merchantValidation called — starting poll for idOper")
+    // storeIdOper calls this BEFORE storing the value, so poll for it
+    idOperHandledRef.current = false
+    pollForIdOper()
     return true // Must return true for storeIdOper to proceed
-  }, [])
+  }, [pollForIdOper])
 
   // ── Initialize InSite form ──────────────────────────────────────────────
 
   useEffect(() => {
     if (!scriptLoaded || !order || !fuc || initRef.current) return
 
-    // Set up global callbacks namespace
-    window.__redsysCallbacks = {
-      onIdOper: null,
-      onError: null,
-    }
-
     // Set up postMessage listener
     const messageHandler = (event: MessageEvent) => {
-      if (window.storeIdOper && tokenRef.current && errorRef.current) {
-        window.storeIdOper(event, "redsys-token", "redsys-error", merchantValidation)
+      // Log all postMessages for debugging (filter Redsys origins)
+      const origin = event.origin || ""
+      if (origin.includes("redsys.es")) {
+        console.log("[RedsysInSite] postMessage from", origin, "data:", typeof event.data === "string" ? event.data.substring(0, 200) : event.data)
+      }
+
+      if (window.storeIdOper) {
+        try {
+          window.storeIdOper(event, "redsys-token", "redsys-error", merchantValidation)
+        } catch (err) {
+          console.error("[RedsysInSite] storeIdOper error:", err)
+        }
       }
     }
 
     window.addEventListener("message", messageHandler)
 
-    // Build InSite config — ALL values must be strings
-    const insiteConfig: Record<string, unknown> = {
+    // ── CRITICAL: ALL values MUST be strings per Redsys InSite V3 docs ──
+    const insiteConfig: Record<string, string> = {
       id: "redsys-card-form",
       fuc: String(fuc),
       terminal: String(terminal),
       order: String(order),
-      buttonValue: buttonText,
-      idiomaInsite: language,
-      estiloInsite: formStyle,
-      mostrarLogoInsite: showLogo,
+      buttonValue: String(buttonText),
+      idiomaInsite: String(language),
+      estiloInsite: String(formStyle),
+      mostrarLogoInsite: String(showLogo),
     }
+
+    console.log("[RedsysInSite] Initializing with config:", JSON.stringify(insiteConfig))
 
     // Small delay to ensure DOM is ready
     requestAnimationFrame(() => {
@@ -193,6 +240,9 @@ export function RedsysInSiteForm({
           window.getInSiteFormJSON(insiteConfig)
           setFormReady(true)
           initRef.current = true
+          console.log("[RedsysInSite] Form initialized successfully")
+        } else {
+          console.error("[RedsysInSite] getInSiteFormJSON not available")
         }
       } catch (err) {
         console.error("[RedsysInSiteForm] Error initializing:", err)
@@ -204,6 +254,56 @@ export function RedsysInSiteForm({
       window.removeEventListener("message", messageHandler)
     }
   }, [scriptLoaded, order, fuc, terminal, buttonText, language, formStyle, showLogo, merchantValidation])
+
+  // ── Fallback: also listen for direct changes to hidden inputs ───────────
+
+  useEffect(() => {
+    if (!formReady) return
+
+    // MutationObserver as a safety net to catch idOper writes we might miss
+    const tokenEl = document.getElementById("redsys-token") as HTMLInputElement | null
+    if (!tokenEl) return
+
+    const observer = new MutationObserver(() => {
+      const val = tokenEl.value
+      if (val && val !== "" && !idOperHandledRef.current) {
+        console.log("[RedsysInSite] MutationObserver caught idOper:", val)
+        if (val === "-1") {
+          idOperHandledRef.current = true
+          const msg = "Número de pedido repetido. Inténtalo de nuevo."
+          setInternalError(msg)
+          onErrorRef.current(msg)
+        } else {
+          idOperHandledRef.current = true
+          setInternalError(null)
+          onIdOperRef.current(val)
+        }
+      }
+    })
+
+    observer.observe(tokenEl, { attributes: true, attributeFilter: ["value"] })
+
+    // Also watch with an input event (some browsers fire this on programmatic .value sets)
+    const onInput = () => {
+      const val = tokenEl.value
+      if (val && val !== "" && !idOperHandledRef.current) {
+        console.log("[RedsysInSite] input event caught idOper:", val)
+        if (val !== "-1") {
+          idOperHandledRef.current = true
+          setInternalError(null)
+          onIdOperRef.current(val)
+        }
+      }
+    }
+    tokenEl.addEventListener("input", onInput)
+    tokenEl.addEventListener("change", onInput)
+
+    return () => {
+      observer.disconnect()
+      tokenEl.removeEventListener("input", onInput)
+      tokenEl.removeEventListener("change", onInput)
+    }
+  }, [formReady])
 
   // ── Render ──────────────────────────────────────────────────────────────
 
