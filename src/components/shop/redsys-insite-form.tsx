@@ -237,7 +237,7 @@ export function RedsysInSiteForm({
       <div
         id="redsys-card-form"
         ref={containerRef}
-        className={disabled ? "pointer-events-none opacity-50" : ""}
+        className={`min-h-[380px] w-full ${disabled ? "pointer-events-none opacity-50" : ""}`}
       />
 
       {/* Hidden inputs for idOper / error storage (used by storeIdOper) */}

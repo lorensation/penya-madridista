@@ -121,3 +121,15 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ── Redsys InSite iframe sizing ──────────────────────────────────────────── */
+#redsys-card-form {
+  min-height: 380px;
+  width: 100%;
+}
+
+#redsys-card-form iframe {
+  width: 100% !important;
+  min-height: 350px !important;
+  border: none;
+}
