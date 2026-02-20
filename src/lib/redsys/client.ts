@@ -87,6 +87,8 @@ export async function trataPeticionREST(
 }> {
   const endpoint = getEndpoints().trataPeticion
 
+  console.log("[redsys/client] trataPeticionREST POST to", endpoint)
+
   const res = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -98,7 +100,21 @@ export async function trataPeticionREST(
     throw new Error(`RedSys trataPeticion HTTP ${res.status}: ${text}`)
   }
 
-  const raw: RedsysRestResponse = await res.json()
+  const raw = (await res.json()) as RedsysRestResponse
+
+  console.log("[redsys/client] trataPeticionREST raw response:", JSON.stringify(raw))
+
+  // Redsys returns {"errorCode": "SISXXXX"} for pre-processing errors
+  // (bad merchant, bad key, invalid params, etc.) — no Ds_MerchantParameters.
+  if ("errorCode" in raw) {
+    throw new Error(`RedSys error: ${(raw as { errorCode: string }).errorCode}`)
+  }
+
+  if (!raw.Ds_MerchantParameters || !raw.Ds_Signature) {
+    console.error("[redsys/client] Response missing Ds_MerchantParameters or Ds_Signature:", raw)
+    throw new Error("RedSys returned an unexpected response (no signed parameters)")
+  }
+
   const merchantKey = getSecretKey()
   const verified = verifySignature(merchantKey, raw.Ds_MerchantParameters, raw.Ds_Signature)
   const params = decodeMerchantParams<RedsysResponseParams>(raw.Ds_MerchantParameters)
@@ -118,6 +134,8 @@ export async function iniciaPeticionREST(
 }> {
   const endpoint = getEndpoints().iniciaPeticion
 
+  console.log("[redsys/client] iniciaPeticionREST POST to", endpoint)
+
   const res = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -129,7 +147,20 @@ export async function iniciaPeticionREST(
     throw new Error(`RedSys iniciaPeticion HTTP ${res.status}: ${text}`)
   }
 
-  const raw: RedsysRestResponse = await res.json()
+  const raw = (await res.json()) as RedsysRestResponse
+
+  console.log("[redsys/client] iniciaPeticionREST raw response:", JSON.stringify(raw))
+
+  // Redsys returns {"errorCode": "SISXXXX"} for pre-processing errors
+  if ("errorCode" in raw) {
+    throw new Error(`RedSys error: ${(raw as { errorCode: string }).errorCode}`)
+  }
+
+  if (!raw.Ds_MerchantParameters || !raw.Ds_Signature) {
+    console.error("[redsys/client] Response missing Ds_MerchantParameters or Ds_Signature:", raw)
+    throw new Error("RedSys returned an unexpected response (no signed parameters)")
+  }
+
   const merchantKey = getSecretKey()
   const verified = verifySignature(merchantKey, raw.Ds_MerchantParameters, raw.Ds_Signature)
   const params = decodeMerchantParams<RedsysResponseParams>(raw.Ds_MerchantParameters)

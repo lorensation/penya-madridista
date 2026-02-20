@@ -177,7 +177,14 @@ export interface RedsysSignedResponse {
 
 // ── REST API Response ────────────────────────────────────────────────────────
 
-export type RedsysRestResponse = RedsysSignedResponse
+/**
+ * Redsys REST can return either a signed response (success/denial)
+ * or a plain error object `{"errorCode": "SISXXXX"}` when the request
+ * itself is malformed or the merchant is misconfigured.
+ */
+export type RedsysRestResponse =
+  | RedsysSignedResponse
+  | { errorCode: string; Ds_SignatureVersion?: never; Ds_MerchantParameters?: never; Ds_Signature?: never }
 
 // ── Ds_Response Helpers ──────────────────────────────────────────────────────
 
