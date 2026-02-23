@@ -6,7 +6,7 @@
  * Replaces `actions/stripe.ts` and `actions/shop-checkout.ts`.
  * Handles:
  *   1. Shop payments — one-time (TransactionType 0, no tokenization)
- *   2. Membership payments — first payment + tokenization (IDENTIFIER=REQUIRED)
+ *   2. Membership payments — first payment + COF initialization (COF_INI="S")
  *   3. Payment execution — authorize via REST using InSite idOper
  */
 
@@ -219,7 +219,7 @@ export async function prepareMembershipPayment(
 /**
  * Execute a previously prepared payment using the InSite idOper.
  * For shop: one-time authorization (no tokenization).
- * For membership: authorization + tokenization (IDENTIFIER=REQUIRED).
+ * For membership: authorization + COF initialization (without DS_MERCHANT_IDENTIFIER).
  */
 export async function executePayment(
   idOper: string,

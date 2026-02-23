@@ -184,7 +184,7 @@ export async function iniciaPeticionREST(
  * Authorize a payment using an InSite idOper.
  * Used for both shop (one-time) and membership (first payment + tokenization).
  *
- * @param options.tokenize  If true, sends IDENTIFIER="REQUIRED" + COF_INI="S"
+ * @param options.tokenize  If true, initializes COF (COF_INI="S") without DS_MERCHANT_IDENTIFIER
  * @param options.cofType   COF type (default "R" for Recurring when tokenizing)
  */
 export async function authorizeWithIdOper(options: {
@@ -212,9 +212,9 @@ export async function authorizeWithIdOper(options: {
     params.DS_MERCHANT_PRODUCTDESCRIPTION = description
   }
 
-  // Request tokenization for subscriptions
+  // Initialize COF for subscriptions.
+  // IMPORTANT: for first COF operation, do not send DS_MERCHANT_IDENTIFIER.
   if (tokenize) {
-    params.DS_MERCHANT_IDENTIFIER = "REQUIRED"
     params.DS_MERCHANT_COF_INI = "S"
     params.DS_MERCHANT_COF_TYPE = cofType ?? "R"
   }
