@@ -69,10 +69,31 @@ export function createSignature(
   merchantParamsBase64: string,
   orderNumber: string,
 ): string {
+  // ── Diagnostic step-by-step logging ──────────────────────────────────
+  const rawKey = Buffer.from(merchantKeyBase64, "base64")
+  console.log("[sig] STEP 1 — merchant key:")
+  console.log("  base64 input:          ", merchantKeyBase64)
+  console.log("  decoded length (bytes):", rawKey.length)
+  console.log("  decoded hex:           ", rawKey.toString("hex"))
+
+  console.log("[sig] STEP 2 — 3DES diversify with order:", orderNumber)
   const derivedKey = diversifyKey(merchantKeyBase64, orderNumber)
+  console.log("  derived key hex:       ", derivedKey.toString("hex"))
+  console.log("  derived key length:    ", derivedKey.length)
+
+  console.log("[sig] STEP 3 — HMAC-SHA256 over Ds_MerchantParameters:")
+  console.log("  Ds_MerchantParameters: ", merchantParamsBase64)
+  try {
+    const decoded = Buffer.from(merchantParamsBase64, "base64").toString("utf8")
+    console.log("  Decoded JSON:          ", decoded)
+  } catch { /* ignore */ }
+
   const hmac = crypto.createHmac("sha256", derivedKey)
   hmac.update(merchantParamsBase64)
-  return hmac.digest("base64")
+  const signature = hmac.digest("base64")
+
+  console.log("[sig] STEP 4 — final signature:", signature)
+  return signature
 }
 
 /**

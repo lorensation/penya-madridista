@@ -10,6 +10,7 @@ import { Toaster } from "@/components/ui/use-toast"
 import CookieConsent from '@/components/cookie-consent'
 import AnalyticsProvider from '@/components/analytics-provider'
 import { Analytics as VercelAnalytics } from '@vercel/analytics/next';
+import { SpeedInsights as VercelSpeedInsights } from '@vercel/speed-insights/next';
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -41,6 +42,7 @@ export default function RootLayout({
             <CookieConsent />
             <AnalyticsProvider />
             <VercelAnalytics />
+            <VercelSpeedInsights />
           </AuthProvider>
         </ThemeProvider>
       </body>

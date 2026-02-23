@@ -63,8 +63,18 @@ export function buildSignedRequest(
     if (v !== undefined && v !== null) cleanParams[k] = String(v)
   }
 
+  console.log("[redsys/client] buildSignedRequest — final params JSON:", JSON.stringify(cleanParams))
+  console.log("[redsys/client] buildSignedRequest — merchant code:", cleanParams.DS_MERCHANT_MERCHANTCODE)
+  console.log("[redsys/client] buildSignedRequest — order:", cleanParams.DS_MERCHANT_ORDER)
+  console.log("[redsys/client] buildSignedRequest — amount cents:", cleanParams.DS_MERCHANT_AMOUNT)
+  console.log("[redsys/client] buildSignedRequest — idOper:", cleanParams.DS_MERCHANT_IDOPER)
+  console.log("[redsys/client] buildSignedRequest — secret key first 4 chars (redacted):", getSecretKey().substring(0, 4) + "...")
+
   const base64Params = encodeMerchantParams(cleanParams)
   const signature = createSignature(merchantKey, base64Params, params.DS_MERCHANT_ORDER)
+
+  console.log("[redsys/client] buildSignedRequest — Ds_MerchantParameters:", base64Params)
+  console.log("[redsys/client] buildSignedRequest — Ds_Signature:", signature)
 
   return {
     Ds_SignatureVersion: SIGNATURE_VERSION,
