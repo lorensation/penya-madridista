@@ -62,8 +62,8 @@ export interface RedsysMerchantParams {
   // ── Tokenization / 1-Click ──
   /**
    * Card reference / token.
+   *  - "REQUIRED" → request reference generation in first COF/tokenization operation.
    *  - <stored_value> → pay with previously stored reference.
-   * For first COF initialization (DS_MERCHANT_COF_INI = "S"), omit this field.
    */
   DS_MERCHANT_IDENTIFIER?: string
 
@@ -71,7 +71,7 @@ export interface RedsysMerchantParams {
   /**
    * First COF transaction flag.
    *  "S" = first transaction (storing credentials).
-   *  For "S", DS_MERCHANT_IDENTIFIER should not be sent.
+   *  If DS_MERCHANT_IDENTIFIER = "REQUIRED", this can be optional depending on setup.
    */
   DS_MERCHANT_COF_INI?: "S" | "N"
   /**
@@ -150,7 +150,7 @@ export interface RedsysResponseParams {
   Ds_MerchantData?: string
   /** Card expiry returned when a reference is generated (YYMM) */
   Ds_ExpiryDate?: string
-  /** Card reference/token — returned in tokenization/COF initialization responses */
+  /** Card reference/token — returned when reference generation is requested */
   Ds_Merchant_Identifier?: string
   /** COF transaction ID — store for subsequent transactions */
   Ds_Merchant_Cof_Txnid?: string
@@ -238,7 +238,7 @@ export interface ExecutePaymentResult {
   authorizationCode?: string
   cardBrand?: string
   lastFour?: string
-  /** Card token generated on successful tokenization/COF initialization */
+  /** Card token generated on successful reference/tokenization request */
   redsysToken?: string
   /** Card expiry for the token (YYMM) */
   redsysTokenExpiry?: string

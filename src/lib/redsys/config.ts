@@ -136,7 +136,8 @@ export function getSecretKey(): string {
 
 export function getNotificationUrl(): string {
   const base = process.env.NEXT_PUBLIC_BASE_URL || "https://www.lorenzosanz.com"
-  return `${base}/api/payments/redsys/notification`
+  const normalizedBase = base.replace(/\/+$/, "")
+  return `${normalizedBase}/api/payments/redsys/notification`
 }
 
 export function getBaseUrl(): string {
