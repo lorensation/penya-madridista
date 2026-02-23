@@ -273,6 +273,12 @@ export async function executePayment(
       .eq("id", txn.id)
 
     if (!result.success) {
+      if (result.errorCode === "SIS0218") {
+        return {
+          ...result,
+          error: "El TPV ha rechazado la operación como NO SEGURA (Host-to-Host). Revisa la configuración del terminal en Redsys/Getnet o implementa flujo EMV3DS REST completo.",
+        }
+      }
       return result
     }
 
