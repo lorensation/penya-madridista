@@ -40,10 +40,19 @@ function diversifyKey(merchantKeyBase64: string, orderNumber: string): Buffer {
     key24 = rawKey.subarray(0, 24)
   }
 
-  // 3. 3DES-CBC encrypt order number (auto PKCS7 padding)
+  // 3. 3DES-CBC encrypt order number with ZERO-padding (not PKCS7).
+  //    Redsys reference implementation (PHP) uses OPENSSL_ZERO_PADDING — the
+  //    order bytes are null-padded to the next 8-byte boundary. Using Node's
+  //    setAutoPadding(true) would add PKCS7 bytes instead, producing a
+  //    different derived key and a SIS0042 signature mismatch.
+  const orderBytes = Buffer.from(orderNumber, "utf8")
+  const paddedLength = Math.ceil(orderBytes.length / 8) * 8
+  const orderPadded = Buffer.alloc(paddedLength, 0) // zero-fill
+  orderBytes.copy(orderPadded)
+
   const cipher = crypto.createCipheriv("des-ede3-cbc", key24, ZERO_IV)
-  cipher.setAutoPadding(true)
-  return Buffer.concat([cipher.update(orderNumber, "utf8"), cipher.final()])
+  cipher.setAutoPadding(false) // input is already block-aligned with zero padding
+  return Buffer.concat([cipher.update(orderPadded), cipher.final()])
 }
 
 /**
