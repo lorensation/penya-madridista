@@ -279,6 +279,12 @@ export async function executePayment(
           error: "El TPV ha rechazado la operación como NO SEGURA (Host-to-Host). Revisa la configuración del terminal en Redsys/Getnet o implementa flujo EMV3DS REST completo.",
         }
       }
+      if (result.errorCode === "SIS0508") {
+        return {
+          ...result,
+          error: "El idOper no es válido, ha caducado o no coincide con el pedido enviado. Genera un nuevo formulario de pago y vuelve a intentarlo.",
+        }
+      }
       return result
     }
 
@@ -641,7 +647,23 @@ export async function executeCardUpdate(
       })
       .eq("id", txn.id)
 
-    if (result.success && result.redsysToken) {
+    if (!result.success) {
+      if (result.errorCode === "SIS0218") {
+        return {
+          ...result,
+          error: "El TPV ha rechazado la operación como NO SEGURA (Host-to-Host). Revisa la configuración del terminal en Redsys/Getnet o implementa flujo EMV3DS REST completo.",
+        }
+      }
+      if (result.errorCode === "SIS0508") {
+        return {
+          ...result,
+          error: "El idOper no es válido, ha caducado o no coincide con el pedido enviado. Genera un nuevo formulario de pago y vuelve a intentarlo.",
+        }
+      }
+      return result
+    }
+
+    if (result.redsysToken) {
       const memberId = txn.member_id as string
 
       // Update subscription with new token

@@ -221,14 +221,8 @@ export async function authorizeWithIdOper(options: {
     params.DS_MERCHANT_COF_TYPE = cofType ?? "R"
   }
 
-  const doAuthorization = async (
-    reqParams: Partial<RedsysMerchantParams> & {
-      DS_MERCHANT_ORDER: string
-      DS_MERCHANT_AMOUNT: string
-      DS_MERCHANT_TRANSACTIONTYPE: TransactionType
-    },
-  ): Promise<ExecutePaymentResult> => {
-    const signedReq = buildSignedRequest(reqParams)
+  const doAuthorization = async (): Promise<ExecutePaymentResult> => {
+    const signedReq = buildSignedRequest(params)
     const { params: resp, verified } = await trataPeticionREST(signedReq)
 
     if (!verified) {
@@ -261,26 +255,11 @@ export async function authorizeWithIdOper(options: {
   }
 
   try {
-    return await doAuthorization(params)
+    return await doAuthorization()
   } catch (err) {
+    console.error("[redsys/client] authorizeWithIdOper error:", err)
     const message = err instanceof Error ? err.message : "Error de red"
     const sisCode = message.match(/\bSIS\d{4}\b/)?.[0]
-
-    // Some TPV configs reject COF-marked init over Host-to-Host (SIS0218).
-    // Retry once requesting reference generation without explicit COF flags.
-    if (tokenize && sisCode === "SIS0218") {
-      try {
-        console.warn("[redsys/client] SIS0218 on COF init. Retrying without COF flags.")
-        const fallbackParams = { ...params }
-        delete fallbackParams.DS_MERCHANT_COF_INI
-        delete fallbackParams.DS_MERCHANT_COF_TYPE
-        return await doAuthorization(fallbackParams)
-      } catch (fallbackErr) {
-        console.error("[redsys/client] authorizeWithIdOper fallback error:", fallbackErr)
-      }
-    }
-
-    console.error("[redsys/client] authorizeWithIdOper error:", err)
     return {
       success: false,
       error: message,
