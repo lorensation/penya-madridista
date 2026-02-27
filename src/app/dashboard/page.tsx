@@ -99,7 +99,7 @@ export default function DashboardPage() {
           .from("miembros")
           .select("*")
           .eq("user_uuid", userData.user.id)
-          .single()
+          .maybeSingle()
 
         if (profileError) {
           console.log("Profile fetch error:", profileError)

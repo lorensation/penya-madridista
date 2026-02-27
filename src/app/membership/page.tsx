@@ -120,6 +120,12 @@ export default function Membership() {
     setSelectedPaymentOption(optionId)
   }
 
+  const scrollToTop = useCallback(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" })
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+  }, [])
+
   // Initiate payment — prepare order and show InSite form
   const handleSubscribe = async () => {
     if (!selectedPlan || !selectedPaymentOption) return
@@ -130,6 +136,7 @@ export default function Membership() {
     }
 
     setError(null)
+    scrollToTop()
     setStep("processing")
 
     try {
@@ -181,6 +188,22 @@ export default function Membership() {
   const handlePaymentError = useCallback((message: string) => {
     setError(message)
   }, [])
+
+  useEffect(() => {
+    if (step === "processing" || step === "payment" || step === "success") {
+      scrollToTop()
+      const raf = requestAnimationFrame(scrollToTop)
+      const timer = window.setTimeout(scrollToTop, 120)
+      const interval = window.setInterval(scrollToTop, 120)
+      const stopInterval = window.setTimeout(() => window.clearInterval(interval), 1200)
+      return () => {
+        cancelAnimationFrame(raf)
+        window.clearTimeout(timer)
+        window.clearInterval(interval)
+        window.clearTimeout(stopInterval)
+      }
+    }
+  }, [step, scrollToTop])
 
   // Render loading state
   if (isLoading) {
