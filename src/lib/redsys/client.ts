@@ -1,8 +1,8 @@
 /**
- * RedSys REST API Client
+ * RedSys REST API client.
  *
- * SERVER-ONLY — calls trataPeticionREST / iniciaPeticionREST.
- * Uses the signature module for HMAC_SHA256_V1 signing and verification.
+ * Server-only helpers for trataPeticionREST / iniciaPeticionREST,
+ * plus high-level operations for InSite and MIT recurring charges.
  */
 
 import {
@@ -33,12 +33,6 @@ import type {
 
 import { isAuthorizationSuccess, isSuccessResponse } from "./types"
 
-// ── Request Building ─────────────────────────────────────────────────────────
-
-/**
- * Build a fully signed RedSys request ready to POST.
- * Merges caller-supplied params with defaults (FUC, terminal, currency, notification URL).
- */
 export function buildSignedRequest(
   params: Partial<RedsysMerchantParams> & {
     DS_MERCHANT_ORDER: string
@@ -48,7 +42,6 @@ export function buildSignedRequest(
 ): RedsysSignedRequest {
   const merchantKey = getSecretKey()
 
-  // Merge with defaults
   const fullParams: Record<string, string> = {
     DS_MERCHANT_CURRENCY: CURRENCY_EUR,
     DS_MERCHANT_MERCHANTCODE: getMerchantCode(),
@@ -57,24 +50,15 @@ export function buildSignedRequest(
     ...(params as Record<string, string | undefined>),
   }
 
-  // Strip undefined values
   const cleanParams: Record<string, string> = {}
-  for (const [k, v] of Object.entries(fullParams)) {
-    if (v !== undefined && v !== null) cleanParams[k] = String(v)
+  for (const [key, value] of Object.entries(fullParams)) {
+    if (value !== undefined && value !== null) {
+      cleanParams[key] = String(value)
+    }
   }
-
-  console.log("[redsys/client] buildSignedRequest — final params JSON:", JSON.stringify(cleanParams))
-  console.log("[redsys/client] buildSignedRequest — merchant code:", cleanParams.DS_MERCHANT_MERCHANTCODE)
-  console.log("[redsys/client] buildSignedRequest — order:", cleanParams.DS_MERCHANT_ORDER)
-  console.log("[redsys/client] buildSignedRequest — amount cents:", cleanParams.DS_MERCHANT_AMOUNT)
-  console.log("[redsys/client] buildSignedRequest — idOper:", cleanParams.DS_MERCHANT_IDOPER)
-  console.log("[redsys/client] buildSignedRequest — secret key first 4 chars (redacted):", getSecretKey().substring(0, 4) + "...")
 
   const base64Params = encodeMerchantParams(cleanParams)
   const signature = createSignature(merchantKey, base64Params, params.DS_MERCHANT_ORDER)
-
-  console.log("[redsys/client] buildSignedRequest — Ds_MerchantParameters:", base64Params)
-  console.log("[redsys/client] buildSignedRequest — Ds_Signature:", signature)
 
   return {
     Ds_SignatureVersion: SIGNATURE_VERSION,
@@ -83,11 +67,6 @@ export function buildSignedRequest(
   }
 }
 
-// ── REST Calls ───────────────────────────────────────────────────────────────
-
-/**
- * Call `trataPeticionREST` — execute an operation (authorize, refund, etc.).
- */
 export async function trataPeticionREST(
   signedRequest: RedsysSignedRequest,
 ): Promise<{
@@ -97,32 +76,25 @@ export async function trataPeticionREST(
 }> {
   const endpoint = getEndpoints().trataPeticion
 
-  console.log("[redsys/client] trataPeticionREST POST to", endpoint)
-
-  const res = await fetch(endpoint, {
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(signedRequest),
   })
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "")
-    throw new Error(`RedSys trataPeticion HTTP ${res.status}: ${text}`)
+  if (!response.ok) {
+    const text = await response.text().catch(() => "")
+    throw new Error(`RedSys trataPeticion HTTP ${response.status}: ${text}`)
   }
 
-  const raw = (await res.json()) as RedsysRestResponse
+  const raw = (await response.json()) as RedsysRestResponse
 
-  console.log("[redsys/client] trataPeticionREST raw response:", JSON.stringify(raw))
-
-  // Redsys returns {"errorCode": "SISXXXX"} for pre-processing errors
-  // (bad merchant, bad key, invalid params, etc.) — no Ds_MerchantParameters.
   if ("errorCode" in raw) {
-    throw new Error(`RedSys error: ${(raw as { errorCode: string }).errorCode}`)
+    throw new Error(`RedSys error: ${raw.errorCode}`)
   }
 
   if (!raw.Ds_MerchantParameters || !raw.Ds_Signature) {
-    console.error("[redsys/client] Response missing Ds_MerchantParameters or Ds_Signature:", raw)
-    throw new Error("RedSys returned an unexpected response (no signed parameters)")
+    throw new Error("RedSys returned an unexpected unsigned response")
   }
 
   const merchantKey = getSecretKey()
@@ -132,9 +104,6 @@ export async function trataPeticionREST(
   return { params, raw, verified }
 }
 
-/**
- * Call `iniciaPeticionREST` — pre-authentication for EMV3DS or DCC.
- */
 export async function iniciaPeticionREST(
   signedRequest: RedsysSignedRequest,
 ): Promise<{
@@ -144,31 +113,25 @@ export async function iniciaPeticionREST(
 }> {
   const endpoint = getEndpoints().iniciaPeticion
 
-  console.log("[redsys/client] iniciaPeticionREST POST to", endpoint)
-
-  const res = await fetch(endpoint, {
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(signedRequest),
   })
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "")
-    throw new Error(`RedSys iniciaPeticion HTTP ${res.status}: ${text}`)
+  if (!response.ok) {
+    const text = await response.text().catch(() => "")
+    throw new Error(`RedSys iniciaPeticion HTTP ${response.status}: ${text}`)
   }
 
-  const raw = (await res.json()) as RedsysRestResponse
+  const raw = (await response.json()) as RedsysRestResponse
 
-  console.log("[redsys/client] iniciaPeticionREST raw response:", JSON.stringify(raw))
-
-  // Redsys returns {"errorCode": "SISXXXX"} for pre-processing errors
   if ("errorCode" in raw) {
-    throw new Error(`RedSys error: ${(raw as { errorCode: string }).errorCode}`)
+    throw new Error(`RedSys error: ${raw.errorCode}`)
   }
 
   if (!raw.Ds_MerchantParameters || !raw.Ds_Signature) {
-    console.error("[redsys/client] Response missing Ds_MerchantParameters or Ds_Signature:", raw)
-    throw new Error("RedSys returned an unexpected response (no signed parameters)")
+    throw new Error("RedSys returned an unexpected unsigned response")
   }
 
   const merchantKey = getSecretKey()
@@ -178,14 +141,8 @@ export async function iniciaPeticionREST(
   return { params, raw, verified }
 }
 
-// ── High-Level Operations ────────────────────────────────────────────────────
-
 /**
  * Authorize a payment using an InSite idOper.
- * Used for both shop (one-time) and membership (first payment + tokenization).
- *
- * @param options.tokenize  If true, initializes COF with IDENTIFIER="REQUIRED" + COF_INI="S"
- * @param options.cofType   COF type (default "R" for Recurring when tokenizing)
  */
 export async function authorizeWithIdOper(options: {
   idOper: string
@@ -212,9 +169,6 @@ export async function authorizeWithIdOper(options: {
     params.DS_MERCHANT_PRODUCTDESCRIPTION = description
   }
 
-  // Initialize COF for subscriptions.
-  // Redsys-managed tokenization requires DS_MERCHANT_IDENTIFIER="REQUIRED"
-  // in the first operation (including InSite + idOper flow).
   if (tokenize) {
     params.DS_MERCHANT_IDENTIFIER = "REQUIRED"
     params.DS_MERCHANT_COF_INI = "S"
@@ -222,27 +176,27 @@ export async function authorizeWithIdOper(options: {
   }
 
   const doAuthorization = async (): Promise<ExecutePaymentResult> => {
-    const signedReq = buildSignedRequest(params)
-    const { params: resp, verified } = await trataPeticionREST(signedReq)
+    const signedRequest = buildSignedRequest(params)
+    const { params: responseParams, verified } = await trataPeticionREST(signedRequest)
 
     if (!verified) {
-      console.error("[redsys/client] Response signature verification failed")
       return { success: false, error: "Signature verification failed", errorCode: "SIG_FAIL" }
     }
 
-    const dsResponse = resp.Ds_Response ?? ""
+    const dsResponse = responseParams.Ds_Response ?? ""
 
     if (isAuthorizationSuccess(dsResponse)) {
-      const cardNumber = resp.Ds_CardNumber ?? ""
+      const cardNumber = responseParams.Ds_CardNumber ?? ""
+
       return {
         success: true,
         dsResponse,
-        authorizationCode: resp.Ds_AuthorisationCode ?? undefined,
-        cardBrand: resp.Ds_Card_Brand ?? undefined,
+        authorizationCode: responseParams.Ds_AuthorisationCode ?? undefined,
+        cardBrand: responseParams.Ds_Card_Brand ?? undefined,
         lastFour: cardNumber.slice(-4) || undefined,
-        redsysToken: resp.Ds_Merchant_Identifier ?? undefined,
-        redsysTokenExpiry: resp.Ds_ExpiryDate ?? undefined,
-        cofTxnId: resp.Ds_Merchant_Cof_Txnid ?? undefined,
+        redsysToken: responseParams.Ds_Merchant_Identifier ?? undefined,
+        redsysTokenExpiry: responseParams.Ds_ExpiryDate ?? undefined,
+        cofTxnId: responseParams.Ds_Merchant_Cof_Txnid ?? undefined,
       }
     }
 
@@ -256,10 +210,11 @@ export async function authorizeWithIdOper(options: {
 
   try {
     return await doAuthorization()
-  } catch (err) {
-    console.error("[redsys/client] authorizeWithIdOper error:", err)
-    const message = err instanceof Error ? err.message : "Error de red"
+  } catch (error) {
+    console.error("[redsys/client] authorizeWithIdOper failed", { order, error })
+    const message = error instanceof Error ? error.message : "Error de red"
     const sisCode = message.match(/\bSIS\d{4}\b/)?.[0]
+
     return {
       success: false,
       error: message,
@@ -269,8 +224,7 @@ export async function authorizeWithIdOper(options: {
 }
 
 /**
- * Charge a stored card token via MIT (Merchant-Initiated Transaction).
- * No cardholder interaction — SCA-exempt under PSD2.
+ * Charge a stored card token via MIT (merchant-initiated transaction).
  */
 export async function chargeMIT(options: {
   order: string
@@ -301,48 +255,40 @@ export async function chargeMIT(options: {
   }
 
   try {
-    const signedReq = buildSignedRequest(params)
-    const { params: resp, verified } = await trataPeticionREST(signedReq)
+    const signedRequest = buildSignedRequest(params)
+    const { params: responseParams, verified } = await trataPeticionREST(signedRequest)
 
     if (!verified) {
       return { success: false, error: "Signature verification failed", errorCode: "SIG_FAIL" }
     }
 
-    const dsResponse = resp.Ds_Response ?? ""
+    const dsResponse = responseParams.Ds_Response ?? ""
 
     if (isAuthorizationSuccess(dsResponse)) {
       return {
         success: true,
         dsResponse,
-        authorizationCode: resp.Ds_AuthorisationCode ?? undefined,
-        // If RedSys returns a new COF TxnID, use it; otherwise keep the one we sent
-        cofTxnId: resp.Ds_Merchant_Cof_Txnid ?? cofTxnId,
+        authorizationCode: responseParams.Ds_AuthorisationCode ?? undefined,
+        cofTxnId: responseParams.Ds_Merchant_Cof_Txnid ?? cofTxnId,
       }
     }
 
     return {
       success: false,
       dsResponse,
-      error: `Cobro MIT denegado (código: ${dsResponse})`,
+      error: `Cobro MIT denegado (codigo: ${dsResponse})`,
       errorCode: dsResponse,
     }
-  } catch (err) {
-    console.error("[redsys/client] chargeMIT error:", err)
+  } catch (error) {
+    console.error("[redsys/client] chargeMIT failed", { order, error })
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Error de red",
+      error: error instanceof Error ? error.message : "Error de red",
       errorCode: "NETWORK",
     }
   }
 }
 
-/**
- * Process a refund (TransactionType = "3").
- * Uses the SAME order number as the original transaction.
- *
- * @param options.originalOrder  DS_MERCHANT_ORDER of the payment to refund
- * @param options.amountCents    Refund amount (can be partial)
- */
 export async function processRefund(options: {
   originalOrder: string
   amountCents: number
@@ -360,42 +306,39 @@ export async function processRefund(options: {
   }
 
   try {
-    const signedReq = buildSignedRequest(params)
-    const { params: resp, verified } = await trataPeticionREST(signedReq)
+    const signedRequest = buildSignedRequest(params)
+    const { params: responseParams, verified } = await trataPeticionREST(signedRequest)
 
     if (!verified) {
       return { success: false, error: "Signature verification failed", errorCode: "SIG_FAIL" }
     }
 
-    const dsResponse = resp.Ds_Response ?? ""
+    const dsResponse = responseParams.Ds_Response ?? ""
 
     if (isSuccessResponse(dsResponse)) {
       return {
         success: true,
         dsResponse,
-        authorizationCode: resp.Ds_AuthorisationCode ?? undefined,
+        authorizationCode: responseParams.Ds_AuthorisationCode ?? undefined,
       }
     }
 
     return {
       success: false,
       dsResponse,
-      error: `Devolución denegada (código: ${dsResponse})`,
+      error: `Devolucion denegada (codigo: ${dsResponse})`,
       errorCode: dsResponse,
     }
-  } catch (err) {
-    console.error("[redsys/client] processRefund error:", err)
+  } catch (error) {
+    console.error("[redsys/client] processRefund failed", { originalOrder, error })
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Error de red",
+      error: error instanceof Error ? error.message : "Error de red",
       errorCode: "NETWORK",
     }
   }
 }
 
-/**
- * Delete a stored card reference / token (TransactionType = "44").
- */
 export async function deleteToken(options: {
   order: string
   redsysToken: string
@@ -414,22 +357,22 @@ export async function deleteToken(options: {
   }
 
   try {
-    const signedReq = buildSignedRequest(params)
-    const { params: resp, verified } = await trataPeticionREST(signedReq)
+    const signedRequest = buildSignedRequest(params)
+    const { params: responseParams, verified } = await trataPeticionREST(signedRequest)
 
     if (!verified) {
       return { success: false, error: "Signature verification failed" }
     }
 
-    const dsResponse = resp.Ds_Response ?? ""
+    const dsResponse = responseParams.Ds_Response ?? ""
     return {
       success: isSuccessResponse(dsResponse),
       error: isSuccessResponse(dsResponse) ? undefined : `No se pudo borrar el token (${dsResponse})`,
     }
-  } catch (err) {
+  } catch (error) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Error desconocido",
+      error: error instanceof Error ? error.message : "Error desconocido",
     }
   }
 }

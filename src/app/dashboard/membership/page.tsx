@@ -12,6 +12,7 @@ import {
   executeCardUpdate,
 } from "@/app/actions/payment"
 import { createBrowserSupabaseClient } from "@/lib/supabase"
+import { hasMembershipAccess } from "@/lib/membership-access"
 import { RedsysInSiteForm } from "@/components/shop/redsys-insite-form"
 import { CheckCircle, AlertCircle, CreditCard, Loader2, ShieldCheck, X } from "lucide-react"
 
@@ -96,15 +97,18 @@ export default function MembershipPage() {
         }
 
         // Fetch subscription details
-        const { data: subData } = await supabase
+        const { data: subData, error: subError } = await supabase
           .from("subscriptions")
           .select("*")
           .eq("member_id", userData.user.id)
           .order("created_at", { ascending: false })
           .limit(1)
-          .single()
+          .maybeSingle()
 
-        if (subData) {
+        if (subError) {
+          console.error("Subscription fetch error:", subError)
+          setSubscription(null)
+        } else if (subData) {
           setSubscription(subData as SubscriptionData)
         }
       } catch (err) {
@@ -217,8 +221,17 @@ export default function MembershipPage() {
     )
   }
 
+  const effectiveStatus = subscription?.status || membership?.subscription_status || "inactive"
+  const hasCurrentMembershipAccess = hasMembershipAccess({
+    status: effectiveStatus,
+    endDate: subscription?.end_date ?? null,
+  })
+  const isExpiredCanceled = effectiveStatus === "canceled" && !hasCurrentMembershipAccess
+  const isWithoutCurrentMembership =
+    !membership || effectiveStatus === "inactive" || effectiveStatus === "expired" || isExpiredCanceled
+
   // No active membership
-  if (!membership || membership.subscription_status === "inactive") {
+  if (isWithoutCurrentMembership) {
     return (
       <div className="space-y-6 p-6 md:p-8">
         <div className="text-center">
@@ -278,9 +291,9 @@ export default function MembershipPage() {
     )
   }
 
-  const isActive = membership.subscription_status === "active" || membership.subscription_status === "trialing"
-  const isCanceled = membership.subscription_status === "canceled"
-  const isPastDue = membership.subscription_status === "past_due"
+  const isActive = effectiveStatus === "active" || effectiveStatus === "trialing"
+  const isCanceled = effectiveStatus === "canceled" && hasCurrentMembershipAccess
+  const isPastDue = effectiveStatus === "past_due"
 
   // Format renewal / end date from subscription
   let renewalDate = "No disponible"
@@ -352,21 +365,21 @@ export default function MembershipPage() {
               <p className="text-lg font-semibold">
                 {membership.last_four
                   ? `Tarjeta terminada en ${membership.last_four}`
-                  : "No disponible"}
+                  : "Tarjeta"}
               </p>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500">Estado</h3>
               <p className="text-lg font-semibold capitalize">
-                {membership.subscription_status === "active"
+                {effectiveStatus === "active"
                   ? "Activa"
-                  : membership.subscription_status === "trialing"
+                  : effectiveStatus === "trialing"
                     ? "Periodo de prueba"
-                    : membership.subscription_status === "canceled"
+                    : effectiveStatus === "canceled"
                       ? "Cancelada (activa hasta fin de periodo)"
-                      : membership.subscription_status === "past_due"
+                      : effectiveStatus === "past_due"
                         ? "Pago pendiente"
-                        : membership.subscription_status || "No disponible"}
+                        : effectiveStatus || "No disponible"}
               </p>
             </div>
           </div>

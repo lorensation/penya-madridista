@@ -42,6 +42,7 @@ export {
   getTerminal,
   getSecretKey,
   getNotificationUrl,
+  getRealizarPagoUrl,
   getBaseUrl,
 } from "./config"
 
@@ -78,3 +79,7 @@ export {
   processRenewals,
   expireCanceledSubscriptions,
 } from "./recurring"
+
+// Transaction status lookup
+export type { PaymentTransactionStatusRow } from "./transaction-status"
+export { getPaymentTransactionStatusByOrder } from "./transaction-status"

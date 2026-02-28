@@ -1,32 +1,74 @@
 "use server"
 
-/**
- * Payment Server Actions — RedSys/Getnet
- *
- * Replaces `actions/stripe.ts` and `actions/shop-checkout.ts`.
- * Handles:
- *   1. Shop payments — one-time (TransactionType 0, no tokenization)
- *   2. Membership payments — first payment + COF/tokenization (IDENTIFIER="REQUIRED")
- *   3. Payment execution — authorize via REST using InSite idOper
- */
-
-import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createClient } from "@supabase/supabase-js"
+import { revalidatePath } from "next/cache"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 import {
-  generateOrderNumber,
   authorizeWithIdOper,
+  buildSignedRequest,
+  decodeMerchantParams,
+  generateOrderNumber,
+  getBaseUrl,
   getMembershipPlan,
+  getRealizarPagoUrl,
+  getSecretKey,
+  isAuthorizationSuccess,
+  verifySignature,
 } from "@/lib/redsys"
 import type {
-  PlanType,
-  PaymentInterval,
-  PreparePaymentResult,
   ExecutePaymentResult,
   PaymentContext,
+  PaymentInterval,
+  PlanType,
+  RedsysResponseParams,
+  RedsysSignedRequest,
 } from "@/lib/redsys"
-import { revalidatePath } from "next/cache"
 
-// Admin Supabase client (bypasses RLS)
+interface PrepareRedirectPaymentResult {
+  success: boolean
+  order?: string
+  amountCents?: number
+  transactionId?: string
+  actionUrl?: string
+  signed?: RedsysSignedRequest
+  error?: string
+}
+
+interface ShopRedirectItemInput {
+  variantId: string
+  qty: number
+  priceCents: number
+  productName: string
+}
+
+interface ShopRedirectShippingInput {
+  fullName: string
+  email: string
+  address: string
+  city: string
+  postalCode: string
+  country: string
+  phone: string
+  shippingCents: number
+}
+
+interface ResolveMembershipRedirectPaymentResult {
+  success: boolean
+  status?: "authorized" | "pending" | "denied" | "error" | "not_found"
+  checkoutData?: {
+    id: string
+    redsys_token: string | null
+    redsys_token_expiry: string | null
+    cof_txn_id: string | null
+    payment_status: "paid"
+    subscription_status: "active"
+    plan_type: string
+    payment_type: string
+    last_four: string | null
+  }
+  error?: string
+}
+
 function getAdminClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,149 +77,241 @@ function getAdminClient() {
   )
 }
 
-// ── 1. Prepare Shop Payment ──────────────────────────────────────────────────
+function getRedirectReturnUrls(context: PaymentContext, order: string, userId?: string) {
+  const base = getBaseUrl().replace(/\/+$/, "")
 
-/**
- * Validate cart items, calculate total, create a pending transaction, and
- * return an order number for InSite initialization.
- */
-export async function prepareShopPayment(
-  items: Array<{
-    variantId: string
-    qty: number
-    priceCents: number
-    productName: string
-  }>,
-): Promise<PreparePaymentResult> {
-  if (!items.length) {
-    return { success: false, error: "El carrito está vacío" }
+  if (context === "membership") {
+    const okUrl = new URL(`${base}/complete-profile`)
+    okUrl.searchParams.set("order", order)
+    if (userId) {
+      okUrl.searchParams.set("userId", userId)
+    }
+
+    return {
+      ok: okUrl.toString(),
+      ko: `${base}/membership/redsys/ko?order=${encodeURIComponent(order)}`,
+    }
   }
 
+  return {
+    ok: `${base}/tienda/checkout/redsys/ok?order=${encodeURIComponent(order)}`,
+    ko: `${base}/tienda/checkout/redsys/ko?order=${encodeURIComponent(order)}`,
+  }
+}
+
+function normalizeBase64Payload(value: string): string {
+  return value.replace(/ /g, "+").replace(/-/g, "+").replace(/_/g, "/")
+}
+
+function mapMembershipCheckoutData(
+  transaction: {
+    redsys_order: string
+    redsys_token: string | null
+    redsys_token_expiry: string | null
+    cof_txn_id: string | null
+    last_four: string | null
+    metadata: unknown
+  },
+): ResolveMembershipRedirectPaymentResult["checkoutData"] {
+  const metadata =
+    transaction.metadata && typeof transaction.metadata === "object" && !Array.isArray(transaction.metadata)
+      ? (transaction.metadata as Record<string, unknown>)
+      : null
+
+  return {
+    id: transaction.redsys_order,
+    redsys_token: transaction.redsys_token,
+    redsys_token_expiry: transaction.redsys_token_expiry,
+    cof_txn_id: transaction.cof_txn_id,
+    payment_status: "paid",
+    subscription_status: "active",
+    plan_type: typeof metadata?.planType === "string" ? metadata.planType : "over25",
+    payment_type: typeof metadata?.interval === "string" ? metadata.interval : "monthly",
+    last_four: transaction.last_four,
+  }
+}
+
+export async function resolveMembershipRedirectPayment(
+  order: string,
+  dsMerchantParameters?: string | null,
+  dsSignature?: string | null,
+): Promise<ResolveMembershipRedirectPaymentResult> {
   try {
     const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
-    // Calculate total from DB prices (don't trust client-side prices)
+    if (authError || !user) {
+      return { success: false, status: "error", error: "AUTH_REQUIRED" }
+    }
+
     const admin = getAdminClient()
-    const variantIds = items.map((i) => i.variantId)
-
-    const { data: variants, error: varErr } = await admin
-      .from("product_variants")
-      .select("id, price_cents, inventory, active")
-      .in("id", variantIds)
-
-    if (varErr || !variants) {
-      console.error("[payment] Error fetching variants:", varErr)
-      return { success: false, error: "No se pudieron verificar los productos" }
-    }
-
-    // Validate availability and compute server-side total
-    let totalCents = 0
-    for (const item of items) {
-      const variant = variants.find((v) => v.id === item.variantId)
-      if (!variant) {
-        return { success: false, error: `Producto no encontrado: ${item.productName}` }
-      }
-      if (!variant.active) {
-        return { success: false, error: `Producto no disponible: ${item.productName}` }
-      }
-      if (variant.inventory < item.qty) {
-        return { success: false, error: `Stock insuficiente para: ${item.productName}` }
-      }
-      totalCents += variant.price_cents * item.qty
-    }
-
-    if (totalCents <= 0) {
-      return { success: false, error: "El importe total debe ser mayor que cero" }
-    }
-
-    // Generate unique order number
-    const order = generateOrderNumber("S")
-
-    // Create pending transaction record
-    const { data: txn, error: txnErr } = await admin
+    const { data: transaction, error: transactionError } = await admin
       .from("payment_transactions")
-      .insert({
-        redsys_order: order,
-        transaction_type: "0",
-        amount_cents: totalCents,
-        currency: "978",
-        status: "pending",
-        context: "shop" as PaymentContext,
-        member_id: user?.id ?? null,
-        is_mit: false,
-        metadata: {
-          items: items.map((i) => ({
-            variantId: i.variantId,
-            qty: i.qty,
-            priceCents: i.priceCents,
-            productName: i.productName,
-          })),
-        },
-      })
-      .select("id")
-      .single()
+      .select("id, redsys_order, member_id, context, amount_cents, status, ds_response, redsys_token, redsys_token_expiry, cof_txn_id, last_four, metadata")
+      .eq("redsys_order", order)
+      .eq("context", "membership")
+      .eq("member_id", user.id)
+      .maybeSingle()
 
-    if (txnErr) {
-      console.error("[payment] Error creating transaction:", txnErr)
-      return { success: false, error: "Error al preparar el pago" }
+    if (transactionError) {
+      console.error("[payment] resolveMembershipRedirectPayment failed loading transaction", {
+        order,
+        memberId: user.id,
+        error: transactionError,
+      })
+      return { success: false, status: "error", error: "TXN_LOOKUP_FAILED" }
+    }
+
+    if (!transaction) {
+      return { success: true, status: "not_found" }
+    }
+
+    if (transaction.status === "authorized") {
+      return {
+        success: true,
+        status: "authorized",
+        checkoutData: mapMembershipCheckoutData(transaction),
+      }
+    }
+
+    if (transaction.status === "denied" || transaction.status === "error") {
+      return { success: true, status: "denied" }
+    }
+
+    if (transaction.status !== "pending") {
+      return { success: true, status: "pending" }
+    }
+
+    if (!dsMerchantParameters || !dsSignature) {
+      return { success: true, status: "pending" }
+    }
+
+    const normalizedParams = normalizeBase64Payload(dsMerchantParameters)
+    const normalizedSignature = normalizeBase64Payload(dsSignature)
+    const hasValidSignature = verifySignature(getSecretKey(), normalizedParams, normalizedSignature)
+    if (!hasValidSignature) {
+      return { success: true, status: "pending" }
+    }
+
+    const decoded = decodeMerchantParams<RedsysResponseParams>(normalizedParams)
+    if (decoded.Ds_Order !== order) {
+      return { success: true, status: "pending" }
+    }
+
+    if (!isAuthorizationSuccess(decoded.Ds_Response ?? "")) {
+      await admin
+        .from("payment_transactions")
+        .update({
+          status: "denied",
+          ds_response: decoded.Ds_Response ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", transaction.id)
+        .eq("status", "pending")
+
+      return { success: true, status: "denied" }
+    }
+
+    const amountFromReturn = Number.parseInt(decoded.Ds_Amount ?? "", 10)
+    if (Number.isNaN(amountFromReturn) || amountFromReturn !== transaction.amount_cents) {
+      return { success: true, status: "pending" }
+    }
+
+    const { data: claimedTransaction, error: claimError } = await admin
+      .from("payment_transactions")
+      .update({
+        status: "authorized",
+        ds_response: decoded.Ds_Response ?? null,
+        ds_authorization_code: decoded.Ds_AuthorisationCode ?? null,
+        ds_card_brand: decoded.Ds_Card_Brand ?? null,
+        ds_card_country: decoded.Ds_Card_Country ?? null,
+        last_four: decoded.Ds_CardNumber ? decoded.Ds_CardNumber.slice(-4) : transaction.last_four,
+        redsys_token: decoded.Ds_Merchant_Identifier ?? transaction.redsys_token,
+        redsys_token_expiry: decoded.Ds_ExpiryDate ?? transaction.redsys_token_expiry,
+        cof_txn_id: decoded.Ds_Merchant_Cof_Txnid ?? transaction.cof_txn_id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", transaction.id)
+      .eq("status", "pending")
+      .select("redsys_order, redsys_token, redsys_token_expiry, cof_txn_id, last_four, metadata")
+      .maybeSingle()
+
+    if (claimError) {
+      console.error("[payment] resolveMembershipRedirectPayment failed updating pending transaction", {
+        order,
+        memberId: user.id,
+        error: claimError,
+      })
+      return { success: true, status: "pending" }
+    }
+
+    const resolvedTransaction = claimedTransaction ?? {
+      redsys_order: transaction.redsys_order,
+      redsys_token: decoded.Ds_Merchant_Identifier ?? transaction.redsys_token,
+      redsys_token_expiry: decoded.Ds_ExpiryDate ?? transaction.redsys_token_expiry,
+      cof_txn_id: decoded.Ds_Merchant_Cof_Txnid ?? transaction.cof_txn_id,
+      last_four: decoded.Ds_CardNumber ? decoded.Ds_CardNumber.slice(-4) : transaction.last_four,
+      metadata: transaction.metadata,
     }
 
     return {
       success: true,
-      order,
-      amountCents: totalCents,
-      transactionId: txn.id,
+      status: "authorized",
+      checkoutData: mapMembershipCheckoutData(resolvedTransaction),
     }
-  } catch (err) {
-    console.error("[payment] prepareShopPayment error:", err)
-    return { success: false, error: "Error interno al preparar el pago" }
+  } catch (error) {
+    console.error("[payment] resolveMembershipRedirectPayment unexpected error", { order, error })
+    return { success: false, status: "error", error: "UNEXPECTED_ERROR" }
   }
 }
 
-// ── 2. Prepare Membership Payment ────────────────────────────────────────────
-
-/**
- * Validate plan selection, create a pending transaction, and return
- * an order number for InSite initialization (with tokenization).
- */
-export async function prepareMembershipPayment(
+export async function prepareMembershipRedirectPayment(
   planType: PlanType,
   interval: PaymentInterval,
-): Promise<PreparePaymentResult> {
+): Promise<PrepareRedirectPaymentResult> {
   try {
     const supabase = await createServerSupabaseClient()
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
-    if (authErr || !user) {
-      return { success: false, error: "Debes iniciar sesión para contratar una membresía" }
+    if (authError || !user) {
+      return { success: false, error: "Debes iniciar sesion para contratar una membresia" }
     }
 
-    // Check if user already has an active subscription
     const admin = getAdminClient()
-    const { data: existingSub } = await admin
+
+    const { data: existingActiveSubscription, error: activeSubError } = await admin
       .from("subscriptions")
-      .select("id, status")
+      .select("id")
       .eq("member_id", user.id)
       .eq("status", "active")
-      .limit(1)
-      .single()
+      .maybeSingle()
 
-    if (existingSub) {
-      return { success: false, error: "Ya tienes una suscripción activa" }
+    if (activeSubError) {
+      console.error("[payment] Failed checking existing membership", {
+        memberId: user.id,
+        error: activeSubError,
+      })
+      return { success: false, error: "No se pudo validar la suscripcion actual" }
     }
 
-    // Look up the plan
+    if (existingActiveSubscription) {
+      return { success: false, error: "Ya tienes una suscripcion activa" }
+    }
+
     const plan = getMembershipPlan(planType, interval)
     if (!plan) {
-      return { success: false, error: "Plan de membresía no válido" }
+      return { success: false, error: "Plan de membresia no valido" }
     }
 
-    // Generate order number
     const order = generateOrderNumber("M")
 
-    // Create pending transaction
-    const { data: txn, error: txnErr } = await admin
+    const { data: transaction, error: insertError } = await admin
       .from("payment_transactions")
       .insert({
         redsys_order: order,
@@ -185,7 +319,7 @@ export async function prepareMembershipPayment(
         amount_cents: plan.amountCents,
         currency: "978",
         status: "pending",
-        context: "membership" as PaymentContext,
+        context: "membership",
         member_id: user.id,
         is_mit: false,
         metadata: {
@@ -197,310 +331,244 @@ export async function prepareMembershipPayment(
       .select("id")
       .single()
 
-    if (txnErr) {
-      console.error("[payment] Error creating membership transaction:", txnErr)
-      return { success: false, error: "Error al preparar el pago de membresía" }
+    if (insertError || !transaction) {
+      console.error("[payment] Failed creating membership transaction", {
+        order,
+        error: insertError,
+      })
+      return { success: false, error: "Error al preparar el pago de membresia" }
     }
+
+    const returnUrls = getRedirectReturnUrls("membership", order, user.id)
+
+    const signed = buildSignedRequest({
+      DS_MERCHANT_TRANSACTIONTYPE: "0",
+      DS_MERCHANT_ORDER: order,
+      DS_MERCHANT_AMOUNT: String(plan.amountCents),
+      DS_MERCHANT_URLOK: returnUrls.ok,
+      DS_MERCHANT_URLKO: returnUrls.ko,
+      DS_MERCHANT_PRODUCTDESCRIPTION: `Membresia Pena Lorenzo Sanz - ${plan.name}`,
+      DS_MERCHANT_IDENTIFIER: "REQUIRED",
+      DS_MERCHANT_COF_INI: "S",
+      DS_MERCHANT_COF_TYPE: "R",
+    })
 
     return {
       success: true,
       order,
       amountCents: plan.amountCents,
-      transactionId: txn.id,
+      transactionId: transaction.id,
+      actionUrl: getRealizarPagoUrl(),
+      signed,
     }
-  } catch (err) {
-    console.error("[payment] prepareMembershipPayment error:", err)
-    return { success: false, error: "Error interno" }
+  } catch (error) {
+    console.error("[payment] prepareMembershipRedirectPayment failed", { error })
+    return { success: false, error: "Error interno al preparar el pago" }
   }
 }
 
-// ── 3. Execute Payment ───────────────────────────────────────────────────────
+export async function prepareShopRedirectPayment(
+  items: ShopRedirectItemInput[],
+  shipping: ShopRedirectShippingInput,
+): Promise<PrepareRedirectPaymentResult> {
+  if (!items.length) {
+    return { success: false, error: "El carrito esta vacio" }
+  }
 
-/**
- * Execute a previously prepared payment using the InSite idOper.
- * For shop: one-time authorization (no tokenization).
- * For membership: authorization + COF/tokenization (IDENTIFIER="REQUIRED").
- */
-export async function executePayment(
-  idOper: string,
-  order: string,
-  context: PaymentContext,
-): Promise<ExecutePaymentResult> {
+  if (
+    !shipping.fullName ||
+    !shipping.email ||
+    !shipping.address ||
+    !shipping.city ||
+    !shipping.postalCode ||
+    !shipping.country ||
+    !shipping.phone
+  ) {
+    return { success: false, error: "Faltan datos de envio obligatorios" }
+  }
+
   try {
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
     const admin = getAdminClient()
+    const variantIds = [...new Set(items.map((item) => item.variantId))]
 
-    // Look up the pending transaction
-    const { data: txn, error: txnErr } = await admin
-      .from("payment_transactions")
-      .select("*")
-      .eq("redsys_order", order)
-      .eq("status", "pending")
-      .single()
+    const { data: variants, error: variantsError } = await admin
+      .from("product_variants")
+      .select("id, price_cents, inventory, active, product_id")
+      .in("id", variantIds)
 
-    if (txnErr || !txn) {
-      return { success: false, error: "Transacción no encontrada o ya procesada", errorCode: "TXN_NOT_FOUND" }
+    if (variantsError || !variants) {
+      console.error("[payment] Failed loading variants", { error: variantsError })
+      return { success: false, error: "No se pudieron validar los productos" }
     }
 
-    // Determine if we should tokenize (membership only)
-    const tokenize = context === "membership"
-    const description = context === "membership"
-      ? `Membresía Peña Lorenzo Sanz — ${txn.metadata?.planName ?? ""}`
-      : "Tienda Peña Lorenzo Sanz"
+    const productIds = [
+      ...new Set(
+        variants
+          .map((variant) => variant.product_id)
+          .filter((value): value is string => typeof value === "string"),
+      ),
+    ]
 
-    // Call RedSys REST authorization
-    const result = await authorizeWithIdOper({
-      idOper,
-      order,
-      amountCents: txn.amount_cents,
-      description,
-      tokenize,
-      cofType: tokenize ? "R" : undefined, // R = Recurring
-    })
+    const productNameById = new Map<string, string>()
+    if (productIds.length > 0) {
+      const { data: products, error: productsError } = await admin
+        .from("products")
+        .select("id, name")
+        .in("id", productIds)
 
-    // Update transaction record
-    await admin
-      .from("payment_transactions")
-      .update({
-        status: result.success ? "authorized" : "denied",
-        ds_response: result.dsResponse ?? null,
-        ds_authorization_code: result.authorizationCode ?? null,
-        ds_card_brand: result.cardBrand ?? null,
-        last_four: result.lastFour ?? null,
-        redsys_token: result.redsysToken ?? null,
-        cof_txn_id: result.cofTxnId ?? null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", txn.id)
-
-    if (!result.success) {
-      if (result.errorCode === "SIS0218") {
-        return {
-          ...result,
-          error: "El TPV ha rechazado la operación como NO SEGURA (Host-to-Host). Revisa la configuración del terminal en Redsys/Getnet o implementa flujo EMV3DS REST completo.",
-        }
+      if (productsError) {
+        console.error("[payment] Failed loading product names", { error: productsError })
       }
-      if (result.errorCode === "SIS0508") {
-        return {
-          ...result,
-          error: "El idOper no es válido, ha caducado o no coincide con el pedido enviado. Genera un nuevo formulario de pago y vuelve a intentarlo.",
-        }
+
+      for (const product of products ?? []) {
+        productNameById.set(product.id, product.name)
       }
-      return result
     }
 
-    // ── Post-authorization processing ──
-    if (context === "shop") {
-      await handleShopSuccess(admin, txn)
-    } else if (context === "membership") {
-      await handleMembershipSuccess(admin, txn, result)
-    }
-
-    return result
-  } catch (err) {
-    console.error("[payment] executePayment error:", err)
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : "Error al ejecutar el pago",
-      errorCode: "EXEC_ERROR",
-    }
-  }
-}
-
-// ── Post-Authorization Handlers ──────────────────────────────────────────────
-
-/**
- * After a successful shop payment:
- *   - Create order + order_items in DB
- *   - Decrement inventory
- */
-async function handleShopSuccess(
-  admin: ReturnType<typeof getAdminClient>,
-  txn: Record<string, unknown>,
-) {
-  try {
-    const items = (txn.metadata as Record<string, unknown>)?.items as Array<{
+    let itemsTotalCents = 0
+    const validatedItems: Array<{
       variantId: string
       qty: number
       priceCents: number
       productName: string
-    }> | undefined
+    }> = []
 
-    if (!items?.length) {
-      console.error("[payment] No items in shop transaction metadata")
-      return
-    }
-
-    // Create order
-    const { data: orderRecord, error: orderErr } = await admin
-      .from("orders")
-      .insert({
-        user_id: (txn.member_id as string) ?? null,
-        status: "paid",
-        amount_cents: txn.amount_cents as number,
-        redsys_order: txn.redsys_order as string,
-        payment_method: "redsys",
-      })
-      .select("id")
-      .single()
-
-    if (orderErr || !orderRecord) {
-      console.error("[payment] Error creating order:", orderErr)
-      return
-    }
-
-    // Update transaction with order_id
-    await admin
-      .from("payment_transactions")
-      .update({ order_id: orderRecord.id })
-      .eq("id", txn.id as string)
-
-    // Create order items
-    const orderItems = items.map((item) => ({
-      order_id: orderRecord.id,
-      variant_id: item.variantId,
-      qty: item.qty,
-      price_cents: item.priceCents,
-      product_name: item.productName,
-    }))
-
-    await admin.from("order_items").insert(orderItems)
-
-    // Decrement inventory
     for (const item of items) {
-      await admin.rpc("decrement_inventory", {
-        variant_id: item.variantId,
+      if (!Number.isInteger(item.qty) || item.qty <= 0) {
+        return { success: false, error: `Cantidad invalida para ${item.productName}` }
+      }
+
+      const variant = variants.find((candidate) => candidate.id === item.variantId)
+      if (!variant) {
+        return { success: false, error: `Producto no encontrado: ${item.productName}` }
+      }
+      if (!variant.active) {
+        return { success: false, error: `Producto no disponible: ${item.productName}` }
+      }
+      if ((variant.inventory ?? 0) < item.qty) {
+        return { success: false, error: `Stock insuficiente para: ${item.productName}` }
+      }
+
+      const variantPrice = variant.price_cents
+      const computedName =
+        (variant.product_id ? productNameById.get(variant.product_id) : undefined) ?? item.productName
+
+      itemsTotalCents += variantPrice * item.qty
+      validatedItems.push({
+        variantId: item.variantId,
         qty: item.qty,
+        priceCents: variantPrice,
+        productName: computedName,
       })
     }
-  } catch (err) {
-    console.error("[payment] handleShopSuccess error:", err)
-  }
-}
 
-/**
- * After a successful membership payment:
- *   - Create/update subscription record
- *   - Store tokenization data (redsys_token, cof_txn_id)
- *   - Update miembros table
- */
-async function handleMembershipSuccess(
-  admin: ReturnType<typeof getAdminClient>,
-  txn: Record<string, unknown>,
-  result: ExecutePaymentResult,
-) {
-  try {
-    const memberId = txn.member_id as string
-    const meta = txn.metadata as Record<string, unknown>
-    const planType = (meta?.planType as string) ?? "over25"
-    const interval = (meta?.interval as string) ?? "monthly"
+    const shippingCents = Number.isFinite(shipping.shippingCents)
+      ? Math.max(0, Math.trunc(shipping.shippingCents))
+      : 0
 
-    if (!memberId) {
-      console.error("[payment] No member_id in membership transaction")
-      return
+    const totalCents = itemsTotalCents + shippingCents
+    if (totalCents <= 0) {
+      return { success: false, error: "El importe total debe ser mayor que cero" }
     }
 
-    // Calculate period dates
-    const startDate = new Date()
-    const endDate = new Date()
-    if (interval === "annual") {
-      endDate.setFullYear(endDate.getFullYear() + 1)
-    } else {
-      endDate.setMonth(endDate.getMonth() + 1)
-    }
+    const order = generateOrderNumber("S")
 
-    // Upsert subscription
-    const { data: sub, error: subErr } = await admin
-      .from("subscriptions")
-      .upsert(
-        {
-          member_id: memberId,
-          plan_type: planType,
-          payment_type: interval,
-          status: "active",
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString(),
-          redsys_token: result.redsysToken ?? null,
-          redsys_token_expiry: result.redsysTokenExpiry ?? null,
-          redsys_cof_txn_id: result.cofTxnId ?? null,
-          redsys_last_order: txn.redsys_order as string,
-          updated_at: new Date().toISOString(),
+    const { data: transaction, error: insertError } = await admin
+      .from("payment_transactions")
+      .insert({
+        redsys_order: order,
+        transaction_type: "0",
+        amount_cents: totalCents,
+        currency: "978",
+        status: "pending",
+        context: "shop",
+        member_id: user?.id ?? null,
+        is_mit: false,
+        metadata: {
+          items: validatedItems,
+          shipping: {
+            fullName: shipping.fullName,
+            email: shipping.email,
+            address: shipping.address,
+            city: shipping.city,
+            postalCode: shipping.postalCode,
+            country: shipping.country,
+            phone: shipping.phone,
+            shippingCents,
+          },
+          itemsTotalCents,
+          shippingCents,
         },
-        { onConflict: "member_id" },
-      )
+      })
       .select("id")
       .single()
 
-    if (subErr) {
-      console.error("[payment] Error upserting subscription:", subErr)
-    }
-
-    // Update transaction with subscription reference
-    if (sub) {
-      await admin
-        .from("payment_transactions")
-        .update({ subscription_id: sub.id })
-        .eq("id", txn.id as string)
-    }
-
-    // Update miembros table
-    await admin
-      .from("miembros")
-      .update({
-        subscription_status: "active",
-        subscription_plan: `${planType}_${interval}`,
-        subscription_updated_at: new Date().toISOString(),
-        last_four: result.lastFour ?? null,
-        redsys_token: result.redsysToken ?? null,
-        redsys_token_expiry: result.redsysTokenExpiry ?? null,
+    if (insertError || !transaction) {
+      console.error("[payment] Failed creating shop transaction", {
+        order,
+        error: insertError,
       })
-      .eq("user_uuid", memberId)
+      return { success: false, error: "Error al preparar el pago" }
+    }
 
-    // Also update users.is_member
-    await admin
-      .from("users")
-      .update({ is_member: true })
-      .eq("id", memberId)
+    const returnUrls = getRedirectReturnUrls("shop", order)
 
-    revalidatePath("/dashboard/membership")
-    revalidatePath("/membership")
-  } catch (err) {
-    console.error("[payment] handleMembershipSuccess error:", err)
+    const signed = buildSignedRequest({
+      DS_MERCHANT_TRANSACTIONTYPE: "0",
+      DS_MERCHANT_ORDER: order,
+      DS_MERCHANT_AMOUNT: String(totalCents),
+      DS_MERCHANT_URLOK: returnUrls.ok,
+      DS_MERCHANT_URLKO: returnUrls.ko,
+      DS_MERCHANT_PRODUCTDESCRIPTION: "Tienda Pena Lorenzo Sanz",
+    })
+
+    return {
+      success: true,
+      order,
+      amountCents: totalCents,
+      transactionId: transaction.id,
+      actionUrl: getRealizarPagoUrl(),
+      signed,
+    }
+  } catch (error) {
+    console.error("[payment] prepareShopRedirectPayment failed", { error })
+    return { success: false, error: "Error interno al preparar el pago" }
   }
 }
 
-// ── 4. Cancel Subscription ───────────────────────────────────────────────────
-
-/**
- * Cancel a membership subscription.
- * Sets status to "canceled" — subscription remains active until period end.
- */
 export async function cancelMembershipSubscription(): Promise<{
   success: boolean
   error?: string
 }> {
   try {
     const supabase = await createServerSupabaseClient()
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
-    if (authErr || !user) {
+    if (authError || !user) {
       return { success: false, error: "No autenticado" }
     }
 
     const admin = getAdminClient()
 
-    // Find active subscription
-    const { data: sub, error: subErr } = await admin
+    const { data: subscription, error: subError } = await admin
       .from("subscriptions")
-      .select("id, end_date")
+      .select("id")
       .eq("member_id", user.id)
       .eq("status", "active")
       .single()
 
-    if (subErr || !sub) {
-      return { success: false, error: "No se encontró una suscripción activa" }
+    if (subError || !subscription) {
+      return { success: false, error: "No se encontro una suscripcion activa" }
     }
 
-    // Mark as canceled (will expire at end_date)
     await admin
       .from("subscriptions")
       .update({
@@ -509,9 +577,8 @@ export async function cancelMembershipSubscription(): Promise<{
         canceled_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .eq("id", sub.id)
+      .eq("id", subscription.id)
 
-    // Update miembros
     await admin
       .from("miembros")
       .update({
@@ -523,88 +590,75 @@ export async function cancelMembershipSubscription(): Promise<{
     revalidatePath("/dashboard/membership")
 
     return { success: true }
-  } catch (err) {
-    console.error("[payment] cancelMembershipSubscription error:", err)
+  } catch (error) {
+    console.error("[payment] cancelMembershipSubscription failed", { error })
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Error al cancelar",
+      error: error instanceof Error ? error.message : "Error al cancelar",
     }
   }
 }
 
-// ── 5. Update Card (Re-tokenization) ────────────────────────────────────────
-
-/**
- * Prepare a card-update payment (€0 validation + tokenization).
- * The user enters new card details in InSite, we validate and store the new token.
- */
-export async function prepareCardUpdate(): Promise<PreparePaymentResult> {
+export async function prepareCardUpdate(): Promise<PrepareRedirectPaymentResult> {
   try {
     const supabase = await createServerSupabaseClient()
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
-    if (authErr || !user) {
+    if (authError || !user) {
       return { success: false, error: "No autenticado" }
     }
 
     const admin = getAdminClient()
 
-    // Check active subscription exists
-    const { data: sub } = await admin
+    const { data: subscription } = await admin
       .from("subscriptions")
       .select("id")
       .eq("member_id", user.id)
       .in("status", ["active", "canceled"])
       .single()
 
-    if (!sub) {
-      return { success: false, error: "No se encontró una suscripción" }
+    if (!subscription) {
+      return { success: false, error: "No se encontro una suscripcion" }
     }
 
     const order = generateOrderNumber("M")
 
-    // Use €0 amount for card validation (TransactionType 7 could also work,
-    // but some acquirers prefer a small preauth. Using validation type 0
-    // with minimum amount and then refunding is another option.
-    // For now, we use a €0.01 preauth which we'll void afterward.)
-    // NOTE: Some configurations support type 7 (validation) — use that if available.
-    const { data: txn, error: txnErr } = await admin
+    const { data: transaction, error: insertError } = await admin
       .from("payment_transactions")
       .insert({
         redsys_order: order,
         transaction_type: "0",
-        amount_cents: 0, // Card validation — €0
+        amount_cents: 0,
         currency: "978",
         status: "pending",
-        context: "membership" as PaymentContext,
+        context: "membership",
         member_id: user.id,
-        subscription_id: sub.id,
+        subscription_id: subscription.id,
         is_mit: false,
         metadata: { type: "card_update" },
       })
       .select("id")
       .single()
 
-    if (txnErr) {
-      return { success: false, error: "Error al preparar la actualización" }
+    if (insertError || !transaction) {
+      return { success: false, error: "Error al preparar la actualizacion" }
     }
 
     return {
       success: true,
       order,
       amountCents: 0,
-      transactionId: txn.id,
+      transactionId: transaction.id,
     }
-  } catch (err) {
-    console.error("[payment] prepareCardUpdate error:", err)
+  } catch (error) {
+    console.error("[payment] prepareCardUpdate failed", { error })
     return { success: false, error: "Error interno" }
   }
 }
 
-/**
- * Execute a card update (re-tokenization with new card).
- * Stores the new token and updates subscription + miembros.
- */
 export async function executeCardUpdate(
   idOper: string,
   order: string,
@@ -612,28 +666,30 @@ export async function executeCardUpdate(
   try {
     const admin = getAdminClient()
 
-    const { data: txn, error: txnErr } = await admin
+    const { data: transaction, error: transactionError } = await admin
       .from("payment_transactions")
       .select("*")
       .eq("redsys_order", order)
       .eq("status", "pending")
       .single()
 
-    if (txnErr || !txn) {
-      return { success: false, error: "Transacción no encontrada", errorCode: "TXN_NOT_FOUND" }
+    if (transactionError || !transaction) {
+      return {
+        success: false,
+        error: "Transaccion no encontrada",
+        errorCode: "TXN_NOT_FOUND",
+      }
     }
 
-    // Authorize with tokenization
     const result = await authorizeWithIdOper({
       idOper,
       order,
-      amountCents: txn.amount_cents,
-      description: "Actualización de tarjeta — Peña Lorenzo Sanz",
+      amountCents: transaction.amount_cents,
+      description: "Actualizacion de tarjeta - Pena Lorenzo Sanz",
       tokenize: true,
       cofType: "R",
     })
 
-    // Update transaction
     await admin
       .from("payment_transactions")
       .update({
@@ -645,28 +701,31 @@ export async function executeCardUpdate(
         cof_txn_id: result.cofTxnId ?? null,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", txn.id)
+      .eq("id", transaction.id)
 
     if (!result.success) {
       if (result.errorCode === "SIS0218") {
         return {
           ...result,
-          error: "El TPV ha rechazado la operación como NO SEGURA (Host-to-Host). Revisa la configuración del terminal en Redsys/Getnet o implementa flujo EMV3DS REST completo.",
+          error:
+            "El TPV ha rechazado la operacion como no segura (Host-to-Host). Revisa la configuracion del terminal en Redsys/Getnet.",
         }
       }
+
       if (result.errorCode === "SIS0508") {
         return {
           ...result,
-          error: "El idOper no es válido, ha caducado o no coincide con el pedido enviado. Genera un nuevo formulario de pago y vuelve a intentarlo.",
+          error:
+            "El idOper no es valido, ha caducado o no coincide con el pedido enviado. Genera un nuevo formulario y vuelve a intentarlo.",
         }
       }
+
       return result
     }
 
     if (result.redsysToken) {
-      const memberId = txn.member_id as string
+      const memberId = transaction.member_id as string
 
-      // Update subscription with new token
       await admin
         .from("subscriptions")
         .update({
@@ -678,7 +737,6 @@ export async function executeCardUpdate(
         .eq("member_id", memberId)
         .eq("status", "active")
 
-      // Update miembros
       await admin
         .from("miembros")
         .update({
@@ -692,11 +750,11 @@ export async function executeCardUpdate(
     }
 
     return result
-  } catch (err) {
-    console.error("[payment] executeCardUpdate error:", err)
+  } catch (error) {
+    console.error("[payment] executeCardUpdate failed", { order, error })
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Error al actualizar tarjeta",
+      error: error instanceof Error ? error.message : "Error al actualizar la tarjeta",
       errorCode: "EXEC_ERROR",
     }
   }

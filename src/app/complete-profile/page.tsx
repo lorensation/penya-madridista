@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase"
+import { resolveMembershipRedirectPayment } from "@/app/actions/payment"
 import { ProfileForm } from "@/components/profile-form"
 import { Loader2 } from "lucide-react"
 import { Suspense } from "react"
@@ -98,11 +99,20 @@ function LoadingForm() {
   )
 }
 
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
+}
+
 function CompleteProfileContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get("session_id")
   const userId = searchParams.get("userId")
+  const redsysOrder = searchParams.get("order") || searchParams.get("Ds_Order")
+  const dsMerchantParameters = searchParams.get("Ds_MerchantParameters")
+  const dsSignature = searchParams.get("Ds_Signature")
   // Get the adminInviteToken parameter
   const adminInviteToken = searchParams.get("admin_invite")
 
@@ -111,15 +121,13 @@ function CompleteProfileContent() {
   const [checkoutData, setCheckoutData] = useState<CheckoutSessionData | null>(null)
   const [authError, setAuthError] = useState<boolean>(false)
 
-  // Fix the condition that checks for missing parameters
-  // Set missingSessionId to true only if BOTH session_id and admin_invite are missing
-  const [missingSessionId, setMissingSessionId] = useState<boolean>(!sessionId && !adminInviteToken)
+  const [missingSessionId, setMissingSessionId] = useState<boolean>(
+    !sessionId && !adminInviteToken && !redsysOrder,
+  )
 
-  // Update the useEffect to handle admin invites
   useEffect(() => {
-    // If there's no session_id or admin_invite, we shouldn't be on this page
-    
-    if (!sessionId && !adminInviteToken) {
+    // If there's no payment/order reference or admin invite, we shouldn't be on this page
+    if (!sessionId && !adminInviteToken && !redsysOrder) {
       setLoading(false)
       setMissingSessionId(true)
       return
@@ -197,7 +205,70 @@ function CompleteProfileContent() {
           }
         }
 
-        // If there's a session_id (legacy) or payment reference, look up the payment from our DB
+        if (redsysOrder) {
+          const maxAttempts = 8
+          const retryDelayMs = 1200
+
+          for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            const resolution = await resolveMembershipRedirectPayment(
+              redsysOrder,
+              dsMerchantParameters,
+              dsSignature,
+            )
+
+            if (!resolution.success) {
+              setError("No se pudo validar el pago con Redsys.")
+              setLoading(false)
+              return
+            }
+
+            if (resolution.status === "authorized" && resolution.checkoutData) {
+              setCheckoutData({
+                id: resolution.checkoutData.id,
+                status: "complete",
+                redsys_token: resolution.checkoutData.redsys_token,
+                redsys_token_expiry: resolution.checkoutData.redsys_token_expiry,
+                cof_txn_id: resolution.checkoutData.cof_txn_id,
+                payment_status: resolution.checkoutData.payment_status,
+                subscription_status: resolution.checkoutData.subscription_status,
+                plan_type: resolution.checkoutData.plan_type,
+                payment_type: resolution.checkoutData.payment_type,
+                last_four: resolution.checkoutData.last_four,
+              })
+              setLoading(false)
+              return
+            }
+
+            if (resolution.status === "denied") {
+              setError("El pago no se ha autorizado. Vuelve a intentar la suscripcion.")
+              setLoading(false)
+              return
+            }
+
+            if (resolution.status === "not_found") {
+              if (attempt < maxAttempts) {
+                await sleep(retryDelayMs)
+                continue
+              }
+
+              setError("No se encontro la transaccion de pago asociada.")
+              setLoading(false)
+              return
+            }
+
+            // pending/error fallback
+            if (attempt < maxAttempts) {
+              await sleep(retryDelayMs)
+              continue
+            }
+
+            setError("El pago aun se esta procesando. Recarga la pagina en unos segundos.")
+            setLoading(false)
+            return
+          }
+        }
+
+        // If there's a session_id (legacy flow), look up the payment from our DB
         if (sessionId) {
           try {
             // Try to find a completed payment transaction for this user
@@ -245,7 +316,7 @@ function CompleteProfileContent() {
     }
 
     initializeProfileForm()
-  }, [router, sessionId, userId, searchParams, adminInviteToken])
+  }, [router, sessionId, userId, adminInviteToken, redsysOrder, dsMerchantParameters, dsSignature])
 
   const handleProfileSubmit = async (formData: ProfileFormValues) => {
     try {
@@ -304,15 +375,37 @@ function CompleteProfileContent() {
         processedData.last_four = checkoutData.last_four
       }
 
-      // Insert the new member profile
+      // Insert the new member profile (fallback to update if already exists)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: insertError } = await supabase.from("miembros").insert(processedData as any)
 
       if (insertError) {
-        console.error("Error creating profile:", insertError)
-        setError("Failed to create your profile. Please try again.")
-        setLoading(false)
-        return
+        const duplicateError = insertError.code === "23505" || insertError.message.toLowerCase().includes("duplicate")
+        if (!duplicateError) {
+          console.error("Error creating profile:", insertError)
+          setError("Failed to create your profile. Please try again.")
+          setLoading(false)
+          return
+        }
+
+        // Avoid updating immutable identity fields during duplicate-profile recovery.
+        const updatableData: Partial<ProcessedMemberData> = { ...processedData }
+        delete updatableData.id
+        delete updatableData.created_at
+        const { error: updateError } = await supabase
+          .from("miembros")
+          .update({
+            ...updatableData,
+            subscription_updated_at: new Date().toISOString(),
+          } as Record<string, unknown>)
+          .eq("user_uuid", userData.user.id)
+
+        if (updateError) {
+          console.error("Error updating existing profile:", updateError)
+          setError("Failed to update your profile. Please try again.")
+          setLoading(false)
+          return
+        }
       }
 
       // Update the users table to mark the user as a member
@@ -330,7 +423,7 @@ function CompleteProfileContent() {
         // We'll continue even if this fails, as the member profile was created successfully
       }
 
-      // If we have checkout data, create a subscription record in the new subscriptions table
+      // If we have checkout data, create or update subscription record
       if (checkoutData && checkoutData.plan_type) {
         // Calculate end date based on payment type
         const startDate = new Date()
@@ -346,7 +439,7 @@ function CompleteProfileContent() {
 
         const { error: subscriptionError } = await supabase
           .from("subscriptions")
-          .insert({
+          .upsert({
             member_id: userData.user.id,
             plan_type: checkoutData.plan_type,
             payment_type: checkoutData.payment_type || "monthly",
@@ -357,7 +450,8 @@ function CompleteProfileContent() {
             start_date: startDate.toISOString(),
             end_date: endDate.toISOString(),
             status: checkoutData.subscription_status || "active",
-          })
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "member_id" })
 
         if (subscriptionError) {
           console.error("Error creating subscription record:", subscriptionError)
@@ -401,7 +495,9 @@ function CompleteProfileContent() {
             </svg>
           </div>
           <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-red-600">Error</h2>
-          <p className="mt-2 text-center text-sm text-gray-600">Falta el identificador de sesión. Por favor, verifica el enlace.</p>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Falta el identificador de pago o invitación. Por favor, verifica el enlace.
+          </p>
           <Button
             onClick={() => router.push("/")}
             className="mt-6 w-full"
@@ -417,10 +513,13 @@ function CompleteProfileContent() {
     // Get the admin invite token if it exists
     const adminInviteToken = searchParams.get("admin_invite")
     
-    // Create return URL that will include the admin_invite parameter if it exists
-    const returnUrl = adminInviteToken 
-      ? `/complete-profile?admin_invite=${adminInviteToken}` 
-      : `/complete-profile?session_id=${sessionId || ""}&userId=${userId || ""}`
+    // Create return URL preserving whichever flow the user came from
+    let returnUrl = `/complete-profile?session_id=${sessionId || ""}&userId=${userId || ""}`
+    if (adminInviteToken) {
+      returnUrl = `/complete-profile?admin_invite=${adminInviteToken}`
+    } else if (redsysOrder) {
+      returnUrl = `/complete-profile?order=${encodeURIComponent(redsysOrder)}&userId=${encodeURIComponent(userId || "")}`
+    }
     
     return (
       <div className="flex min-h-screen items-center justify-center">

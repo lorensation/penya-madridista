@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { createBrowserSupabaseClient } from "@/lib/supabase"
+import { hasMembershipAccess } from "@/lib/membership-access"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -49,9 +50,15 @@ interface ActivityItem {
   slug?: string
 }
 
+interface Subscription {
+  status: string | null
+  end_date: string | null
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [membershipSubscription, setMembershipSubscription] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [events, setEvents] = useState<Event[]>([])
@@ -107,6 +114,21 @@ export default function DashboardPage() {
           setProfile(null)
         } else {
           setProfile(profileData)
+        }
+
+        const { data: subscriptionData, error: subscriptionError } = await supabase
+          .from("subscriptions")
+          .select("status, end_date")
+          .eq("member_id", userData.user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (subscriptionError) {
+          console.error("Subscription fetch error:", subscriptionError)
+          setMembershipSubscription(null)
+        } else {
+          setMembershipSubscription(subscriptionData as Subscription | null)
         }
         setLoading(false)
       } catch (error: unknown) {
@@ -244,9 +266,15 @@ export default function DashboardPage() {
     )
   }
 
-  const subscriptionStatus = profile?.subscription_status || "inactive"
+  const subscriptionStatus = membershipSubscription?.status || profile?.subscription_status || "inactive"
   const subscriptionPlan = profile?.subscription_plan || null
-  const isMember = subscriptionStatus === "active"
+  const hasCurrentMembershipAccess = hasMembershipAccess({
+    status: subscriptionStatus,
+    endDate: membershipSubscription?.end_date ?? null,
+  })
+  const isMember = hasCurrentMembershipAccess
+  const isCanceled = subscriptionStatus === "canceled" && hasCurrentMembershipAccess
+  const isActive = subscriptionStatus === "active" || subscriptionStatus === "trialing"
 
   return (
     <div className="space-y-6 p-6 md:p-8">
@@ -257,7 +285,18 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {subscriptionStatus !== "active" && (
+      {isCanceled ? (
+        <Alert className="mb-8 bg-red-50 border-red-200">
+          <AlertTriangle className="h-4 w-4 text-red-800" />
+          <AlertDescription className="text-red-800">
+            Tienes tu membresía cancelada. Para seguir disfrutando de los beneficios,
+            <Link href="/dashboard/membership" className="font-medium underline ml-1">
+              renuévala
+            </Link>
+            .
+          </AlertDescription>
+        </Alert>
+      ) : !isMember ? (
         <Alert className="mb-8 bg-yellow-50 border-yellow-200">
           <AlertTriangle className="h-4 w-4 text-yellow-800" />
           <AlertDescription className="text-yellow-800">
@@ -268,7 +307,7 @@ export default function DashboardPage() {
             .
           </AlertDescription>
         </Alert>
-      )}
+      ) : null}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card className="flex flex-col h-full">
@@ -283,15 +322,19 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm text-gray-500">Estado</p>
                 <p className="font-medium">
-                  {subscriptionStatus === "active" ? (
+                  {isActive ? (
                     <span className="text-green-600">Activa</span>
-                  ) : (
+                  ) : isCanceled ? (
+                    <span className="text-red-600">Cancelada</span>
+                  ) : subscriptionStatus === "past_due" || subscriptionStatus === "incomplete" ? (
                     <span className="text-yellow-600">Pendiente</span>
+                  ) : (
+                    <span className="text-gray-600">Inactiva</span>
                   )}
                 </p>
               </div>
             </div>
-            {subscriptionStatus === "active" && subscriptionPlan && (
+            {isMember && subscriptionPlan && (
               <div className="mt-2">
                 <p className="text-sm text-gray-500">Plan</p>
                 <p className="font-medium">
@@ -378,7 +421,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="flex flex-col flex-grow">
             <p className="text-sm text-gray-500">
-              {subscriptionStatus === "active"
+              {isMember
                 ? "Accede a contenido exclusivo"
                 : "Activa tu membresía para ver contenido"}
             </p>
@@ -551,7 +594,7 @@ export default function DashboardPage() {
                   Sobre Nosotros
                 </Button>
               </Link>
-              {subscriptionStatus === "active" && (
+              {isMember && (
                 <Link href="/dashboard/membership">
                   <Button variant="outline" className="w-full justify-start transition-all hover:bg-black hover:text-white hover:border hover:border-black">
                     Gestionar Membresía

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { supabase } from "@/lib/supabase"
+import { hasMembershipAccess } from "@/lib/membership-access"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -31,9 +32,15 @@ interface Profile {
   [key: string]: string | number | boolean | null | undefined
 }
 
+interface Subscription {
+  status: string | null
+  end_date: string | null
+}
+
 export default function EventsPage() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -45,13 +52,17 @@ export default function EventsPage() {
 
         if (!userData.user) {
           console.log("Auth User fetch error: ", userError)
+          setLoading(false)
+          return
         }
+
+        const userId = userData.user.id
 
         // Fetch user profile
         const { data: profileData, error: profileError } = await supabase
           .from("miembros")
           .select("*")
-          .eq("id", userData.user?.id || "")
+          .eq("id", userId)
           .single()
 
         if (profileError) {
@@ -60,6 +71,21 @@ export default function EventsPage() {
           setProfile(null)
         } else {
           setProfile(profileData)
+        }
+
+        const { data: subscriptionData, error: subscriptionError } = await supabase
+          .from("subscriptions")
+          .select("status, end_date")
+          .eq("member_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (subscriptionError) {
+          console.error("Subscription fetch error:", subscriptionError)
+          setSubscription(null)
+        } else {
+          setSubscription(subscriptionData as Subscription | null)
         }
 
         // Fetch events from database
@@ -109,7 +135,11 @@ export default function EventsPage() {
     )
   }
 
-  const subscriptionStatus = profile?.subscription_status || "inactive"
+  const subscriptionStatus = subscription?.status || profile?.subscription_status || "inactive"
+  const hasPrivilegedAccess = hasMembershipAccess({
+    status: subscriptionStatus,
+    endDate: subscription?.end_date ?? null,
+  })
 
   // Create a WhatsApp chat link for event reservation
   const createWhatsAppLink = (eventTitle: string) => {
@@ -125,7 +155,7 @@ export default function EventsPage() {
         <p className="text-gray-500">Descubre y reserva tu plaza en los próximos eventos exclusivos para socios</p>
       </div>
 
-      {subscriptionStatus !== "active" && (
+      {!hasPrivilegedAccess && (
         <Alert className="mb-8 bg-yellow-50 border-yellow-200">
           <AlertTriangle className="h-4 w-4 text-yellow-800" />
           <AlertDescription className="text-yellow-800">
@@ -205,13 +235,13 @@ export default function EventsPage() {
                 >
                   <Button 
                     className={`w-full transition-all flex items-center justify-center gap-2 
-                    ${subscriptionStatus === "active" 
+                    ${hasPrivilegedAccess
                       ? "hover:bg-white hover:text-primary hover:border hover:border-black" 
                       : "bg-gray-400 hover:bg-gray-500 cursor-not-allowed"}`} 
-                    disabled={subscriptionStatus !== "active"}
+                    disabled={!hasPrivilegedAccess}
                   >
                     <PhoneOutgoing className="h-4 w-4" />
-                    {subscriptionStatus === "active" ? "Reservar Plaza por WhatsApp" : "Membresía Requerida"}
+                    {hasPrivilegedAccess ? "Reservar Plaza por WhatsApp" : "Membresía Requerida"}
                   </Button>
                 </a>
               </CardContent>
@@ -222,3 +252,4 @@ export default function EventsPage() {
     </div>
   )
 }
+

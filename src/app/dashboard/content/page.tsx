@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { FileText, Video, Download, AlertTriangle, AlertCircle, CheckCircle } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase"
+import { hasMembershipAccess } from "@/lib/membership-access"
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js"
 
 // Define types for our content
@@ -95,9 +96,15 @@ interface Profile {
   [key: string]: string | null | boolean | number
 }
 
+interface Subscription {
+  status: string | null
+  end_date: string | null
+}
+
 export default function ContentPage() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [membershipSubscription, setMembershipSubscription] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -154,6 +161,23 @@ export default function ContentPage() {
           }
         } else if (isMounted) {
           setProfile(profileData as Profile)
+        }
+
+        const { data: subscriptionData, error: subscriptionError } = await supabase
+          .from("subscriptions")
+          .select("status, end_date")
+          .eq("member_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (subscriptionError) {
+          console.error("Subscription fetch error:", subscriptionError)
+          if (isMounted) {
+            setMembershipSubscription(null)
+          }
+        } else if (isMounted) {
+          setMembershipSubscription(subscriptionData as Subscription | null)
         }
       } catch (err: unknown) {
         const errorMsg = err instanceof Error ? err.message : "Failed to load user data"
@@ -238,8 +262,11 @@ export default function ContentPage() {
     )
   }
 
-  const subscriptionStatus = profile?.subscription_status || "inactive"
-  const isSubscribed = subscriptionStatus === "active"
+  const subscriptionStatus = membershipSubscription?.status || profile?.subscription_status || "inactive"
+  const isSubscribed = hasMembershipAccess({
+    status: subscriptionStatus,
+    endDate: membershipSubscription?.end_date ?? null,
+  })
 
   // Fallback UI for non-members
   if (!isSubscribed) {

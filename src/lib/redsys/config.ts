@@ -21,12 +21,14 @@ export const REDSYS_ENDPOINTS = {
   test: {
     trataPeticion:  "https://sis-t.redsys.es:25443/sis/rest/trataPeticionREST",
     iniciaPeticion: "https://sis-t.redsys.es:25443/sis/rest/iniciaPeticionREST",
+    realizarPago:   "https://sis-t.redsys.es:25443/sis/realizarPago",
     insiteJs:       "https://sis-t.redsys.es:25443/sis/NC/sandbox/redsysV3.js",
     adminPortal:    "https://sis-t.redsys.es:25443/sis/adminWeb/",
   },
   production: {
     trataPeticion:  "https://sis.redsys.es/sis/rest/trataPeticionREST",
     iniciaPeticion: "https://sis.redsys.es/sis/rest/iniciaPeticionREST",
+    realizarPago:   "https://sis.redsys.es/sis/realizarPago",
     insiteJs:       "https://sis.redsys.es/sis/NC/redsysV3.js",
     adminPortal:    "https://sis.redsys.es/sis/adminWeb/",
   },
@@ -111,11 +113,17 @@ export function getMembershipPlan(planType: PlanType, interval: PaymentInterval)
 // ── Environment Helpers (server-side) ────────────────────────────────────────
 
 export function getRedsysEnv(): "test" | "production" {
-  return process.env.REDSYS_ENV === "production" ? "production" : "test"
+  return process.env.REDSYS_ENV === "production" || process.env.REDSYS_ENV === "prod"
+    ? "production"
+    : "test"
 }
 
 export function getEndpoints() {
   return REDSYS_ENDPOINTS[getRedsysEnv()]
+}
+
+export function getRealizarPagoUrl(): string {
+  return getEndpoints().realizarPago
 }
 
 export function getMerchantCode(): string {
@@ -134,12 +142,34 @@ export function getSecretKey(): string {
   return key
 }
 
+function resolveBaseUrl(): string {
+  const fallback = "https://www.lorenzosanz.com"
+  const configured = process.env.NEXT_PUBLIC_BASE_URL?.trim()
+
+  if (!configured) {
+    return fallback
+  }
+
+  try {
+    const url = new URL(configured)
+    const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(url.hostname)
+    const isNonProduction = process.env.NODE_ENV !== "production"
+
+    // Local Next dev usually runs on HTTP. Avoid generating HTTPS localhost return URLs.
+    if (isLocalHost && isNonProduction && url.protocol === "https:") {
+      url.protocol = "http:"
+    }
+
+    return url.origin
+  } catch {
+    return fallback
+  }
+}
+
 export function getNotificationUrl(): string {
-  const base = process.env.NEXT_PUBLIC_BASE_URL || "https://www.lorenzosanz.com"
-  const normalizedBase = base.replace(/\/+$/, "")
-  return `${normalizedBase}/api/payments/redsys/notification`
+  return `${resolveBaseUrl()}/api/payments/redsys/notification`
 }
 
 export function getBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_BASE_URL || "https://www.lorenzosanz.com"
+  return resolveBaseUrl()
 }

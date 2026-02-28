@@ -1,106 +1,134 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { CheckCircle, Calendar, CreditCard, Award, BadgeCheck, Gift, Loader2, ShieldCheck, AlertCircle, ArrowLeft } from "lucide-react"
-import { supabase } from "@/lib/supabase"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import type { User } from "@supabase/supabase-js"
-import { RedsysInSiteForm } from "@/components/shop/redsys-insite-form"
-import { prepareMembershipPayment, executePayment } from "@/app/actions/payment"
-import type { PlanType, PaymentInterval } from "@/lib/redsys"
-
-// ── Membership Plans (amounts managed server-side in config.ts) ──────────────
+import { CheckCircle, Calendar, CreditCard, Award, Gift, Loader2, AlertCircle, BadgeCheck } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { supabase } from "@/lib/supabase"
+import { hasMembershipAccess } from "@/lib/membership-access"
+import type { PaymentInterval, PlanType, RedsysSignedRequest } from "@/lib/redsys"
+import { prepareMembershipRedirectPayment } from "@/app/actions/payment"
+import { RedsysRedirectAutoSubmitForm } from "@/components/payments/redsys-redirect-form"
 
 const membershipPlans = [
   {
     id: "under25" as PlanType,
-    name: "Membresía Joven (Menores de 25)",
+    name: "Membresia Joven (Menores de 25)",
     paymentOptions: [
-      { id: "monthly" as PaymentInterval, name: "Mensual", price: "€5", period: "/mes" },
-      { id: "annual" as PaymentInterval, name: "Anual", price: "€50", period: "/año", discount: "¡Ahorra 2 meses!" },
+      { id: "monthly" as PaymentInterval, name: "Mensual", price: "5 €", period: "/mes" },
+      { id: "annual" as PaymentInterval, name: "Anual", price: "50 €", period: "/año", discount: "¡Ahorra 2 meses!" },
     ],
     features: [
-      "Acceso a eventos exclusivos organizados por la peña",
+      "Acceso a eventos exclusivos organizados por la pena",
       "Descuentos en viajes organizados para ver partidos",
-      "Participación en sorteos y promociones exclusivas",
+      "Participacion en sorteos y promociones exclusivas",
       "Acceso al contenido exclusivo en nuestra web",
-      "Carnet oficial de socio de la Peña Lorenzo Sanz",
+      "Carnet oficial de socio de la Pena Lorenzo Sanz",
     ],
   },
   {
     id: "over25" as PlanType,
-    name: "Membresía Adulto (Mayores de 25)",
+    name: "Membresia Adulto (Mayores de 25)",
     paymentOptions: [
-      { id: "monthly" as PaymentInterval, name: "Mensual", price: "€10", period: "/mes" },
-      { id: "annual" as PaymentInterval, name: "Anual", price: "€100", period: "/año", discount: "¡Ahorra 2 meses!" },
+      { id: "monthly" as PaymentInterval, name: "Mensual", price: "10 €", period: "/mes" },
+      { id: "annual" as PaymentInterval, name: "Anual", price: "100 €", period: "/año", discount: "¡Ahorra 2 meses!" },
     ],
     features: [
-      "Acceso a eventos exclusivos organizados por la peña",
+      "Acceso a eventos exclusivos organizados por la pena",
       "Descuentos en viajes organizados para ver partidos",
-      "Participación en sorteos y promociones exclusivas",
+      "Participacion en sorteos y promociones exclusivas",
       "Acceso al contenido exclusivo en nuestra web",
-      "Carnet oficial de socio de la Peña Lorenzo Sanz",
+      "Carnet oficial de socio de la Pena Lorenzo Sanz",
     ],
     popular: true,
   },
   {
     id: "family" as PlanType,
-    name: "Membresía Familiar (Un adulto y un menor)",
+    name: "Membresia Familiar (Un adulto y un menor)",
     paymentOptions: [
-      { id: "monthly" as PaymentInterval, name: "Mensual", price: "€15", period: "/mes" },
-      { id: "annual" as PaymentInterval, name: "Anual", price: "€150", period: "/año", discount: "¡Ahorra 2 meses!" },
+      { id: "monthly" as PaymentInterval, name: "Mensual", price: "15 €", period: "/mes" },
+      { id: "annual" as PaymentInterval, name: "Anual", price: "150 €", period: "/año", discount: "¡Ahorra 2 meses!" },
     ],
     features: [
-      "Todos los beneficios de la membresía individual",
-      "Válido para un adulto y un menor miembros de la familia",
+      "Todos los beneficios de la membresia individual",
+      "Valido para un adulto y un menor miembros de la familia",
       "Descuentos adicionales en eventos familiares",
       "Carnets oficiales para todos los miembros incluidos",
-      "Actividades para los más pequeños",
+      "Actividades para los mas pequenos",
     ],
   },
 ]
 
-type PageStep = "select" | "payment" | "processing" | "success"
+type MembershipStep = "select" | "processing" | "redirecting"
 
-export default function Membership() {
+interface MembershipSubscription {
+  status: string | null
+  end_date: string | null
+}
+
+export default function MembershipPage() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
-  const [isMember, setIsMember] = useState<boolean>(false)
-  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [isMember, setIsMember] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
-  const [selectedPaymentOption, setSelectedPaymentOption] = useState<string | null>(null)
 
-  // Payment flow state
-  const [step, setStep] = useState<PageStep>("select")
-  const [orderNumber, setOrderNumber] = useState<string | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null)
+  const [selectedPaymentOption, setSelectedPaymentOption] = useState<PaymentInterval | null>(null)
+
+  const [step, setStep] = useState<MembershipStep>("select")
+  const [redirectActionUrl, setRedirectActionUrl] = useState<string | null>(null)
+  const [redirectSigned, setRedirectSigned] = useState<RedsysSignedRequest | null>(null)
 
   useEffect(() => {
     const checkUserAndMembership = async () => {
       try {
         setIsLoading(true)
+
         const { data: userData } = await supabase.auth.getUser()
         setUser(userData.user)
 
-        if (userData.user) {
-          const { data: memberData, error: memberError } = await supabase
-            .from('users')
-            .select('is_member')
-            .eq('id', userData.user.id)
-            .single()
-
-          if (memberError) {
-            console.error('Error checking membership status:', memberError)
-          } else if (memberData) {
-            setIsMember(memberData.is_member)
-          }
+        if (!userData.user) {
+          return
         }
-      } catch (err) {
-        console.error('Error checking user status:', err)
-        setError('Error checking membership status')
+
+        const { data: memberData, error: memberError } = await supabase
+          .from("users")
+          .select("is_member")
+          .eq("id", userData.user.id)
+          .maybeSingle()
+
+        if (memberError) {
+          console.error("[membership] Error checking membership status", memberError)
+        }
+
+        const { data: subscriptionData, error: subscriptionError } = await supabase
+          .from("subscriptions")
+          .select("status, end_date")
+          .eq("member_id", userData.user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (subscriptionError) {
+          console.error("[membership] Error checking subscription status", subscriptionError)
+        }
+
+        const subscription = subscriptionData as MembershipSubscription | null
+        const hasCurrentAccess = subscription
+          ? hasMembershipAccess({
+              status: subscription.status,
+              endDate: subscription.end_date,
+            })
+          : Boolean(memberData?.is_member)
+
+        setIsMember(hasCurrentAccess)
+      } catch (loadError) {
+        console.error("[membership] Error checking user status", loadError)
+        setError("Error al comprobar el estado de membresia")
       } finally {
         setIsLoading(false)
       }
@@ -109,26 +137,16 @@ export default function Membership() {
     checkUserAndMembership()
   }, [])
 
-  const handleSelectPlan = (planId: string) => {
+  const handleSelectPlan = (planId: PlanType) => {
     setSelectedPlan(planId)
     setSelectedPaymentOption(null)
-    setStep("select")
     setError(null)
   }
 
-  const handleSelectPaymentOption = (optionId: string) => {
-    setSelectedPaymentOption(optionId)
-  }
-
-  const scrollToTop = useCallback(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" })
-    document.documentElement.scrollTop = 0
-    document.body.scrollTop = 0
-  }, [])
-
-  // Initiate payment — prepare order and show InSite form
   const handleSubscribe = async () => {
-    if (!selectedPlan || !selectedPaymentOption) return
+    if (!selectedPlan || !selectedPaymentOption) {
+      return
+    }
 
     if (!user) {
       router.push("/login?redirect=/membership")
@@ -136,88 +154,38 @@ export default function Membership() {
     }
 
     setError(null)
-    scrollToTop()
     setStep("processing")
 
     try {
-      const result = await prepareMembershipPayment(
-        selectedPlan as PlanType,
-        selectedPaymentOption as PaymentInterval,
-      )
+      const result = await prepareMembershipRedirectPayment(selectedPlan, selectedPaymentOption)
 
-      if (!result.success || !result.order) {
-        setError(result.error || "Error al preparar el pago")
+      if (!result.success || !result.actionUrl || !result.signed || !result.order) {
+        setError(result.error || "No se pudo preparar el pago")
         setStep("select")
         return
       }
 
-      setOrderNumber(result.order)
-      setStep("payment")
-    } catch (err) {
-      console.error("Error preparing membership payment:", err)
-      setError("Error al preparar el pago. Inténtalo de nuevo.")
+      setRedirectActionUrl(result.actionUrl)
+      setRedirectSigned(result.signed)
+      setStep("redirecting")
+    } catch (prepareError) {
+      console.error("[membership] Error preparing redirect payment", prepareError)
+      setError("Error al preparar el pago")
       setStep("select")
     }
   }
 
-  // Handle idOper from InSite → execute payment with tokenization
-  const handleIdOperReceived = useCallback(
-    async (idOper: string) => {
-      if (!orderNumber) return
-      setStep("processing")
-      setError(null)
-
-      try {
-        const result = await executePayment(idOper, orderNumber, "membership")
-
-        if (result.success) {
-          setStep("success")
-        } else {
-          setError(result.error || "Pago denegado. Por favor, revisa los datos de tu tarjeta.")
-          setStep("payment")
-        }
-      } catch (err) {
-        console.error("Error executing membership payment:", err)
-        setError("Error al procesar el pago")
-        setStep("payment")
-      }
-    },
-    [orderNumber],
-  )
-
-  const handlePaymentError = useCallback((message: string) => {
-    setError(message)
-  }, [])
-
-  useEffect(() => {
-    if (step === "processing" || step === "payment" || step === "success") {
-      scrollToTop()
-      const raf = requestAnimationFrame(scrollToTop)
-      const timer = window.setTimeout(scrollToTop, 120)
-      const interval = window.setInterval(scrollToTop, 120)
-      const stopInterval = window.setTimeout(() => window.clearInterval(interval), 1200)
-      return () => {
-        cancelAnimationFrame(raf)
-        window.clearTimeout(timer)
-        window.clearInterval(interval)
-        window.clearTimeout(stopInterval)
-      }
-    }
-  }, [step, scrollToTop])
-
-  // Render loading state
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 md:py-24">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando información de membresía...</p>
+          <p className="mt-4 text-gray-600">Cargando informacion de membresia...</p>
         </div>
       </div>
     )
   }
 
-  // Render member UI if user is already a member
   if (isMember) {
     return (
       <div className="min-h-screen bg-gray-50 py-12 md:py-24 border-gray-500">
@@ -227,18 +195,16 @@ export default function Membership() {
               <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
                 <BadgeCheck className="h-8 w-8 text-green-600" />
               </div>
-              <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">¡Gracias por ser Socio!</h1>
-              <p className="text-lg text-gray-600">
-                Eres un miembro activo de la Peña Lorenzo Sanz.
-              </p>
+              <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Gracias por ser socio</h1>
+              <p className="text-lg text-gray-600">Eres un miembro activo de la Pena Lorenzo Sanz.</p>
             </div>
-            
+
             <div className="bg-gray-50 rounded-lg p-6 mb-8">
-              <h2 className="text-xl font-bold text-primary mb-4">Beneficios de tu membresía</h2>
+              <h2 className="text-xl font-bold text-primary mb-4">Beneficios de tu membresia</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex items-start">
                   <Award className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                  <span>Acceso a eventos exclusivos organizados por la peña</span>
+                  <span>Acceso a eventos exclusivos organizados por la pena</span>
                 </div>
                 <div className="flex items-start">
                   <Gift className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
@@ -246,7 +212,7 @@ export default function Membership() {
                 </div>
                 <div className="flex items-start">
                   <CheckCircle className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                  <span>Participación en sorteos y promociones exclusivas</span>
+                  <span>Participacion en sorteos y promociones exclusivas</span>
                 </div>
                 <div className="flex items-start">
                   <CheckCircle className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
@@ -254,14 +220,12 @@ export default function Membership() {
                 </div>
               </div>
             </div>
-            
+
             <div className="text-center">
-              <p className="mb-6 text-gray-600">
-                Gestiona tu membresía, actualiza tus datos o consulta información sobre renovación.
-              </p>
+              <p className="mb-6 text-gray-600">Gestiona tu membresia, actualiza tus datos o consulta renovaciones.</p>
               <Link href="/dashboard/membership">
                 <Button size="lg" className="px-6 py-5 text-lg hover:bg-white hover:text-black hover:border hover:border-black">
-                  Gestionar mi membresía
+                  Gestionar mi membresia
                 </Button>
               </Link>
             </div>
@@ -271,119 +235,40 @@ export default function Membership() {
     )
   }
 
-  // ── Success view ──────────────────────────────────────────────────────────
-  if (step === "success") {
-    return (
-      <div className="min-h-screen bg-gray-50 py-12 md:py-24">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-8 text-center">
-            <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
-              <CheckCircle className="h-8 w-8 text-green-600" />
-            </div>
-            <h1 className="text-3xl font-bold text-primary mb-4">¡Bienvenido a la Peña!</h1>
-            <p className="text-lg text-gray-600 mb-6">
-              Tu suscripción se ha activado correctamente. Ya eres socio de la Peña Lorenzo Sanz.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/dashboard/membership">
-                <Button size="lg" className="px-6">Gestionar mi membresía</Button>
-              </Link>
-              <Link href="/dashboard">
-                <Button size="lg" variant="outline" className="px-6">Ir al panel</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // ── Get selected plan/option helpers ─────────────────────────────────────
-  const selectedPlanData = membershipPlans.find((p) => p.id === selectedPlan)
-  const selectedOptionData = selectedPlanData?.paymentOptions.find((o) => o.id === selectedPaymentOption)
-
-  // ── Payment view (InSite card form) ─────────────────────────────────────
-  if (step === "payment" && orderNumber && selectedPlanData && selectedOptionData) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-12 md:py-24">
-        <div className="container mx-auto px-4">
-          <div className="max-w-xl mx-auto">
-
-            {/* Back button */}
-            <button
-              type="button"
-              onClick={() => { setStep("select"); setOrderNumber(null); setError(null) }}
-              className="flex items-center gap-2 text-gray-600 hover:text-primary mb-6 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" /> Volver a selección de plan
-            </button>
-
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <h2 className="text-xl font-bold text-primary mb-2">Resumen de tu suscripción</h2>
-              <div className="flex justify-between items-center py-3 border-b">
-                <span className="text-gray-600">{selectedPlanData.name}</span>
-                <span className="font-semibold">
-                  {selectedOptionData.price}
-                  <span className="text-sm font-normal text-gray-500">{selectedOptionData.period}</span>
-                </span>
-              </div>
-              {selectedOptionData.discount && (
-                <p className="text-sm text-green-600 mt-2">{selectedOptionData.discount}</p>
-              )}
-            </div>
-
-            {error && (
-              <Alert variant="destructive" className="mb-6">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-bold mb-4">Introduce los datos de tu tarjeta</h3>
-              <RedsysInSiteForm
-                order={orderNumber}
-                onIdOperReceived={handleIdOperReceived}
-                onError={handlePaymentError}
-                buttonText="Suscribirse y pagar"
-              />
-            </div>
-
-            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-gray-500">
-              <ShieldCheck className="h-4 w-4" />
-              <span>Pago seguro procesado por Redsys</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // ── Processing spinner ──────────────────────────────────────────────────
   if (step === "processing") {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 md:py-24">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-          <p className="mt-4 text-gray-600">Procesando tu pago...</p>
+          <p className="mt-4 text-gray-600">Preparando pasarela de pago...</p>
         </div>
       </div>
     )
   }
 
-  // ── Plan selection (default) ────────────────────────────────────────────
+  if (step === "redirecting" && redirectActionUrl && redirectSigned) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 md:py-24">
+        <div className="max-w-lg w-full bg-white rounded-lg shadow-md p-8 text-center">
+          <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
+          <h1 className="text-2xl font-bold text-primary mt-4">Redirigiendo a Redsys</h1>
+          <p className="text-gray-600 mt-2">No cierres esta pagina. Te llevamos al TPV seguro para completar el pago.</p>
+          <div className="mt-6">
+            <RedsysRedirectAutoSubmitForm actionUrl={redirectActionUrl} signed={redirectSigned} />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const selectedPlanData = membershipPlans.find((plan) => plan.id === selectedPlan)
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 md:py-24">
       <div className="container mx-auto px-4">
         <div className="text-center max-w-3xl mx-auto mb-12">
-          <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Hazte Socio de la Peña Lorenzo Sanz</h1>
-          <p className="text-lg text-gray-600">
-            Únete a nuestra comunidad madridista y disfruta de beneficios exclusivos para socios.
-          </p>
-          <br />
-          <p className="text-lg text-gray-600">
-            Selecciona cualquiera de los planes para ver los precios.
-          </p>
+          <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Hazte socio de la Pena Lorenzo Sanz</h1>
+          <p className="text-lg text-gray-600">Unete a nuestra comunidad madridista y disfruta de beneficios exclusivos.</p>
         </div>
 
         {error && (
@@ -396,30 +281,30 @@ export default function Membership() {
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {membershipPlans.map((plan) => (
-              <div
+              <button
                 key={plan.id}
-                className={`bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transition-all flex flex-col h-full ${
+                type="button"
+                className={`bg-white rounded-lg shadow-md overflow-hidden text-left transition-all flex flex-col h-full ${
                   plan.popular ? "border-2 border-secondary" : ""
                 } ${selectedPlan === plan.id ? "ring-2 ring-primary" : ""}`}
                 onClick={() => handleSelectPlan(plan.id)}
               >
-                <div className={`bg-primary text-white p-6 text-center relative`}>
+                <div className="bg-primary text-white p-6 text-center relative">
                   {plan.popular && (
                     <div className="absolute top-0 right-0 bg-accent text-primary text-xs font-bold px-3 py-1 transform translate-y-2 rotate-45">
                       POPULAR
                     </div>
                   )}
-                  <h2 className="text-2xl font-bold">{plan.name}</h2>
+                  <h2 className="text-xl font-bold">{plan.name}</h2>
                 </div>
                 <div className="p-6 flex-grow flex flex-col">
-                  {/* Price preview */}
                   <div className="mb-6 border-b pb-4">
                     <div className="flex justify-between items-center mb-2">
                       <div className="flex items-center">
                         <Calendar className="h-4 w-4 text-primary mr-1" />
                         <span className="text-sm">Mensual</span>
                       </div>
-                      <span className="font-bold">{plan.paymentOptions.find(o => o.id === "monthly")?.price}</span>
+                      <span className="font-bold">{plan.paymentOptions.find((opt) => opt.id === "monthly")?.price}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <div className="flex items-center">
@@ -427,73 +312,51 @@ export default function Membership() {
                         <span className="text-sm">Anual</span>
                       </div>
                       <div className="text-right">
-                        <span className="font-bold">{plan.paymentOptions.find(o => o.id === "annual")?.price}</span>
-                        {plan.paymentOptions.find(o => o.id === "annual")?.discount && (
-                          <div className="text-xs text-green-600">{plan.paymentOptions.find(o => o.id === "annual")?.discount}</div>
+                        <span className="font-bold">{plan.paymentOptions.find((opt) => opt.id === "annual")?.price}</span>
+                        {plan.paymentOptions.find((opt) => opt.id === "annual")?.discount && (
+                          <div className="text-xs text-green-600">{plan.paymentOptions.find((opt) => opt.id === "annual")?.discount}</div>
                         )}
                       </div>
                     </div>
                   </div>
                   <ul className="space-y-4 mb-auto">
-                    {plan.features.map((feature, index) => (
-                      <li key={index} className="flex items-start">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="flex items-start">
                         <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
                         <span>{feature}</span>
                       </li>
                     ))}
                   </ul>
-                  <div className="mt-8 pt-4">
-                    <Button
-                      className={`w-full ${
-                        selectedPlan === plan.id
-                          ? "bg-primary"
-                          : "bg-gray-200 text-black hover:bg-primary hover:text-white"
-                      }`}
-                      onClick={() => handleSelectPlan(plan.id)}
-                    >
-                      {selectedPlan === plan.id ? "Plan seleccionado" : "Seleccionar Plan"}
-                    </Button>
-                  </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
 
-          {selectedPlan && (
+          {selectedPlanData && (
             <div className="mt-8 bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-xl font-bold text-primary mb-4">Elige tu opción de pago</h3>
+              <h3 className="text-xl font-bold text-primary mb-4">Elige tu opcion de pago</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {membershipPlans
-                  .find((p) => p.id === selectedPlan)
-                  ?.paymentOptions.map((option) => (
-                    <div
-                      key={option.id}
-                      className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                        selectedPaymentOption === option.id ? "border-primary ring-2 ring-primary" : "border-gray-200"
-                      }`}
-                      onClick={() => handleSelectPaymentOption(option.id)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          {option.id === "monthly" ? (
-                            <Calendar className="h-5 w-5 text-primary mr-2" />
-                          ) : (
-                            <CreditCard className="h-5 w-5 text-primary mr-2" />
-                          )}
-                          <span className="font-medium">{option.name}</span>
+                {selectedPlanData.paymentOptions.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={`border rounded-lg p-4 text-left transition-all ${
+                      selectedPaymentOption === option.id ? "border-primary ring-2 ring-primary" : "border-gray-200"
+                    }`}
+                    onClick={() => setSelectedPaymentOption(option.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{option.name}</span>
+                      <div className="text-right">
+                        <div className="text-xl font-bold">
+                          {option.price}
+                          <span className="text-sm font-normal text-gray-500">{option.period}</span>
                         </div>
-                        <div className="text-right">
-                          <div className="text-xl font-bold">
-                            {option.price}
-                            <span className="text-sm font-normal text-gray-500">{option.period}</span>
-                          </div>
-                          {option.discount && (
-                            <div className="text-xs text-green-600 font-medium">{option.discount}</div>
-                          )}
-                        </div>
+                        {option.discount && <div className="text-xs text-green-600 font-medium">{option.discount}</div>}
                       </div>
                     </div>
-                  ))}
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -502,22 +365,16 @@ export default function Membership() {
             <Button
               size="lg"
               onClick={handleSubscribe}
-              disabled={!selectedPlan || !selectedPaymentOption || (step as PageStep) === "processing"}
+              disabled={!selectedPlan || !selectedPaymentOption}
               className="px-8 py-6 text-lg"
             >
-              {!user
-                ? "Iniciar Sesión para Suscribirse"
-                : (step as PageStep) === "processing"
-                  ? <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Preparando pago...</>
-                  : "Continuar con el pago"}
+              {!user ? "Iniciar sesion para suscribirse" : "Continuar con el pago"}
             </Button>
           </div>
 
           <div className="mt-12 bg-white rounded-lg shadow-md p-8 text-center">
-            <h2 className="text-2xl font-bold text-primary mb-4">¿Tienes preguntas sobre la membresía?</h2>
-            <p className="text-gray-600 mb-6">
-              Estamos aquí para ayudarte. Contáctanos para obtener más información sobre los beneficios de ser socio.
-            </p>
+            <h2 className="text-2xl font-bold text-primary mb-4">Tienes preguntas sobre la membresia?</h2>
+            <p className="text-gray-600 mb-6">Estamos aqui para ayudarte con cualquier duda sobre nuestros planes.</p>
             <Link href="/contact">
               <Button variant="outline" className="transition-colors duration-300 bg-black text-white hover:bg-white hover:text-black hover:border hover:border-black">
                 Contactar
