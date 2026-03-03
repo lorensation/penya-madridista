@@ -5,6 +5,7 @@ import type { User as SupabaseUser } from "@supabase/supabase-js"
 // User profile type - extends Supabase User type
 export interface UserProfile extends Omit<SupabaseUser, "app_metadata" | "user_metadata"> {
   role?: string
+  /** @deprecated Membership status is canonical in subscriptions.status */
   subscription_status?: string
   user_metadata?: {
     name?: string
@@ -96,15 +97,24 @@ export interface MemberData {
   cargo_directivo?: string | null
   created_at?: string | Date
   role?: string | null
-  // Subscription related fields
+  // Legacy fields kept for phase-2 compatibility only.
+  /** @deprecated Membership status is canonical in subscriptions.status */
   subscription_status?: string | null
+  /** @deprecated Plan is canonical in subscriptions.plan_type/payment_type */
   subscription_plan?: string | null
+  /** @deprecated Subscription id is canonical in subscriptions.id */
   subscription_id?: string | null
+  /** @deprecated Use subscriptions.updated_at */
   subscription_updated_at?: string | Date | null
+  /** @deprecated Card metadata is canonical in subscriptions.last_four */
   last_four?: string | null
+  /** @deprecated Token is canonical in subscriptions.redsys_token */
   redsys_token?: string | null
+  /** @deprecated Token expiry is canonical in subscriptions.redsys_token_expiry */
   redsys_token_expiry?: string | null
+  /** @deprecated Consent is canonical in users.email_notifications */
   email_notifications?: boolean | null
+  /** @deprecated Consent is canonical in users.marketing_emails */
   marketing_emails?: boolean | null
   auth_id?: string // For compatibility
   [key: string]: unknown // Allow for additional properties

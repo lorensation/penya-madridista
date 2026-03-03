@@ -3,7 +3,8 @@ import { NextResponse } from "next/server"
 
 export async function POST(request: Request) {
   try {
-    const { email, password, name } = await request.json()
+    const { email, password, name, subscribeToNewsletter } = await request.json()
+    const communicationsConsent = subscribeToNewsletter !== false
 
     if (!email || !password) {
       return NextResponse.json({ error: "Email and password are required" }, { status: 400 })
@@ -17,6 +18,7 @@ export async function POST(request: Request) {
       options: {
         data: {
           name,
+          subscribeToNewsletter: communicationsConsent,
         },
         emailRedirectTo: `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/auth/callback`,
       },
@@ -42,8 +44,10 @@ export async function POST(request: Request) {
         const { error: insertError } = await supabase.from("users").insert({
           id: data.user.id,
           email: email,
+          name: name || null,
           is_member: false,
-          // Remove the role field from here
+          email_notifications: communicationsConsent,
+          marketing_emails: communicationsConsent,
         })
 
         if (insertError) {

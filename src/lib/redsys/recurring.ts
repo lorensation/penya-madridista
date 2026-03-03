@@ -287,15 +287,6 @@ async function handleRenewalFailure(
       })
       .eq("id", sub.id as string)
 
-    // Update miembros
-    await admin
-      .from("miembros")
-      .update({
-        subscription_status: "expired",
-        subscription_updated_at: new Date().toISOString(),
-      })
-      .eq("user_uuid", sub.member_id as string)
-
     // Update users.is_member
     await admin
       .from("users")
@@ -315,15 +306,6 @@ async function handleRenewalFailure(
         updated_at: new Date().toISOString(),
       })
       .eq("id", sub.id as string)
-
-    // Also flag miembros table
-    await admin
-      .from("miembros")
-      .update({
-        subscription_status: "past_due",
-        subscription_updated_at: new Date().toISOString(),
-      })
-      .eq("user_uuid", sub.member_id as string)
 
     console.warn(
       `[recurring] ✗ Sub ${sub.id} renewal failed (attempt ${failures}/${MAX_RETRIES}): ${chargeResult.error}`,
@@ -363,14 +345,6 @@ export async function expireCanceledSubscriptions(): Promise<{
         updated_at: new Date().toISOString(),
       })
       .eq("id", sub.id)
-
-    await admin
-      .from("miembros")
-      .update({
-        subscription_status: "expired",
-        subscription_updated_at: new Date().toISOString(),
-      })
-      .eq("user_uuid", sub.member_id)
 
     await admin
       .from("users")

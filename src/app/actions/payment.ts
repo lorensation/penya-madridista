@@ -99,6 +99,27 @@ function getRedirectReturnUrls(context: PaymentContext, order: string, userId?: 
   }
 }
 
+function getCardUpdateReturnUrls(order: string) {
+  const base = getBaseUrl().replace(/\/+$/, "")
+  const encodedOrder = encodeURIComponent(order)
+
+  return {
+    ok: `${base}/dashboard/membership/card-update/ok?order=${encodedOrder}`,
+    ko: `${base}/dashboard/membership/card-update/ko?order=${encodedOrder}`,
+  }
+}
+
+function getCardUpdateAmountCents(): number {
+  const raw = process.env.REDSYS_CARD_UPDATE_AMOUNT_CENTS
+  const parsed = Number.parseInt(raw ?? "0", 10)
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0
+  }
+
+  return Math.trunc(parsed)
+}
+
 function normalizeBase64Payload(value: string): string {
   return value.replace(/ /g, "+").replace(/-/g, "+").replace(/_/g, "/")
 }
@@ -579,14 +600,6 @@ export async function cancelMembershipSubscription(): Promise<{
       })
       .eq("id", subscription.id)
 
-    await admin
-      .from("miembros")
-      .update({
-        subscription_status: "canceled",
-        subscription_updated_at: new Date().toISOString(),
-      })
-      .eq("user_uuid", user.id)
-
     revalidatePath("/dashboard/membership")
 
     return { success: true }
@@ -613,25 +626,36 @@ export async function prepareCardUpdate(): Promise<PrepareRedirectPaymentResult>
 
     const admin = getAdminClient()
 
-    const { data: subscription } = await admin
+    const { data: subscription, error: subscriptionError } = await admin
       .from("subscriptions")
       .select("id")
       .eq("member_id", user.id)
       .in("status", ["active", "canceled"])
-      .single()
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (subscriptionError) {
+      console.error("[payment] Failed loading subscription for card update", {
+        memberId: user.id,
+        error: subscriptionError,
+      })
+      return { success: false, error: "No se pudo cargar la suscripcion actual" }
+    }
 
     if (!subscription) {
       return { success: false, error: "No se encontro una suscripcion" }
     }
 
     const order = generateOrderNumber("M")
+    const amountCents = getCardUpdateAmountCents()
 
     const { data: transaction, error: insertError } = await admin
       .from("payment_transactions")
       .insert({
         redsys_order: order,
-        transaction_type: "0",
-        amount_cents: 0,
+        transaction_type: "7",
+        amount_cents: amountCents,
         currency: "978",
         status: "pending",
         context: "membership",
@@ -647,11 +671,26 @@ export async function prepareCardUpdate(): Promise<PrepareRedirectPaymentResult>
       return { success: false, error: "Error al preparar la actualizacion" }
     }
 
+    const returnUrls = getCardUpdateReturnUrls(order)
+    const signed = buildSignedRequest({
+      DS_MERCHANT_TRANSACTIONTYPE: "7",
+      DS_MERCHANT_ORDER: order,
+      DS_MERCHANT_AMOUNT: String(amountCents),
+      DS_MERCHANT_URLOK: returnUrls.ok,
+      DS_MERCHANT_URLKO: returnUrls.ko,
+      DS_MERCHANT_PRODUCTDESCRIPTION: "Actualizacion de tarjeta - Pena Lorenzo Sanz",
+      DS_MERCHANT_IDENTIFIER: "REQUIRED",
+      DS_MERCHANT_COF_INI: "S",
+      DS_MERCHANT_COF_TYPE: "R",
+    })
+
     return {
       success: true,
       order,
-      amountCents: 0,
+      amountCents,
       transactionId: transaction.id,
+      actionUrl: getRealizarPagoUrl(),
+      signed,
     }
   } catch (error) {
     console.error("[payment] prepareCardUpdate failed", { error })
@@ -659,6 +698,9 @@ export async function prepareCardUpdate(): Promise<PrepareRedirectPaymentResult>
   }
 }
 
+/**
+ * @deprecated Kept only for backward compatibility. Use redirect flow via prepareCardUpdate.
+ */
 export async function executeCardUpdate(
   idOper: string,
   order: string,
@@ -729,6 +771,7 @@ export async function executeCardUpdate(
       await admin
         .from("subscriptions")
         .update({
+          last_four: result.lastFour ?? null,
           redsys_token: result.redsysToken,
           redsys_token_expiry: result.redsysTokenExpiry ?? null,
           redsys_cof_txn_id: result.cofTxnId ?? null,
@@ -736,15 +779,6 @@ export async function executeCardUpdate(
         })
         .eq("member_id", memberId)
         .eq("status", "active")
-
-      await admin
-        .from("miembros")
-        .update({
-          last_four: result.lastFour ?? null,
-          redsys_token: result.redsysToken,
-          redsys_token_expiry: result.redsysTokenExpiry ?? null,
-        })
-        .eq("user_uuid", memberId)
 
       revalidatePath("/dashboard/membership")
     }

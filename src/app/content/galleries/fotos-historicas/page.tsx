@@ -9,13 +9,8 @@ import { ArrowLeft, AlertTriangle } from "lucide-react"
 import { ImageGallery } from "@/components/ui/image-gallery"
 import { createBrowserSupabaseClient } from "@/lib/supabase"
 import { hasMembershipAccess } from "@/lib/membership-access"
+import { getLatestSubscriptionByUserId } from "@/lib/data/subscription"
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js"
-
-interface Profile {
-  id: string
-  subscription_status: string
-  [key: string]: string | null | boolean | number
-}
 
 interface Subscription {
   status: string | null
@@ -24,7 +19,6 @@ interface Subscription {
 
 export default function HistoricGalleryPage() {
   const router = useRouter()
-  const [profile, setProfile] = useState<Profile | null>(null)
   const [subscriptionData, setSubscriptionData] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -67,29 +61,10 @@ export default function HistoricGalleryPage() {
         // Now get the user data using the session's user
         const userId = sessionData.session.user.id;
         
-        // Fetch user profile directly using the session's user ID
-        const { data: profileData, error: profileError } = await supabase
-          .from("miembros")
-          .select("*")
-          .eq("id", userId)
-          .single()
-
-        if (profileError) {
-          console.log("Profile fetch error:", profileError)
-          if (isMounted) {
-            setProfile(null)
-          }
-        } else if (isMounted) {
-          setProfile(profileData as Profile)
-        }
-
-        const { data: latestSubscription, error: subscriptionError } = await supabase
-          .from("subscriptions")
-          .select("status, end_date")
-          .eq("member_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle()
+        const { data: latestSubscription, error: subscriptionError } = await getLatestSubscriptionByUserId(
+          supabase,
+          userId,
+        )
 
         if (subscriptionError) {
           console.error("Subscription fetch error:", subscriptionError)
@@ -183,7 +158,7 @@ export default function HistoricGalleryPage() {
     )
   }
 
-  const subscriptionStatus = subscriptionData?.status || profile?.subscription_status || "inactive"
+  const subscriptionStatus = subscriptionData?.status || "inactive"
   const isSubscribed = hasMembershipAccess({
     status: subscriptionStatus,
     endDate: subscriptionData?.end_date ?? null,

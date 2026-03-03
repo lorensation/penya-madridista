@@ -5,6 +5,9 @@ import type React from "react"
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { getOptionalMemberProfile } from "@/lib/data/member-profile"
+import { getLatestSubscriptionByUserId } from "@/lib/data/subscription"
+import { getMembershipPlanLabel } from "@/lib/membership/plan-label"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -57,9 +60,18 @@ interface UserData {
   email: string
   name?: string | null
   is_member?: boolean
+  email_notifications?: boolean | null
+  marketing_emails?: boolean | null
   created_at?: string
   updated_at?: string | null
   [key: string]: unknown // For any other properties that might exist
+}
+
+interface SubscriptionData {
+  status: string | null
+  end_date: string | null
+  plan_type: string | null
+  payment_type: string | null
 }
 
 export default function SettingsPage() {
@@ -67,6 +79,7 @@ export default function SettingsPage() {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [memberData, setMemberData] = useState<MemberData | null>(null)
+  const [membershipSubscription, setMembershipSubscription] = useState<SubscriptionData | null>(null)
   const [isUser, setIsUser] = useState<boolean>(false)
   const [isMiembro, setIsMiembro] = useState<boolean>(false)
   const [loading, setLoading] = useState(true)
@@ -101,6 +114,8 @@ export default function SettingsPage() {
       ...prevData,
       name: userRecord.name || "",
       email: userRecord.email || "",
+      emailNotifications: userRecord.email_notifications !== false,
+      marketingEmails: userRecord.marketing_emails !== false,
     }))
   }, []);
 
@@ -117,42 +132,31 @@ export default function SettingsPage() {
       postalCode: memberRecord.cp?.toString() || "",
       province: memberRecord.provincia || "",
       country: memberRecord.pais || "",
-      emailNotifications: memberRecord.email_notifications !== false,
-      marketingEmails: memberRecord.marketing_emails !== false,
     }))
   }, []);
 
   // Load member data from miembros table - wrapped in useCallback
   const loadMemberDataFromTable = useCallback(async (userId: string) => {
     try {
-      // Try to get member data using user_uuid
-      const { data: memberRecord, error: memberError } = await supabase
-        .from("miembros")
-        .select("*")
-        .eq("user_uuid", userId)
-        .single()
+      const { data: memberRecord, error: memberError } = await getOptionalMemberProfile(
+        supabase,
+        userId,
+      )
 
       if (memberError) {
-        // Try with auth_id instead
-        const { data: memberDataById } = await supabase
-          .from("miembros")
-          .select("*")
-          .eq("id", userId)
-          .single()
-        
-          if (memberDataById !== null) {
-            setMemberData(memberDataById)
-            updateFormWithMemberData(memberDataById)
-            return true
-          } else {
-            console.log("both fetches didnt work")
-          }
-        
-      } else {
+        console.error("Error loading member data:", memberError)
+        setMemberData(null)
+        return false
+      }
+
+      if (memberRecord) {
         setMemberData(memberRecord)
         updateFormWithMemberData(memberRecord)
         return true
       }
+
+      setMemberData(null)
+      return false
     } catch (error) {
       console.error("Error loading member data:", error)
       return false
@@ -181,6 +185,26 @@ export default function SettingsPage() {
 
       setUser(userProfile)
 
+      const { data: subscriptionData, error: subscriptionError } = await getLatestSubscriptionByUserId(
+        supabase,
+        userData.user.id,
+      )
+      if (subscriptionError) {
+        console.error("Error fetching subscription data:", subscriptionError)
+        setMembershipSubscription(null)
+      } else {
+        setMembershipSubscription(
+          subscriptionData
+            ? {
+                status: subscriptionData.status,
+                end_date: subscriptionData.end_date,
+                plan_type: subscriptionData.plan_type,
+                payment_type: subscriptionData.payment_type,
+              }
+            : null,
+        )
+      }
+
       // Step 2: Check if user exists in "users" table
       const { data: publicUserData, error: publicUserError } = await supabase
         .from("users")
@@ -198,6 +222,8 @@ export default function SettingsPage() {
               email: userData.user.email!,
               name: userData.user.user_metadata?.name || "",
               is_member: false,
+              email_notifications: true,
+              marketing_emails: true,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             })
@@ -207,8 +233,12 @@ export default function SettingsPage() {
             console.error("Error creating user record:", insertError)
             setIsUser(false)
           } else {
-            setUserData(newUser?.[0] || null)
+            const createdUser = newUser?.[0] || null
+            setUserData(createdUser)
             setIsUser(true)
+            if (createdUser) {
+              updateFormWithUserData(createdUser)
+            }
           }
         } else {
           console.error("Error fetching user data:", publicUserError)
@@ -237,8 +267,6 @@ export default function SettingsPage() {
               user_uuid: userData.user.id,
               email: userData.user.email || "",
               name: publicUserData.name || userData.user.user_metadata?.name || "",
-              email_notifications: true,
-              marketing_emails: true,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
               es_socio_realmadrid: false,
@@ -401,35 +429,17 @@ export default function SettingsPage() {
       pais: formData.country,
     }
 
-    // Try user_uuid first
-    let updated = false;
-    if (memberData?.user_uuid) {
-      const { error: updateError } = await supabase
-        .from("miembros")
-        .update(updateData)
-        .eq("user_uuid", memberData.user_uuid)
-
-      if (!updateError) updated = true;
+    if (!memberData?.user_uuid) {
+      throw new Error("No se encontro correlacion user_uuid para el perfil de miembro")
     }
 
-    // If not updated yet, try auth_id
-    if (!updated && memberData?.auth_id) {
-      const { error: updateError } = await supabase
-        .from("miembros")
-        .update(updateData)
-        .eq("auth_id", memberData.auth_id)
+    const { error: updateError } = await supabase
+      .from("miembros")
+      .update(updateData)
+      .eq("user_uuid", memberData.user_uuid)
 
-      if (!updateError) updated = true;
-    }
-
-    // If still not updated, try id as last resort
-    if (!updated && memberData?.id) {
-      const { error: updateError } = await supabase
-        .from("miembros")
-        .update(updateData)
-        .eq("id", memberData.id)
-
-      if (updateError) throw updateError;
+    if (updateError) {
+      throw updateError
     }
     
     // Refresh member data after update
@@ -526,97 +536,32 @@ export default function SettingsPage() {
         throw new Error("Usuario no encontrado")
       }
 
-      // If user is not a member yet, ask if they want to become one
-      if (!isMiembro) {
-        // Update users table to mark as member
-        const { error: userUpdateError } = await supabase
-          .from("users")
-          .update({
-            is_member: true,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", user.id)
+      const nowIso = new Date().toISOString()
 
-        if (userUpdateError) {
-          throw userUpdateError
-        }
-
-        // Create a new member record
-        const newMemberData = {
-          user_uuid: user.id,
-          email: user?.email || userData?.email || "",
-          name: formData.name || user?.user_metadata?.name || "",
+      const { error: userPreferencesError } = await supabase
+        .from("users")
+        .update({
           email_notifications: formData.emailNotifications,
           marketing_emails: formData.marketingEmails,
-          es_socio_realmadrid: false,
-          fecha_nacimiento: "1990-01-01",
-          socio_carnet_madridista: false,
-          telefono: 0,
-        }
+          updated_at: nowIso,
+        })
+        .eq("id", user.id)
 
-        const { error: createMemberError } = await supabase
-          .from("miembros")
-          .insert(newMemberData)
-
-        if (createMemberError) {
-          throw createMemberError
-        }
-
-        // Update state
-        setIsMiembro(true)
-        
-        // Refresh data
-        await loadMemberDataFromTable(user.id)
-        
-        // Refresh user data
-        const { data: refreshedUserData } = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", user.id)
-          .single()
-          
-        if (refreshedUserData) {
-          setUserData(refreshedUserData)
-        }
-
-        setSuccess("Te has convertido en miembro y tus preferencias han sido actualizadas correctamente")
-        return
+      if (userPreferencesError) {
+        throw userPreferencesError
       }
 
-      // If already a member, just update preferences
-      // Try all possible ID fields for compatibility
-      let updated = false;
-      
-      // Try user_uuid first
-      if (memberData?.user_uuid) {
-        const { error: updateError } = await supabase
-          .from("miembros")
-          .update({
-            email_notifications: formData.emailNotifications,
-            marketing_emails: formData.marketingEmails,
-          })
-          .eq("user_uuid", memberData.user_uuid)
-          
-        if (!updateError) updated = true;
-      }
-      
-      // Try auth_id if not updated yet
-      if (!updated && memberData?.auth_id) {
-        const { error: updateError } = await supabase
-          .from("miembros")
-          .update({
-            email_notifications: formData.emailNotifications,
-            marketing_emails: formData.marketingEmails,
-          })
-          .eq("id", memberData.auth_id)
-          
-        if (!updateError) updated = true;
-      }
+      setUserData((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          email_notifications: formData.emailNotifications,
+          marketing_emails: formData.marketingEmails,
+          updated_at: nowIso,
+        }
+      })
 
-      setSuccess("Preferencias de comunicación actualizadas correctamente")
-      
-      // Refresh member data
-      await loadMemberDataFromTable(user.id)
+      setSuccess("Preferencias de comunicacion actualizadas correctamente")
     } catch (error: unknown) {
       console.error("Error updating preferences:", error)
       setError(error instanceof Error ? error.message : "No se pudieron actualizar las preferencias")
@@ -624,8 +569,7 @@ export default function SettingsPage() {
       setSaving(false)
     }
   }
-
-  const handleSendPasswordReset = async () => {
+const handleSendPasswordReset = async () => {
     try {
       if (!user?.email) {
         throw new Error("No se pudo encontrar el correo electrónico asociado a tu cuenta")
@@ -738,6 +682,25 @@ export default function SettingsPage() {
     )
   }
 
+  const subscriptionStatus = membershipSubscription?.status || "inactive"
+  const subscriptionStatusLabel =
+    subscriptionStatus === "active"
+      ? "Activa"
+      : subscriptionStatus === "trialing"
+        ? "Prueba"
+        : subscriptionStatus === "canceled"
+          ? "Cancelada"
+          : subscriptionStatus === "past_due"
+            ? "Pago pendiente"
+            : "Inactiva"
+  const membershipPlanLabel = membershipSubscription?.plan_type
+    ? getMembershipPlanLabel({
+        planType: membershipSubscription.plan_type,
+        paymentType: membershipSubscription.payment_type,
+      })
+    : null
+  const hasActiveMembership = subscriptionStatus === "active" || subscriptionStatus === "trialing"
+
   // Main settings page UI for authenticated users
   return (
     <div className="space-y-6 p-6 md:p-8">
@@ -793,22 +756,22 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
         
-        <Card className={`flex-1 ${isMiembro ? "border-green-200" : "border-yellow-200"}`}>
+        <Card className={`flex-1 ${hasActiveMembership ? "border-green-200" : isMiembro ? "border-orange-200" : "border-yellow-200"}`}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Estado de Membresía</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
-              <div className={`w-3 h-3 rounded-full mr-2 ${isMiembro ? "bg-green-500" : "bg-yellow-500"}`}></div>
+              <div className={`w-3 h-3 rounded-full mr-2 ${hasActiveMembership ? "bg-green-500" : isMiembro ? "bg-orange-500" : "bg-yellow-500"}`}></div>
               <span className="text-sm">
                 {isMiembro ? (
                   <>
                     <Badge className="mr-2" variant="outline">
-                      {memberData?.subscription_status === "active" ? "Activa" : "Pendiente"}
+                      {subscriptionStatusLabel}
                     </Badge>
-                    {memberData?.subscription_plan && (
+                    {membershipPlanLabel && (
                       <Badge className="bg-primary/20 text-primary border-primary">
-                        {memberData.subscription_plan}
+                        {membershipPlanLabel}
                       </Badge>
                     )}
                   </>
@@ -974,7 +937,7 @@ export default function SettingsPage() {
           </Card>
           
           {/* Additional information if editing member profile */}
-          {editTable === "miembros" && isMiembro && memberData?.subscription_status === "active" && (
+          {editTable === "miembros" && isMiembro && hasActiveMembership && (
             <Card>
               <CardHeader>
                 <CardTitle>Información de Suscripción</CardTitle>
@@ -984,33 +947,26 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm font-medium">Estado de suscripción</p>
-                    <Badge className="mt-1" variant={memberData.subscription_status === "active" ? "default" : "outline"}>
-                      {memberData.subscription_status === "active" ? "Activa" : "Inactiva"}
+                    <Badge className="mt-1" variant={subscriptionStatus === "active" ? "default" : "outline"}>
+                      {subscriptionStatusLabel}
                     </Badge>
                   </div>
-                  
+
                   <div>
                     <p className="text-sm font-medium">Plan</p>
-                    <p className="text-sm mt-1">{memberData.subscription_plan || "Estándar"}</p>
+                    <p className="text-sm mt-1">{membershipPlanLabel || "Sin plan activo"}</p>
                   </div>
-                  
-                  {memberData.subscription_updated_at && (
+
+
+                  {membershipSubscription?.end_date && (
                     <div>
-                      <p className="text-sm font-medium">Última actualización</p>
+                      <p className="text-sm font-medium">Renovacion / fin de periodo</p>
                       <p className="text-sm mt-1">
-                        {new Date(memberData.subscription_updated_at).toLocaleDateString('es-ES')}
+                        {new Date(membershipSubscription.end_date).toLocaleDateString("es-ES")}
                       </p>
                     </div>
                   )}
-                  
-                  {memberData.subscription_id && (
-                    <div>
-                      <p className="text-sm font-medium">ID de suscripción</p>
-                      <p className="text-sm mt-1 font-mono">{memberData.subscription_id.substring(0, 12)}...</p>
-                    </div>
-                  )}
                 </div>
-                
                 <Separator />
                 
                 <div className="flex justify-end">
@@ -1065,18 +1021,13 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <div className="flex justify-end">
-                  <Button 
-                    type="submit" 
-                    className={`transition-all hover:bg-white hover:text-primary hover:border hover:border-black ${!isMiembro ? "bg-primary" : ""}`} 
+                  <Button
+                    type="submit"
+                    className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
                     disabled={saving}
                   >
                     {saving ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : !isMiembro ? (
-                      <>
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Convertirme en miembro
-                      </>
                     ) : (
                       <>
                         <Save className="mr-2 h-4 w-4" />
@@ -1085,12 +1036,6 @@ export default function SettingsPage() {
                     )}
                   </Button>
                 </div>
-                
-                {!isMiembro && (
-                  <p className="text-sm text-gray-500 mt-2">
-                    Al convertirte en miembro, se creará un registro en la base de datos con estas preferencias.
-                  </p>
-                )}
               </form>
             </CardContent>
           </Card>

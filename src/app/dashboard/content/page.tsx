@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { FileText, Video, Download, AlertTriangle, AlertCircle, CheckCircle } from "lucide-react"
 import { createBrowserSupabaseClient } from "@/lib/supabase"
 import { hasMembershipAccess } from "@/lib/membership-access"
+import { getLatestSubscriptionByUserId } from "@/lib/data/subscription"
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js"
 
 // Define types for our content
@@ -89,13 +90,6 @@ const exclusiveContent: ContentItem[] = [
   }, 
 ]
 
-// Define types for profile
-interface Profile {
-  id: string
-  subscription_status: string
-  [key: string]: string | null | boolean | number
-}
-
 interface Subscription {
   status: string | null
   end_date: string | null
@@ -103,7 +97,6 @@ interface Subscription {
 
 export default function ContentPage() {
   const router = useRouter()
-  const [profile, setProfile] = useState<Profile | null>(null)
   const [membershipSubscription, setMembershipSubscription] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -146,30 +139,10 @@ export default function ContentPage() {
         // Now get the user data using the session's user
         const userId = sessionData.session.user.id;
         
-        // Fetch user profile directly using the session's user ID
-        const { data: profileData, error: profileError } = await supabase
-          .from("miembros")
-          .select("*")
-          .eq("id", userId)
-          .single()
-
-        if (profileError) {
-          console.log("Profile fetch error:", profileError)
-          // Don't throw error, just set profile to null
-          if (isMounted) {
-            setProfile(null)
-          }
-        } else if (isMounted) {
-          setProfile(profileData as Profile)
-        }
-
-        const { data: subscriptionData, error: subscriptionError } = await supabase
-          .from("subscriptions")
-          .select("status, end_date")
-          .eq("member_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle()
+        const { data: subscriptionData, error: subscriptionError } = await getLatestSubscriptionByUserId(
+          supabase,
+          userId,
+        )
 
         if (subscriptionError) {
           console.error("Subscription fetch error:", subscriptionError)
@@ -177,7 +150,14 @@ export default function ContentPage() {
             setMembershipSubscription(null)
           }
         } else if (isMounted) {
-          setMembershipSubscription(subscriptionData as Subscription | null)
+          setMembershipSubscription(
+            subscriptionData
+              ? {
+                  status: subscriptionData.status,
+                  end_date: subscriptionData.end_date,
+                }
+              : null,
+          )
         }
       } catch (err: unknown) {
         const errorMsg = err instanceof Error ? err.message : "Failed to load user data"
@@ -262,7 +242,7 @@ export default function ContentPage() {
     )
   }
 
-  const subscriptionStatus = membershipSubscription?.status || profile?.subscription_status || "inactive"
+  const subscriptionStatus = membershipSubscription?.status || "inactive"
   const isSubscribed = hasMembershipAccess({
     status: subscriptionStatus,
     endDate: membershipSubscription?.end_date ?? null,

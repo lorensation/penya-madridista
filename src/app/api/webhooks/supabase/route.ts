@@ -37,6 +37,7 @@ export async function POST(request: Request) {
     if (event === "user.created") {
       // User was created in Auth
       const user = payload.record
+      const communicationsConsent = user.user_metadata?.subscribeToNewsletter !== false
 
       try {
         // Use a separate supabase client for this operation to avoid transaction issues
@@ -44,8 +45,10 @@ export async function POST(request: Request) {
         const { error: insertError } = await supabase.from("users").insert({
           id: user.id,
           email: user.email || "",
+          name: user.user_metadata?.name || null,
           is_member: false,
-          // Remove role field from here
+          email_notifications: communicationsConsent,
+          marketing_emails: communicationsConsent,
         })
 
         if (insertError) {

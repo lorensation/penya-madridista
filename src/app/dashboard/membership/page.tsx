@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,33 +9,23 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   cancelMembershipSubscription,
   prepareCardUpdate,
-  executeCardUpdate,
 } from "@/app/actions/payment"
 import { createBrowserSupabaseClient } from "@/lib/supabase"
 import { hasMembershipAccess } from "@/lib/membership-access"
-import { RedsysInSiteForm } from "@/components/shop/redsys-insite-form"
-import { CheckCircle, AlertCircle, CreditCard, Loader2, ShieldCheck, X } from "lucide-react"
+import { getLatestSubscriptionByUserId } from "@/lib/data/subscription"
+import { getMembershipPlanLabel } from "@/lib/membership/plan-label"
+import { RedsysRedirectAutoSubmitForm } from "@/components/payments/redsys-redirect-form"
+import type { RedsysSignedRequest } from "@/lib/redsys"
+import { CheckCircle, AlertCircle, CreditCard, Loader2 } from "lucide-react"
 
-// Membership data from miembros table
-interface Membership {
-  id: string
-  user_uuid: string
-  subscription_status?: "active" | "trialing" | "canceled" | "incomplete" | "past_due" | "expired" | "inactive"
-  subscription_plan?: string
-  subscription_updated_at?: string
-  last_four?: string
-  redsys_token?: string
-  redsys_token_expiry?: string
-}
-
-// Subscription data
 interface SubscriptionData {
   id: string
   plan_type: string
   payment_type: string
   status: string
-  start_date: string
-  end_date: string
+  last_four: string | null
+  start_date: string | null
+  end_date: string | null
   cancel_at_period_end?: boolean
   canceled_at?: string
 }
@@ -46,22 +36,19 @@ export default function MembershipPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
-  const [membership, setMembership] = useState<Membership | null>(null)
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null)
   const [canceling, setCanceling] = useState(false)
 
-  // Card update flow
-  const [showCardUpdate, setShowCardUpdate] = useState(false)
-  const [cardUpdateOrder, setCardUpdateOrder] = useState<string | null>(null)
   const [cardUpdateLoading, setCardUpdateLoading] = useState(false)
+  const [redirectActionUrl, setRedirectActionUrl] = useState<string | null>(null)
+  const [redirectSigned, setRedirectSigned] = useState<RedsysSignedRequest | null>(null)
 
   const supabase = createBrowserSupabaseClient()
-
   const successParam = searchParams?.get("success") === "true"
 
   useEffect(() => {
     if (successParam) {
-      setSuccessMsg("¡Tu suscripción se ha procesado correctamente! Ya eres miembro oficial de la Peña Lorenzo Sanz.")
+      setSuccessMsg("Tu suscripcion se ha procesado correctamente. Ya eres miembro de la Pena Lorenzo Sanz.")
     }
   }, [successParam])
 
@@ -76,44 +63,20 @@ export default function MembershipPage() {
           return
         }
 
-        // Fetch membership
-        const { data: memberData } = await supabase
-          .from("miembros")
-          .select("*")
-          .eq("user_uuid", userData.user.id)
-          .single()
-
-        if (!memberData) {
-          // Fallback: try by id
-          const { data: memberById } = await supabase
-            .from("miembros")
-            .select("*")
-            .eq("id", userData.user.id)
-            .single()
-
-          setMembership((memberById as Membership) ?? null)
-        } else {
-          setMembership(memberData as Membership)
-        }
-
-        // Fetch subscription details
-        const { data: subData, error: subError } = await supabase
-          .from("subscriptions")
-          .select("*")
-          .eq("member_id", userData.user.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle()
+        const { data: subData, error: subError } = await getLatestSubscriptionByUserId(
+          supabase,
+          userData.user.id,
+        )
 
         if (subError) {
           console.error("Subscription fetch error:", subError)
           setSubscription(null)
-        } else if (subData) {
-          setSubscription(subData as SubscriptionData)
+        } else {
+          setSubscription((subData as SubscriptionData) ?? null)
         }
       } catch (err) {
         console.error("Error loading membership data:", err)
-        setError("Ocurrió un error al cargar los datos de membresía")
+        setError("Ocurrio un error al cargar los datos de membresia")
       } finally {
         setLoading(false)
       }
@@ -122,9 +85,8 @@ export default function MembershipPage() {
     loadData()
   }, [router, supabase])
 
-  // ── Cancel subscription ─────────────────────────────────────────────────
   const handleCancelSubscription = async () => {
-    if (!confirm("¿Estás seguro de que deseas cancelar tu suscripción? Seguirá activa hasta el final del período actual.")) {
+    if (!confirm("Estas seguro de que deseas cancelar tu suscripcion? Seguira activa hasta el final del periodo actual.")) {
       return
     }
 
@@ -134,109 +96,70 @@ export default function MembershipPage() {
 
       const result = await cancelMembershipSubscription()
       if (result.success) {
-        setMembership((prev) =>
-          prev ? { ...prev, subscription_status: "canceled" } : null,
-        )
         if (subscription) {
           setSubscription({ ...subscription, status: "canceled", cancel_at_period_end: true })
         }
-        setSuccessMsg("Tu suscripción se cancelará al final del período de facturación actual.")
+        setSuccessMsg("Tu suscripcion se cancelara al final del periodo de facturacion actual.")
       } else {
-        setError(result.error || "No se pudo cancelar la suscripción")
+        setError(result.error || "No se pudo cancelar la suscripcion")
       }
     } catch (err) {
       console.error("Error canceling subscription:", err)
-      setError("No se pudo cancelar la suscripción")
+      setError("No se pudo cancelar la suscripcion")
     } finally {
       setCanceling(false)
     }
   }
 
-  // ── Card update flow ────────────────────────────────────────────────────
   const handleStartCardUpdate = async () => {
     setError(null)
     setCardUpdateLoading(true)
+    setRedirectActionUrl(null)
+    setRedirectSigned(null)
 
     try {
       const result = await prepareCardUpdate()
-      if (!result.success || !result.order) {
-        setError(result.error || "Error al preparar la actualización de tarjeta")
-        setCardUpdateLoading(false)
+      if (!result.success || !result.actionUrl || !result.signed) {
+        setError(result.error || "Error al preparar la actualizacion de tarjeta")
         return
       }
 
-      setCardUpdateOrder(result.order)
-      setShowCardUpdate(true)
+      setRedirectActionUrl(result.actionUrl)
+      setRedirectSigned(result.signed)
     } catch (err) {
       console.error("Error preparing card update:", err)
-      setError("Error al preparar la actualización de tarjeta")
+      setError("Error al preparar la actualizacion de tarjeta")
     } finally {
       setCardUpdateLoading(false)
     }
   }
-
-  const handleCardUpdateIdOper = useCallback(
-    async (idOper: string) => {
-      if (!cardUpdateOrder) return
-      setCardUpdateLoading(true)
-      setError(null)
-
-      try {
-        const result = await executeCardUpdate(idOper, cardUpdateOrder)
-        if (result.success) {
-          setSuccessMsg("¡Tarjeta actualizada correctamente!")
-          setShowCardUpdate(false)
-          setCardUpdateOrder(null)
-          // Update displayed last_four
-          if (result.lastFour) {
-            setMembership((prev) =>
-              prev ? { ...prev, last_four: result.lastFour } : null,
-            )
-          }
-        } else {
-          setError(result.error || "No se pudo actualizar la tarjeta")
-        }
-      } catch (err) {
-        console.error("Error executing card update:", err)
-        setError("Error al actualizar la tarjeta")
-      } finally {
-        setCardUpdateLoading(false)
-      }
-    },
-    [cardUpdateOrder],
-  )
-
-  const handleCardUpdateError = useCallback((message: string) => {
-    setError(message)
-  }, [])
 
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando información de membresía...</p>
+          <p className="mt-4 text-gray-600">Cargando informacion de membresia...</p>
         </div>
       </div>
     )
   }
 
-  const effectiveStatus = subscription?.status || membership?.subscription_status || "inactive"
+  const effectiveStatus = subscription?.status || "inactive"
   const hasCurrentMembershipAccess = hasMembershipAccess({
     status: effectiveStatus,
     endDate: subscription?.end_date ?? null,
   })
   const isExpiredCanceled = effectiveStatus === "canceled" && !hasCurrentMembershipAccess
   const isWithoutCurrentMembership =
-    !membership || effectiveStatus === "inactive" || effectiveStatus === "expired" || isExpiredCanceled
+    effectiveStatus === "inactive" || effectiveStatus === "expired" || isExpiredCanceled
 
-  // No active membership
   if (isWithoutCurrentMembership) {
     return (
       <div className="space-y-6 p-6 md:p-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold">Membresía</h1>
-          <p className="text-gray-500">Gestiona tu membresía de la Peña Lorenzo Sanz</p>
+          <h1 className="text-3xl font-bold">Membresia</h1>
+          <p className="text-gray-500">Gestiona tu membresia de la Pena Lorenzo Sanz</p>
         </div>
 
         {error && (
@@ -248,16 +171,16 @@ export default function MembershipPage() {
 
         <Card className="bg-gray-50 border-dashed">
           <CardHeader>
-            <CardTitle>Información de Membresía</CardTitle>
+            <CardTitle>Informacion de membresia</CardTitle>
             <CardDescription>
-              Los ajustes de la membresía solo están disponibles a aquellos que dispongan de una
+              Los ajustes de membresia solo estan disponibles para usuarios con suscripcion activa.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                No tienes una membresía activa. Hazte socio para disfrutar de todos los beneficios.
+                No tienes una membresia activa. Hazte socio para disfrutar de todos los beneficios.
               </AlertDescription>
             </Alert>
           </CardContent>
@@ -267,20 +190,20 @@ export default function MembershipPage() {
               onClick={() => router.push("/dashboard")}
               className="transition-all border-black hover:bg-primary hover:text-white mb-2 md:mb-0"
             >
-              Volver al Dashboard
+              Volver al dashboard
             </Button>
             <Button
               onClick={() => router.push("/membership")}
               className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
             >
-              Ver Planes de Membresía
+              Ver planes de membresia
             </Button>
           </CardFooter>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Beneficios de Membresía</CardTitle>
+            <CardTitle>Beneficios de membresia</CardTitle>
             <CardDescription>Disfruta de estos beneficios exclusivos como miembro</CardDescription>
           </CardHeader>
           <CardContent>
@@ -295,7 +218,6 @@ export default function MembershipPage() {
   const isCanceled = effectiveStatus === "canceled" && hasCurrentMembershipAccess
   const isPastDue = effectiveStatus === "past_due"
 
-  // Format renewal / end date from subscription
   let renewalDate = "No disponible"
   if (subscription?.end_date) {
     renewalDate = new Date(subscription.end_date).toLocaleDateString("es-ES", {
@@ -305,15 +227,17 @@ export default function MembershipPage() {
     })
   }
 
-  // Plan display name
-  const planLabel = formatPlanLabel(membership.subscription_plan)
+  const planLabel = getMembershipPlanLabel({
+    planType: subscription?.plan_type,
+    paymentType: subscription?.payment_type,
+  })
 
   return (
     <div className="space-y-6 p-6 md:p-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Membresía</h1>
-          <p className="text-gray-500">Gestiona tu membresía de la Peña Lorenzo Sanz</p>
+          <h1 className="text-3xl font-bold">Membresia</h1>
+          <p className="text-gray-500">Gestiona tu membresia de la Pena Lorenzo Sanz</p>
         </div>
       </div>
 
@@ -331,11 +255,10 @@ export default function MembershipPage() {
         </Alert>
       )}
 
-      {/* Subscription status card */}
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>Estado de Membresía</CardTitle>
+            <CardTitle>Estado de membresia</CardTitle>
             {isActive ? (
               <Badge className="bg-green-500">Activa</Badge>
             ) : isCanceled ? (
@@ -346,7 +269,7 @@ export default function MembershipPage() {
               <Badge variant="outline" className="text-red-500 border-red-200">Inactiva</Badge>
             )}
           </div>
-          <CardDescription>Detalles de tu membresía actual</CardDescription>
+          <CardDescription>Detalles de tu membresia actual</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -356,16 +279,14 @@ export default function MembershipPage() {
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500">
-                {isCanceled ? "Activa hasta" : "Próxima renovación"}
+                {isCanceled ? "Activa hasta" : "Proxima renovacion"}
               </h3>
               <p className="text-lg font-semibold">{renewalDate}</p>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-500">Método de pago</h3>
+              <h3 className="text-sm font-medium text-gray-500">Metodo de pago</h3>
               <p className="text-lg font-semibold">
-                {membership.last_four
-                  ? `Tarjeta terminada en ${membership.last_four}`
-                  : "Tarjeta"}
+                {subscription?.last_four ? `Tarjeta terminada en ${subscription.last_four}` : "Tarjeta"}
               </p>
             </div>
             <div>
@@ -387,7 +308,7 @@ export default function MembershipPage() {
         <CardFooter className="flex flex-col md:flex-row gap-3 justify-between">
           {isCanceled ? (
             <p className="text-orange-500 text-sm">
-              Tu suscripción se cancelará el {renewalDate}. Hasta entonces sigues disfrutando de todos los beneficios.
+              Tu suscripcion se cancelara el {renewalDate}. Hasta entonces sigues disfrutando de todos los beneficios.
             </p>
           ) : (
             <>
@@ -397,7 +318,7 @@ export default function MembershipPage() {
                 className="text-red-500 border-red-200 hover:bg-red-500 hover:text-white"
                 disabled={canceling || !isActive}
               >
-                {canceling ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Cancelando...</> : "Cancelar Suscripción"}
+                {canceling ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Cancelando...</> : "Cancelar suscripcion"}
               </Button>
               <Button
                 onClick={handleStartCardUpdate}
@@ -414,53 +335,40 @@ export default function MembershipPage() {
         </CardFooter>
       </Card>
 
-      {/* Card update InSite form (shown inline) */}
-      {showCardUpdate && cardUpdateOrder && (
+      {redirectActionUrl && redirectSigned && (
         <Card>
           <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle className="text-lg">Actualizar tarjeta de pago</CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => { setShowCardUpdate(false); setCardUpdateOrder(null) }}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            <CardTitle className="text-lg">Actualizar tarjeta de pago</CardTitle>
             <CardDescription>
-              Introduce los datos de tu nueva tarjeta. Se guardará para los próximos cobros automáticos.
+              Te estamos redirigiendo al TPV seguro de Redsys para actualizar tu tarjeta.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <RedsysInSiteForm
-              order={cardUpdateOrder}
-              onIdOperReceived={handleCardUpdateIdOper}
-              onError={handleCardUpdateError}
-              buttonText="Guardar nueva tarjeta"
-            />
-            <div className="mt-3 flex items-center justify-center gap-2 text-sm text-gray-500">
-              <ShieldCheck className="h-4 w-4" />
-              <span>Datos procesados de forma segura por Redsys</span>
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+              <p className="mt-3 text-sm text-gray-500">
+                No cierres esta pagina hasta completar el proceso.
+              </p>
+              <div className="mt-4">
+                <RedsysRedirectAutoSubmitForm actionUrl={redirectActionUrl} signed={redirectSigned} />
+              </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Past due warning */}
       {isPastDue && (
         <Alert className="border-yellow-200 bg-yellow-50">
           <AlertCircle className="h-4 w-4 text-yellow-600" />
           <AlertDescription className="text-yellow-800">
-            No se pudo procesar tu último pago. Actualiza tu tarjeta para evitar la cancelación de tu membresía.
+            No se pudo procesar tu ultimo pago. Actualiza tu tarjeta para evitar la cancelacion de tu membresia.
           </AlertDescription>
         </Alert>
       )}
 
-      {/* Benefits card */}
       <Card>
         <CardHeader>
-          <CardTitle>Beneficios de Membresía</CardTitle>
+          <CardTitle>Beneficios de membresia</CardTitle>
           <CardDescription>Disfruta de estos beneficios exclusivos como miembro</CardDescription>
         </CardHeader>
         <CardContent>
@@ -471,15 +379,13 @@ export default function MembershipPage() {
   )
 }
 
-// ── Helper Components ──────────────────────────────────────────────────────
-
 function BenefitsList() {
   const benefits = [
-    "Acceso a eventos exclusivos organizados por la peña",
+    "Acceso a eventos exclusivos organizados por la pena",
     "Descuentos en viajes organizados para ver partidos",
-    "Participación en sorteos y promociones exclusivas",
+    "Participacion en sorteos y promociones exclusivas",
     "Acceso al contenido exclusivo en nuestra web",
-    "Carnet oficial de socio de la Peña Lorenzo Sanz",
+    "Carnet oficial de socio de la Pena Lorenzo Sanz",
   ]
 
   return (
@@ -492,17 +398,4 @@ function BenefitsList() {
       ))}
     </ul>
   )
-}
-
-function formatPlanLabel(plan?: string): string {
-  if (!plan) return "Plan Estándar"
-  const labels: Record<string, string> = {
-    under25_monthly: "Joven — Mensual",
-    under25_annual: "Joven — Anual",
-    over25_monthly: "Adulto — Mensual",
-    over25_annual: "Adulto — Anual",
-    family_monthly: "Familiar — Mensual",
-    family_annual: "Familiar — Anual",
-  }
-  return labels[plan] || plan
 }

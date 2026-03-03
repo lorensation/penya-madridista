@@ -15,40 +15,14 @@ export async function GET() {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
     }
 
-    // Try to find the user profile using multiple methods
-    let profile = null
-
-    // 1. Try by user_uuid
-    const { data: profileByUuid, error: uuidError } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("miembros")
       .select("*")
       .eq("user_uuid", session.user.id)
-      .single()
+      .maybeSingle()
 
-    if (!uuidError && profileByUuid) {
-      profile = profileByUuid
-    } else {
-      // 2. Try by id
-      const { data: profileById, error: idError } = await supabase
-        .from("miembros")
-        .select("*")
-        .eq("id", session.user.id)
-        .single()
-
-      if (!idError && profileById) {
-        profile = profileById
-      } else if (session.user.email) {
-        // 3. Try by email
-        const { data: profileByEmail, error: emailError } = await supabase
-          .from("miembros")
-          .select("*")
-          .eq("email", session.user.email)
-          .single()
-
-        if (!emailError && profileByEmail) {
-          profile = profileByEmail
-        }
-      }
+    if (profileError) {
+      return NextResponse.json({ error: "Error loading user profile" }, { status: 500 })
     }
 
     if (!profile) {

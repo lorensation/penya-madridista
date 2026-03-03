@@ -90,6 +90,8 @@ export function RegisterForm() {
             email: values.email,
             name: values.name,
             is_member: false,
+            email_notifications: values.subscribeToNewsletter,
+            marketing_emails: values.subscribeToNewsletter,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });

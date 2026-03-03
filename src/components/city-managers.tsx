@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MapPin, Phone } from "lucide-react"
 import Image from "next/image"
@@ -68,12 +69,15 @@ const cityManagers: CityManagerProps[] = [
 ]
 
 const CityManagerCard = ({ manager }: { manager: CityManagerProps }) => {
+  const [mapLoadFailed, setMapLoadFailed] = useState(false)
+  const showMapFallback = GOOGLE_MAPS_API_KEY === 'YOUR_API_KEY' || mapLoadFailed
+
   return (
     <div className="bg-white rounded-lg shadow-md p-5 hover:shadow-lg transition-shadow">
       <div className="flex flex-col md:flex-row items-center gap-4">
         <div className="relative w-full md:w-[300px] h-[200px] rounded-md overflow-hidden">
-          {GOOGLE_MAPS_API_KEY === 'YOUR_API_KEY' ? (
-            // Fallback if API key isn't provided
+          {showMapFallback ? (
+            // Fallback when API key is missing or Google rejects map loading
             <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
               <MapPin className="h-10 w-10 text-gray-400" />
               <span className="absolute text-2xl">{manager.countryCode}</span>
@@ -86,6 +90,8 @@ const CityManagerCard = ({ manager }: { manager: CityManagerProps }) => {
               sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
               className="object-cover"
               priority
+              unoptimized
+              onError={() => setMapLoadFailed(true)}
             />
           )}
         </div>

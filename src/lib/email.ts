@@ -19,11 +19,14 @@ export async function sendEmail({
   subject,
   html,
   text,
+  headers,
 }: {
   to: string | string[];
   subject: string;
   html: string;
   text?: string;
+  /** Optional extra headers (e.g. List-Unsubscribe for marketing/event emails) */
+  headers?: Record<string, string>;
 }) {
   try {
     const transporter = createTransporter()
@@ -34,10 +37,11 @@ export async function sendEmail({
       subject,
       text,
       html,
+      ...(headers ? { headers } : {}),
     })
     
     console.log(`Email sent: ${info.messageId}`)
-    return { success: true }
+    return { success: true, messageId: info.messageId }
   } catch (error) {
     console.error("Error sending email:", error)
     return { success: false, error }

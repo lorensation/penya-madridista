@@ -30,6 +30,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 Events
               </Button>
             </Link>
+            <Link href="/admin/emails">
+              <Button variant="ghost" className="text-white hover:text-black transition-all hover:bg-white hover:border hover:border-white">
+                Emails
+              </Button>
+            </Link>
             <Link href="/admin/settings">
               <Button variant="ghost" className="text-white hover:text-black transition-all hover:bg-white hover:border hover:border-white">
                 Settings

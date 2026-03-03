@@ -45,6 +45,14 @@ interface PaymentTransactionRow {
   metadata: Json | null
 }
 
+function parseMetadataRecord(metadata: Json | null): Record<string, unknown> {
+  if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
+    return metadata as Record<string, unknown>
+  }
+
+  return {}
+}
+
 function parseInteger(value: string | undefined): number | null {
   if (!value) {
     return null
@@ -60,9 +68,7 @@ function parseContextMetadata(metadata: Json | null): {
   planType: string | null
   interval: string | null
 } {
-  const record = metadata && typeof metadata === "object" && !Array.isArray(metadata)
-    ? metadata as Record<string, unknown>
-    : {}
+  const record = parseMetadataRecord(metadata)
 
   const rawItems = Array.isArray(record.items) ? record.items : []
   const items = rawItems
@@ -211,6 +217,7 @@ async function handleAuthorizedMembershipPayment(
         status: "active",
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
+        last_four: responseParams.Ds_CardNumber ? responseParams.Ds_CardNumber.slice(-4) : null,
         redsys_token: responseParams.Ds_Merchant_Identifier ?? null,
         redsys_token_expiry: responseParams.Ds_ExpiryDate ?? null,
         redsys_cof_txn_id: responseParams.Ds_Merchant_Cof_Txnid ?? null,
@@ -235,21 +242,48 @@ async function handleAuthorizedMembershipPayment(
     .eq("id", transaction.id)
 
   await admin
-    .from("miembros")
-    .update({
-      subscription_status: "active",
-      subscription_plan: `${planType}_${interval}`,
-      subscription_updated_at: new Date().toISOString(),
-      last_four: responseParams.Ds_CardNumber ? responseParams.Ds_CardNumber.slice(-4) : null,
-      redsys_token: responseParams.Ds_Merchant_Identifier ?? null,
-      redsys_token_expiry: responseParams.Ds_ExpiryDate ?? null,
-    })
-    .eq("user_uuid", memberId)
-
-  await admin
     .from("users")
     .update({ is_member: true })
     .eq("id", memberId)
+}
+
+async function handleAuthorizedCardUpdate(
+  transaction: PaymentTransactionRow,
+  responseParams: RedsysResponseParams,
+) {
+  const memberId = transaction.member_id
+  if (!memberId) {
+    throw new Error("Card update transaction has no member_id")
+  }
+
+  const { data: latestSubscription, error: latestSubscriptionError } = await admin
+    .from("subscriptions")
+    .select("id")
+    .eq("member_id", memberId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (latestSubscriptionError) {
+    throw new Error(`Failed loading subscription for card update: ${latestSubscriptionError.message}`)
+  }
+
+  if (latestSubscription) {
+    const { error: updateSubscriptionError } = await admin
+      .from("subscriptions")
+      .update({
+        last_four: responseParams.Ds_CardNumber ? responseParams.Ds_CardNumber.slice(-4) : null,
+        redsys_token: responseParams.Ds_Merchant_Identifier ?? null,
+        redsys_token_expiry: responseParams.Ds_ExpiryDate ?? null,
+        redsys_cof_txn_id: responseParams.Ds_Merchant_Cof_Txnid ?? null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", latestSubscription.id)
+
+    if (updateSubscriptionError) {
+      throw new Error(`Failed updating subscription token fields: ${updateSubscriptionError.message}`)
+    }
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -306,8 +340,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true }, { status: 200 })
     }
 
+    const transactionMetadata = parseMetadataRecord(transaction.metadata)
+    const transactionMetadataType =
+      typeof transactionMetadata.type === "string" ? transactionMetadata.type : null
     const notifiedAmount = parseInteger(responseParams.Ds_Amount)
-    if (notifiedAmount === null || notifiedAmount !== transaction.amount_cents) {
+    const isCardUpdateZeroAmount = transactionMetadataType === "card_update" && transaction.amount_cents === 0
+
+    if ((notifiedAmount === null && !isCardUpdateZeroAmount) || (notifiedAmount !== null && notifiedAmount !== transaction.amount_cents)) {
       console.error("[redsys/notification] Amount mismatch", {
         order,
         expected: transaction.amount_cents,
@@ -392,7 +431,14 @@ export async function POST(request: NextRequest) {
       if (claimed.data.context === "shop") {
         await handleAuthorizedShopPayment(claimed.data as PaymentTransactionRow)
       } else if (claimed.data.context === "membership") {
-        await handleAuthorizedMembershipPayment(claimed.data as PaymentTransactionRow, responseParams)
+        const metadata = parseMetadataRecord(claimed.data.metadata)
+        const metadataType = typeof metadata.type === "string" ? metadata.type : null
+
+        if (metadataType === "card_update") {
+          await handleAuthorizedCardUpdate(claimed.data as PaymentTransactionRow, responseParams)
+        } else {
+          await handleAuthorizedMembershipPayment(claimed.data as PaymentTransactionRow, responseParams)
+        }
       }
     } catch (fulfillmentError) {
       console.error("[redsys/notification] Fulfillment failed", {

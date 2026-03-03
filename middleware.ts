@@ -26,6 +26,8 @@ const PUBLIC_PATHS = [
   '/favicon.ico',
   '/blocked', // Allow access to blocked page
   '/tienda', // Allow access to shop page
+  '/email-preferences', // Allow access to email preferences page
+  '/unsubscribe', // Allow access to one-click unsubscribe
 ]
 
 export async function middleware(request: NextRequest) {

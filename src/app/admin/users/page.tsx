@@ -59,6 +59,7 @@ interface AuthUser {
 export default function AdminUsersPage() {
   const router = useRouter()
   const [miembros, setMiembros] = useState<MiembroUser[]>([])
+  const [subscriptionStatusByUserId, setSubscriptionStatusByUserId] = useState<Record<string, string>>({})
   const [authUsers, setAuthUsers] = useState<AuthUser[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingAuthUsers, setLoadingAuthUsers] = useState(true)
@@ -170,6 +171,7 @@ export default function AdminUsersPage() {
       
       if (!data) {
         setMiembros([]);
+        setSubscriptionStatusByUserId({});
         setTotalCount(0);
         setTotalPages(1);
         return;
@@ -177,6 +179,34 @@ export default function AdminUsersPage() {
 
       // Use the data directly as it now matches our MiembroUser type from Database
       setMiembros(data);
+
+      const userIds = data
+        .map((member) => member.user_uuid)
+        .filter((value): value is string => typeof value === "string" && value.length > 0)
+
+      if (userIds.length > 0) {
+        const { data: subscriptions, error: subscriptionsError } = await supabase
+          .from("subscriptions")
+          .select("member_id, status, created_at")
+          .in("member_id", userIds)
+          .order("created_at", { ascending: false })
+
+        if (subscriptionsError) {
+          console.error("Error fetching subscriptions for admin list:", subscriptionsError)
+          setSubscriptionStatusByUserId({})
+        } else {
+          const statusMap: Record<string, string> = {}
+          for (const subscription of subscriptions ?? []) {
+            if (!statusMap[subscription.member_id]) {
+              statusMap[subscription.member_id] = subscription.status
+            }
+          }
+          setSubscriptionStatusByUserId(statusMap)
+        }
+      } else {
+        setSubscriptionStatusByUserId({})
+      }
+
       setTotalCount(count || 0);
       setTotalPages(Math.ceil((count || 0) / usersPerPage));
       setError(null);
@@ -586,15 +616,25 @@ export default function AdminUsersPage() {
                             </span>
                           </td>
                           <td className="py-3 px-4 hidden md:table-cell">
+                            {(() => {
+                              const memberUserId = miembro.user_uuid || ""
+                              const subscriptionStatus = memberUserId
+                                ? (subscriptionStatusByUserId[memberUserId] || "inactive")
+                                : "inactive"
+                              const isActive = subscriptionStatus === "active" || subscriptionStatus === "trialing"
+
+                              return (
                             <span
                               className={`px-2 py-1 text-xs rounded-full ${
-                                miembro.subscription_status === "active"
+                                  isActive
                                   ? "bg-green-100 text-green-800"
                                   : "bg-yellow-100 text-yellow-800"
                               }`}
                             >
-                              {miembro.subscription_status === "active" ? "Activa" : "Inactiva"}
+                                  {isActive ? "Activa" : "Inactiva"}
                             </span>
+                              )
+                            })()}
                           </td>
                           <td className="py-3 px-4 hidden md:table-cell">
                             {formatDate(miembro.created_at || null)}

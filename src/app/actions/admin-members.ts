@@ -3,6 +3,8 @@
 import { createAdminSupabaseClient } from "@/lib/supabase"
 import { sendEmail } from "@/lib/email"
 import { revalidatePath } from "next/cache"
+import { renderMemberInviteEmail } from "@/lib/email/templates/member-invite"
+import { generatePreferencesToken } from "@/lib/email/preferences-token"
 
 export interface MakeUserMemberResponse {
   success: boolean
@@ -85,109 +87,17 @@ export async function makeAuthUserMember(userId: string, email: string): Promise
 }
 
 /**
- * Generate the member invitation email HTML template
+ * Generate the member invitation email HTML template using shared layout
  */
-function generateMemberInvitationTemplate(token: string): string {
-  const completeProfileUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://lorenzosanz.com'}/complete-profile?admin_invite=${token}`
-  
-  return `
-<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <title>¡Has sido invitado a ser miembro de la Peña Lorenzo Sanz!</title>
-    <style>
-      body {
-        margin: 0;
-        padding: 0;
-        background-color: #f4f4f4;
-        font-family: 'Arial', sans-serif;
-      }
-      .container {
-        width: 100%;
-        max-width: 600px;
-        margin: 0 auto;
-        background-color: #ffffff;
-      }
-      .header {
-        background-color: #07025A; /* Real Madrid blue */
-        padding: 20px;
-        text-align: center;
-      }
-      .logo {
-        max-width: 200px;
-        height: auto;
-      }
-      .content {
-        padding: 30px;
-        color: #333333;
-        font-size: 16px;
-        line-height: 1.5;
-      }
-      .footer {
-        background-color: #f4f4f4;
-        padding: 20px;
-        text-align: center;
-        color: #666666;
-        font-size: 12px;
-      }
-      .button {
-        background-color: #07025A;
-        color: #ffffff;
-        padding: 12px 24px;
-        text-decoration: none;
-        border-radius: 4px;
-        font-weight: bold;
-        display: inline-block;
-        margin: 20px 0;
-      }
-      h1 {
-        color: #07025A;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <img src="https://www.lorenzosanz.com/Logo-Penya-LS-resized.jpg" alt="Peña Lorenzo Sanz" class="logo" />
-      </div>
-      
-      <div class="content">
-        <h1>¡Has sido invitado a ser miembro de la Peña Lorenzo Sanz!</h1>
-        <p>Hola,</p>
-        <p>Nos complace informarte que has sido seleccionado para ser miembro oficial de la <strong>Peña Lorenzo Sanz Siempre Presente</strong>.</p>
-        
-        <p>Como miembro, disfrutarás de los siguientes beneficios exclusivos:</p>
-        
-        <ul>
-          <li>Acceso a eventos exclusivos organizados por la peña</li>
-          <li>Descuentos en viajes organizados para ver partidos</li>
-          <li>Participación en sorteos y promociones exclusivas</li>
-          <li>Acceso al contenido premium en nuestra web</li>
-          <li>Carnet oficial de socio de la Peña Lorenzo Sanz</li>
-        </ul>
-        
-        <p><strong>Esta invitación incluye una membresía permanente sin necesidad de pago.</strong></p>
-        
-        <p>Para completar tu registro, por favor haz clic en el botón de abajo:</p>
-        
-        <p style="text-align: center;">
-          <a href="${completeProfileUrl}" class="button">Completar mi perfil</a>
-        </p>
-        
-        <p><em>Esta invitación expirará en 7 días.</em></p>
-        
-        <p>¡Hala Madrid!</p>
-        <p>El equipo de la Peña Lorenzo Sanz</p>
-      </div>
-      
-      <div class="footer">
-        <p>© ${new Date().getFullYear()} Peña Lorenzo Sanz. Todos los derechos reservados.</p>
-      </div>
-    </div>
-  </body>
-</html>
-  `
+function generateMemberInvitationTemplate(token: string, email: string): string {
+  let preferencesToken: string | undefined
+  try {
+    preferencesToken = generatePreferencesToken(email)
+  } catch {
+    // EMAIL_PREFERENCES_SECRET not set, skip preferences link
+  }
+
+  return renderMemberInviteEmail({ token, preferencesToken })
 }
 
 /**
@@ -195,7 +105,7 @@ function generateMemberInvitationTemplate(token: string): string {
  */
 async function sendMemberInvitationEmail(to: string, token: string) {
   try {
-    const html = generateMemberInvitationTemplate(token)
+    const html = generateMemberInvitationTemplate(token, to)
     
     return await sendEmail({
       to,

@@ -18,29 +18,156 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2 } from "lucide-react"
 
-// Define the form schema with validation
-const profileFormSchema = z.object({
-  name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres" }),
-  apellido1: z.string().min(2, { message: "El primer apellido es obligatorio" }),
-  apellido2: z.string().optional(),
-  dni_pasaporte: z.string().min(5, { message: "El DNI/Pasaporte es obligatorio" }),
-  telefono: z.string().min(9, { message: "El teléfono debe tener al menos 9 dígitos" }),
-  fecha_nacimiento: z.string().min(1, { message: "La fecha de nacimiento es obligatoria" }),
-  direccion: z.string().min(5, { message: "La dirección es obligatoria" }),
-  direccion_extra: z.string().optional(),
-  poblacion: z.string().min(2, { message: "La población es obligatoria" }),
-  cp: z.string().min(4, { message: "El código postal es obligatorio" }),
-  provincia: z.string().min(2, { message: "La provincia es obligatoria" }),
-  pais: z.string().min(2, { message: "El país es obligatorio" }),
-  nacionalidad: z.string().min(2, { message: "La nacionalidad es obligatoria" }),
-  es_socio_realmadrid: z.boolean().default(false),
-  num_socio: z.string().optional(),
-  socio_carnet_madridista: z.boolean().default(false),
-  num_carnet: z.string().optional(),
-  email_notifications: z.boolean().default(true),
-  marketing_emails: z.boolean().default(true),
-})
+const ONLY_TEXT_REGEX = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ\s'-]+$/
+const DNI_PASSPORT_REGEX = /^[A-Za-z0-9]+$/
+const ADDRESS_REGEX = /^[A-Za-z0-9ÁÉÍÓÚÜÑáéíóúüñ\s.,ºª#\/-]+$/
+const DIGITS_REGEX = /^\d+$/
+const PHONE_INPUT_REGEX = /^[+\d\s().-]+$/
 
+function normalizeText(value: string): string {
+  return value.trim().replace(/\s+/g, " ")
+}
+
+function normalizeOptionalText(value: string): string | undefined {
+  const normalized = normalizeText(value)
+  return normalized.length > 0 ? normalized : undefined
+}
+
+const requiredOnlyText = (field: string, minLength = 2) =>
+  z
+    .string()
+    .transform(normalizeText)
+    .refine((value) => value.length >= minLength, {
+      message: `${field} es obligatorio`,
+    })
+    .refine((value) => ONLY_TEXT_REGEX.test(value), {
+      message: `${field} solo puede contener letras`,
+    })
+
+const optionalOnlyText = (field: string) =>
+  z
+    .string()
+    .transform(normalizeOptionalText)
+    .refine((value) => value === undefined || ONLY_TEXT_REGEX.test(value), {
+      message: `${field} solo puede contener letras`,
+    })
+    .optional()
+
+const requiredDigits = (field: string, minLength = 1, maxLength?: number) =>
+  z.preprocess(
+    (value) => (typeof value === "string" ? value.trim() : value),
+    z
+      .string()
+      .min(1, { message: `${field} es obligatorio` })
+      .refine((value) => DIGITS_REGEX.test(value), {
+        message: `${field} solo puede contener numeros`,
+      })
+      .refine((value) => value.length >= minLength, {
+        message: `${field} debe tener al menos ${minLength} digitos`,
+      })
+      .refine((value) => (maxLength ? value.length <= maxLength : true), {
+        message: maxLength ? `${field} no puede superar ${maxLength} digitos` : `${field} invalido`,
+      }),
+  )
+
+const optionalDigits = (field: string, minLength = 1, maxLength?: number) =>
+  z.preprocess(
+    (value) => {
+      if (typeof value !== "string") {
+        return value
+      }
+
+      const trimmed = value.trim()
+      return trimmed.length > 0 ? trimmed : undefined
+    },
+    z
+      .string()
+      .refine((value) => DIGITS_REGEX.test(value), {
+        message: `${field} solo puede contener numeros`,
+      })
+      .refine((value) => value.length >= minLength, {
+        message: `${field} debe tener al menos ${minLength} digitos`,
+      })
+      .refine((value) => (!maxLength ? true : value.length <= maxLength), {
+        message: maxLength ? `${field} no puede superar ${maxLength} digitos` : `${field} invalido`,
+      })
+      .optional(),
+  )
+
+// Define the form schema with strict normalization and validation
+const profileFormSchema = z
+  .object({
+    name: requiredOnlyText("El nombre"),
+    apellido1: requiredOnlyText("El primer apellido"),
+    apellido2: optionalOnlyText("El segundo apellido"),
+    dni_pasaporte: z
+      .string()
+      .transform((value) => value.trim().replace(/\s+/g, "").toUpperCase())
+      .refine((value) => value.length > 0, { message: "El DNI/Pasaporte es obligatorio" })
+      .refine((value) => DNI_PASSPORT_REGEX.test(value), {
+        message: "El DNI/Pasaporte solo puede contener letras y numeros",
+      }),
+    telefono: z
+      .string()
+      .transform((value) => value.trim())
+      .refine((value) => value.length > 0, { message: "El telefono es obligatorio" })
+      .refine((value) => PHONE_INPUT_REGEX.test(value), {
+        message: "El telefono contiene caracteres no permitidos",
+      })
+      .refine((value) => {
+        const plusCount = (value.match(/\+/g) || []).length
+        return plusCount === 0 || (plusCount === 1 && value.startsWith("+"))
+      }, {
+        message: "El telefono solo puede usar '+' al inicio",
+      })
+      .transform((value) => value.replace(/\D/g, ""))
+      .refine((value) => value.length >= 9 && value.length <= 15, {
+        message: "El telefono debe tener entre 9 y 15 digitos",
+      }),
+    fecha_nacimiento: z.string().min(1, { message: "La fecha de nacimiento es obligatoria" }),
+    direccion: z
+      .string()
+      .transform(normalizeText)
+      .refine((value) => value.length >= 5, { message: "La direccion es obligatoria" })
+      .refine((value) => ADDRESS_REGEX.test(value), {
+        message: "La direccion contiene caracteres no permitidos",
+      }),
+    direccion_extra: z
+      .string()
+      .transform((value) => normalizeOptionalText(value))
+      .refine((value) => value === undefined || ADDRESS_REGEX.test(value), {
+        message: "La direccion adicional contiene caracteres no permitidos",
+      })
+      .optional(),
+    poblacion: requiredOnlyText("La poblacion"),
+    cp: requiredDigits("El codigo postal", 4, 10),
+    provincia: requiredOnlyText("La provincia"),
+    pais: requiredOnlyText("El pais"),
+    nacionalidad: requiredOnlyText("La nacionalidad"),
+    es_socio_realmadrid: z.boolean().default(false),
+    num_socio: optionalDigits("El numero de socio", 1, 20),
+    socio_carnet_madridista: z.boolean().default(false),
+    num_carnet: optionalDigits("El numero de carnet", 1, 20),
+    email_notifications: z.boolean().default(true),
+    marketing_emails: z.boolean().default(true),
+  })
+  .superRefine((values, ctx) => {
+    if (values.es_socio_realmadrid && !values.num_socio) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["num_socio"],
+        message: "El numero de socio es obligatorio",
+      })
+    }
+
+    if (values.socio_carnet_madridista && !values.num_carnet) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["num_carnet"],
+        message: "El numero de carnet es obligatorio",
+      })
+    }
+  })
 type ProfileFormValues = z.infer<typeof profileFormSchema>
 
 interface ProfileFormProps {
@@ -422,3 +549,4 @@ export function ProfileForm({ onSubmit, initialData }: ProfileFormProps) {
     </Form>
   )
 }
+

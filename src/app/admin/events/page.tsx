@@ -31,7 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Calendar as CalendarIcon, Trash2, Pencil, Plus, AlertTriangle, MoreHorizontal, ImagePlus, Users, Clock, MapPin } from "lucide-react"
+import { Calendar as CalendarIcon, Trash2, Pencil, Plus, AlertTriangle, MoreHorizontal, ImagePlus, Users, Clock, MapPin, Mail, Send, CheckCircle } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -41,6 +41,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import { createEventCampaign, sendCampaign, sendTestCampaign, getEventCampaignStatus } from "@/app/actions/admin-email-campaigns"
 
 // Add route segment config to mark this route as dynamic
 export const dynamic = 'force-dynamic'
@@ -90,6 +91,17 @@ export default function AdminEventsPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null)
   const [imageUploading, setImageUploading] = useState(false)
+
+  // Email notification state
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false)
+  const [emailEventId, setEmailEventId] = useState<string | null>(null)
+  const [emailEventTitle, setEmailEventTitle] = useState("")
+  const [emailPreviewText, setEmailPreviewText] = useState("")
+  const [emailTestAddress, setEmailTestAddress] = useState("")
+  const [emailSending, setEmailSending] = useState(false)
+  const [emailResult, setEmailResult] = useState<{ sent: number; failed: number; skipped: number } | null>(null)
+  const [emailAlreadySent, setEmailAlreadySent] = useState(false)
+  const [emailConfirmResend, setEmailConfirmResend] = useState(false)
 
   // Check if user is admin on client side
   useEffect(() => {
@@ -359,6 +371,76 @@ export default function AdminEventsPage() {
   }
 
   // Format date for display
+  // ─── Email notification handlers ────────────────────────────────────────────
+  const handleOpenEmailDialog = async (event: Event) => {
+    setEmailEventId(event.id)
+    setEmailEventTitle(event.title)
+    setEmailPreviewText("")
+    setEmailTestAddress("")
+    setEmailResult(null)
+    setEmailConfirmResend(false)
+
+    // Check if a campaign was already sent for this event
+    const status = await getEventCampaignStatus(event.id)
+    setEmailAlreadySent(status.hasSentCampaign)
+    setEmailDialogOpen(true)
+  }
+
+  const handleSendTestEmail = async () => {
+    if (!emailEventId || !emailTestAddress) return
+    setEmailSending(true)
+    try {
+      const campaignResult = await createEventCampaign(emailEventId, undefined, emailPreviewText || undefined)
+      if (!campaignResult.success || !campaignResult.campaignId) {
+        setError(campaignResult.error || "Error al crear la campaña de prueba")
+        return
+      }
+      const result = await sendTestCampaign(campaignResult.campaignId, emailTestAddress)
+      if (result.success) {
+        setEmailResult({ sent: 1, failed: 0, skipped: 0 })
+      } else {
+        setError(result.error || "Error al enviar el email de prueba")
+      }
+    } catch (err) {
+      console.error("Error sending test email:", err)
+      setError("Error al enviar el email de prueba")
+    } finally {
+      setEmailSending(false)
+    }
+  }
+
+  const handleSendEventEmail = async () => {
+    if (!emailEventId) return
+    if (emailAlreadySent && !emailConfirmResend) {
+      setEmailConfirmResend(true)
+      return
+    }
+
+    setEmailSending(true)
+    setEmailResult(null)
+    try {
+      const campaignResult = await createEventCampaign(emailEventId, undefined, emailPreviewText || undefined)
+      if (!campaignResult.success || !campaignResult.campaignId) {
+        setError(campaignResult.error || "Error al crear la campaña")
+        return
+      }
+
+      const result = await sendCampaign(campaignResult.campaignId)
+      if (result.success) {
+        setEmailResult({ sent: result.sent, failed: result.failed, skipped: result.skipped })
+        setEmailAlreadySent(true)
+        setEmailConfirmResend(false)
+      } else {
+        setError(result.error || "Error al enviar la campaña")
+      }
+    } catch (err) {
+      console.error("Error sending event email:", err)
+      setError("Error al enviar la notificación por email")
+    } finally {
+      setEmailSending(false)
+    }
+  }
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("es-ES", {
       day: "numeric",
@@ -456,6 +538,10 @@ export default function AdminEventsPage() {
                       <DropdownMenuItem onClick={() => handleEditEvent(event)}>
                         <Pencil className="mr-2 h-4 w-4" />
                         Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleOpenEmailDialog(event)}>
+                        <Mail className="mr-2 h-4 w-4" />
+                        Enviar notificación por email
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         onClick={() => handleDeletePrompt(event.id)}
@@ -734,6 +820,109 @@ export default function AdminEventsPage() {
                 </>
               ) : (
                 "Eliminar Evento"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Notification Dialog */}
+      <Dialog open={emailDialogOpen} onOpenChange={(open) => { setEmailDialogOpen(open); if (!open) { setEmailResult(null); setEmailConfirmResend(false); } }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Enviar notificación por email
+            </DialogTitle>
+            <DialogDescription>
+              Envía una notificación del evento &quot;{emailEventTitle}&quot; a todos los miembros activos con notificaciones de eventos habilitadas.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {emailAlreadySent && !emailResult && (
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Ya se ha enviado una notificación para este evento anteriormente.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {emailResult && (
+              <Alert>
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-700">
+                  Enviados: {emailResult.sent} | Fallidos: {emailResult.failed} | Omitidos: {emailResult.skipped}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="previewText">Texto de vista previa (opcional)</Label>
+              <Input
+                id="previewText"
+                value={emailPreviewText}
+                onChange={(e) => setEmailPreviewText(e.target.value)}
+                placeholder="Se muestra en la bandeja de entrada antes de abrir el email"
+              />
+            </div>
+
+            <div className="border-t pt-4 space-y-2">
+              <Label htmlFor="testEmail">Enviar prueba a:</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="testEmail"
+                  type="email"
+                  value={emailTestAddress}
+                  onChange={(e) => setEmailTestAddress(e.target.value)}
+                  placeholder="test@example.com"
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  onClick={handleSendTestEmail}
+                  disabled={emailSending || !emailTestAddress}
+                  size="sm"
+                >
+                  {emailSending ? (
+                    <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+                  ) : (
+                    "Probar"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEmailDialogOpen(false)}
+              disabled={emailSending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSendEventEmail}
+              disabled={emailSending}
+              className="ml-2"
+            >
+              {emailSending ? (
+                <>
+                  <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                  Enviando...
+                </>
+              ) : emailConfirmResend ? (
+                <>
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  Confirmar reenvío
+                </>
+              ) : (
+                <>
+                  <Send className="mr-2 h-4 w-4" />
+                  Enviar a todos los miembros
+                </>
               )}
             </Button>
           </DialogFooter>

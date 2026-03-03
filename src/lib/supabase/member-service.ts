@@ -21,7 +21,6 @@ function prepareMemberData(memberData: MemberData, userId: string): MemberData {
     ...memberData,
     id: userId,
     user_uuid: userId,
-    subscription_status: memberData.subscription_status || "inactive",
   }
 
   // Handle numeric values

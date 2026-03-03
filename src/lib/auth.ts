@@ -30,7 +30,7 @@ export async function checkAdminStatus() {
     console.log("Session user email:", session.user.email);
 
     // Get the member profile using the helper function
-    const profile = await getMemberProfile(session.user.id, session.user.email);
+    const profile = await getMemberProfile(session.user.id);
     
     if (!profile) {
       console.warn("No profile found for user");
@@ -69,7 +69,7 @@ export async function checkUserRole(role: string) {
       return null;
     }
 
-    const profile = await getMemberProfile(session.user.id, session.user.email);
+    const profile = await getMemberProfile(session.user.id);
 
     if (!profile) {
       return null;
@@ -132,7 +132,7 @@ export async function getMemberData() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return null;
     
-    return await getMemberProfile(session.user.id, session.user.email);
+    return await getMemberProfile(session.user.id);
   } catch (error) {
     console.error("Error getting member data:", error);
     return null;
@@ -145,48 +145,23 @@ export async function getMemberData() {
  * @param email The user's email
  * @returns Member profile or null if not found
  */
-async function getMemberProfile(userId: string, email?: string) {
+async function getMemberProfile(userId: string) {
   const supabase = await createServerSupabaseClient();
-
-  // 1. Try by user_uuid
   const { data: profileByUuid, error: uuidError } = await supabase
     .from("miembros")
     .select("*")
     .eq("user_uuid", userId)
-    .single();
+    .maybeSingle();
     
   if (!uuidError && profileByUuid) {
     console.log("User found via user_uuid match");
     return profileByUuid;
   }
-  
-  // 2. Try by id
-  const { data: profileById, error: idError } = await supabase
-    .from("miembros")
-    .select("*")
-    .eq("id", userId)
-    .single();
-    
-  if (!idError && profileById) {
-    console.log("User found via id match");
-    return profileById;
+
+  if (uuidError) {
+    console.error("Error loading member profile by user_uuid:", uuidError);
   }
-  
-  // 3. Try by email as final fallback
-  if (email) {
-    console.log("Attempting email-based lookup for:", email);
-    const { data: profileByEmail, error: emailError } = await supabase
-      .from("miembros")
-      .select("*")
-      .eq("email", email)
-      .single();
-      
-    if (!emailError && profileByEmail) {
-      console.log("User found via email match");
-      return profileByEmail;
-    }
-  }
-  
+
   console.warn("User profile not found by any method");
   return null;
 }
@@ -235,44 +210,18 @@ export async function getMemberDataSSR() {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return null;
-    
-    // Try all three methods to find the member
-    let memberData = null;
-    
-    // 1. Try by user_uuid
+
     const { data: memberByUuid, error: uuidError } = await supabase
       .from('miembros')
       .select('*')
       .eq('user_uuid', session.user.id)
-      .single();
-      
-    if (!uuidError && memberByUuid) {
-      memberData = memberByUuid;
-    } else {
-      // 2. Try by id
-      const { data: memberById, error: idError } = await supabase
-        .from('miembros')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-        
-      if (!idError && memberById) {
-        memberData = memberById;
-      } else if (session.user.email) {
-        // 3. Try by email
-        const { data: memberByEmail, error: emailError } = await supabase
-          .from('miembros')
-          .select('*')
-          .eq('email', session.user.email)
-          .single();
-          
-        if (!emailError && memberByEmail) {
-          memberData = memberByEmail;
-        }
-      }
+      .maybeSingle();
+
+    if (uuidError) {
+      console.error("Error loading member data by user_uuid (SSR):", uuidError);
     }
-    
-    return memberData;
+
+    return memberByUuid ?? null;
   } catch (error) {
     console.error("Error getting member data (SSR):", error);
     return null;

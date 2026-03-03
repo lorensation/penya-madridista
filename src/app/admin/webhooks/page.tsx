@@ -49,8 +49,8 @@ export default function WebhooksSetupPage() {
         const { data: profile, error: profileError } = await supabase
           .from('miembros')
           .select('role')
-          .eq('id', user.id)
-          .single()
+          .eq('user_uuid', user.id)
+          .maybeSingle()
         
         if (profileError) {
           console.error("Error fetching profile:", profileError)

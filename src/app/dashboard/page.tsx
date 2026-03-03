@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -6,6 +6,8 @@ import Link from "next/link"
 import Image from "next/image"
 import { createBrowserSupabaseClient } from "@/lib/supabase"
 import { hasMembershipAccess } from "@/lib/membership-access"
+import { getLatestSubscriptionByUserId } from "@/lib/data/subscription"
+import { getMembershipPlanLabel } from "@/lib/membership/plan-label"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -14,14 +16,6 @@ import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
 
 // Define interfaces for our data types
-interface Profile {
-  id: string
-  name?: string
-  auth_id?: string
-  subscription_status?: string | null
-  subscription_plan?: string | null
-}
-
 interface Event {
   id: string
   title: string
@@ -53,12 +47,14 @@ interface ActivityItem {
 interface Subscription {
   status: string | null
   end_date: string | null
+  plan_type: string | null
+  payment_type: string | null
 }
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [profile, setProfile] = useState<Profile | null>(null)
   const [membershipSubscription, setMembershipSubscription] = useState<Subscription | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [events, setEvents] = useState<Event[]>([])
@@ -78,7 +74,7 @@ export default function DashboardPage() {
         locale: es 
       })
     } catch (e) {
-      return "fecha inválida: " + e;
+      return "fecha invÃ¡lida: " + e;
     }
   }
 
@@ -101,34 +97,27 @@ export default function DashboardPage() {
           return
         }
 
-        // Fetch user profile - FIXED: using user_uuid instead of id to match RLS policy
-        const { data: profileData, error: profileError } = await supabase
-          .from("miembros")
-          .select("*")
-          .eq("user_uuid", userData.user.id)
-          .maybeSingle()
+        setUserId(userData.user.id)
 
-        if (profileError) {
-          console.log("Profile fetch error:", profileError)
-          // Don't throw error, just set profile to null
-          setProfile(null)
-        } else {
-          setProfile(profileData)
-        }
-
-        const { data: subscriptionData, error: subscriptionError } = await supabase
-          .from("subscriptions")
-          .select("status, end_date")
-          .eq("member_id", userData.user.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle()
+        const { data: subscriptionData, error: subscriptionError } = await getLatestSubscriptionByUserId(
+          supabase,
+          userData.user.id,
+        )
 
         if (subscriptionError) {
           console.error("Subscription fetch error:", subscriptionError)
           setMembershipSubscription(null)
         } else {
-          setMembershipSubscription(subscriptionData as Subscription | null)
+          setMembershipSubscription(
+            subscriptionData
+              ? {
+                  status: subscriptionData.status,
+                  end_date: subscriptionData.end_date,
+                  plan_type: subscriptionData.plan_type,
+                  payment_type: subscriptionData.payment_type,
+                }
+              : null,
+          )
         }
         setLoading(false)
       } catch (error: unknown) {
@@ -144,10 +133,13 @@ export default function DashboardPage() {
   // Fetch upcoming events
   useEffect(() => {
     const fetchEvents = async () => {
-      if (!profile) return
-      
       try {
         setLoadingEvents(true)
+
+        if (!userId) {
+          setEvents([])
+          return
+        }
         
         // Get events that are upcoming (date is today or in the future)
         const today = new Date().toISOString().split('T')[0] // Format as YYYY-MM-DD
@@ -173,13 +165,17 @@ export default function DashboardPage() {
     }
     
     fetchEvents()
-  }, [profile, supabase])
+  }, [userId, supabase])
   
   // Fetch recent activity (blog posts and events)
   useEffect(() => {
     const fetchRecentActivity = async () => {
-      if (!profile) return
-      
+      if (!userId) {
+        setRecentActivity([])
+        setLoadingActivity(false)
+        return
+      }
+
       try {
         setLoadingActivity(true)
         
@@ -240,7 +236,7 @@ export default function DashboardPage() {
     }
     
     fetchRecentActivity()
-  }, [profile, supabase])
+  }, [userId, supabase])
 
   if (loading) {
     return (
@@ -261,16 +257,19 @@ export default function DashboardPage() {
             <AlertDescription className="text-center">{error}</AlertDescription>
           </Alert>
         </div>
-        <Button onClick={() => router.push("/login")}>Volver a Iniciar Sesión</Button>
+        <Button onClick={() => router.push("/login")}>Volver a Iniciar SesiÃ³n</Button>
       </div>
     )
   }
 
-  const subscriptionStatus = membershipSubscription?.status || profile?.subscription_status || "inactive"
-  const subscriptionPlan = profile?.subscription_plan || null
+  const subscriptionStatus = membershipSubscription?.status || "inactive"
   const hasCurrentMembershipAccess = hasMembershipAccess({
     status: subscriptionStatus,
     endDate: membershipSubscription?.end_date ?? null,
+  })
+  const planLabel = getMembershipPlanLabel({
+    planType: membershipSubscription?.plan_type,
+    paymentType: membershipSubscription?.payment_type,
   })
   const isMember = hasCurrentMembershipAccess
   const isCanceled = subscriptionStatus === "canceled" && hasCurrentMembershipAccess
@@ -281,7 +280,7 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-gray-500">Bienvenido a tu área personal</p>
+          <p className="text-gray-500">Bienvenido a tu Ã¡rea personal</p>
         </div>
       </div>
 
@@ -289,9 +288,9 @@ export default function DashboardPage() {
         <Alert className="mb-8 bg-red-50 border-red-200">
           <AlertTriangle className="h-4 w-4 text-red-800" />
           <AlertDescription className="text-red-800">
-            Tienes tu membresía cancelada. Para seguir disfrutando de los beneficios,
+            Tienes tu membresÃ­a cancelada. Para seguir disfrutando de los beneficios,
             <Link href="/dashboard/membership" className="font-medium underline ml-1">
-              renuévala
+              renuÃ©vala
             </Link>
             .
           </AlertDescription>
@@ -300,9 +299,9 @@ export default function DashboardPage() {
         <Alert className="mb-8 bg-yellow-50 border-yellow-200">
           <AlertTriangle className="h-4 w-4 text-yellow-800" />
           <AlertDescription className="text-yellow-800">
-            Tu membresía no está activa. Para disfrutar de todos los beneficios,
+            Tu membresÃ­a no estÃ¡ activa. Para disfrutar de todos los beneficios,
             <Link href="/membership" className="font-medium underline ml-1">
-              completa tu suscripción
+              completa tu suscripciÃ³n
             </Link>
             .
           </AlertDescription>
@@ -314,7 +313,7 @@ export default function DashboardPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium flex items-center">
               <CreditCard className="mr-2 h-5 w-5 text-primary" />
-              Estado de Membresía
+              Estado de MembresÃ­a
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col flex-grow">
@@ -334,11 +333,11 @@ export default function DashboardPage() {
                 </p>
               </div>
             </div>
-            {isMember && subscriptionPlan && (
+            {isMember && membershipSubscription?.plan_type && (
               <div className="mt-2">
                 <p className="text-sm text-gray-500">Plan</p>
                 <p className="font-medium">
-                  {subscriptionPlan === "annual" ? "Membresía Anual" : "Membresía Familiar"}
+                  {planLabel}
                 </p>
               </div>
             )}
@@ -360,7 +359,7 @@ export default function DashboardPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium flex items-center">
               <Calendar className="mr-2 h-5 w-5 text-primary" />
-              Próximos Eventos
+              PrÃ³ximos Eventos
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col flex-grow">
@@ -368,12 +367,15 @@ export default function DashboardPage() {
               <div className="flex items-center justify-center py-4">
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
               </div>
-            ) : !isMember ? (
-              <p className="text-sm text-gray-500">Activa tu membresía para ver eventos</p>
             ) : events.length === 0 ? (
-              <p className="text-sm text-gray-500">No hay eventos próximos</p>
+              <p className="text-sm text-gray-500">No hay eventos prÃ³ximos</p>
             ) : (
               <div className="space-y-3">
+                {!isMember && (
+                  <p className="text-xs text-gray-500">
+                    Vista previa. Hazte miembro para reservar plaza.
+                  </p>
+                )}
                 {events.slice(0, 2).map(event => (
                   <div key={event.id} className="text-sm">
                     <p className="font-medium line-clamp-1">{event.title}</p>
@@ -382,7 +384,7 @@ export default function DashboardPage() {
                       <span>{formatEventDate(event.date)}</span>
                       {event.time && (
                         <>
-                          <span className="mx-1">•</span>
+                          <span className="mx-1">â€¢</span>
                           <Clock className="h-3 w-3 mr-1" />
                           <span>{event.time}</span>
                         </>
@@ -423,7 +425,7 @@ export default function DashboardPage() {
             <p className="text-sm text-gray-500">
               {isMember
                 ? "Accede a contenido exclusivo"
-                : "Activa tu membresía para ver contenido"}
+                : "Activa tu membresÃ­a para ver contenido"}
             </p>
             
             {isMember && (
@@ -432,11 +434,11 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-1 gap-2">
                   <div className="flex items-center">
                     <div className="w-10 h-10 relative flex-shrink-0">
-                      <Image src="/lorenzosanz-bufanda.jpg" alt="Fotos históricas" width={50} height={50} className="object-cover w-full h-full rounded-sm" />
+                      <Image src="/lorenzosanz-bufanda.jpg" alt="Fotos histÃ³ricas" width={50} height={50} className="object-cover w-full h-full rounded-sm" />
                     </div>
                     <div className="ml-2 truncate">
-                      <p className="text-xs font-medium line-clamp-1">Colección de fotos históricas</p>
-                      <p className="text-xs text-gray-500"><Link href="/content/galleries/fotos-historicas" className="hover:underline">Galería</Link> • 45 imágenes</p>
+                      <p className="text-xs font-medium line-clamp-1">ColecciÃ³n de fotos histÃ³ricas</p>
+                      <p className="text-xs text-gray-500"><Link href="/content/galleries/fotos-historicas" className="hover:underline">GalerÃ­a</Link> â€¢ 45 imÃ¡genes</p>
                     </div>
                   </div>
                   <div className="flex items-center">
@@ -450,12 +452,12 @@ export default function DashboardPage() {
                     </div>
                     <div className="ml-2 truncate">
                       <p className="text-xs font-medium line-clamp-1">Entrevista exclusiva con Lorenzo Sanz</p>
-                      <p className="text-xs text-gray-500"><Link href="/dashboard/content/" className="hover:underline">Video</Link> • 100 min</p>
+                      <p className="text-xs text-gray-500"><Link href="/dashboard/content/" className="hover:underline">Video</Link> â€¢ 100 min</p>
                     </div>
                   </div>
                   {/*<div className="flex items-center">
                     <div className="w-10 h-10 relative flex-shrink-0">
-                      <img src="/reportaje-movistar.jpg" alt="La Séptima" className="object-cover w-full h-full rounded-sm" />
+                      <img src="/reportaje-movistar.jpg" alt="La SÃ©ptima" className="object-cover w-full h-full rounded-sm" />
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="w-4 h-4 rounded-full bg-white/80 flex items-center justify-center">
                           <div className="w-0 h-0 border-y-2 border-y-transparent border-l-3 border-l-primary ml-0.5"></div>
@@ -463,8 +465,8 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="ml-2 truncate">
-                      <p className="text-xs font-medium line-clamp-1">La Séptima: El camino hacia la gloria</p>
-                      <p className="text-xs text-gray-500"><Link href="/dashboard/content/" className="hover:underline">Video</Link> • 60 min</p>
+                      <p className="text-xs font-medium line-clamp-1">La SÃ©ptima: El camino hacia la gloria</p>
+                      <p className="text-xs text-gray-500"><Link href="/dashboard/content/" className="hover:underline">Video</Link> â€¢ 60 min</p>
                     </div>
                   </div>*/}
                 </div>
@@ -489,7 +491,7 @@ export default function DashboardPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium flex items-center">
               <Settings className="mr-2 h-5 w-5 text-primary" />
-              Configuración
+              ConfiguraciÃ³n
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col flex-grow">
@@ -515,15 +517,15 @@ export default function DashboardPage() {
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Actividad Reciente</CardTitle>
-            <CardDescription>Últimas actualizaciones y actividades de la peña</CardDescription>
+            <CardDescription>Ãšltimas actualizaciones y actividades de la peÃ±a</CardDescription>
           </CardHeader>
           <CardContent>
             {!isMember ? (
               <div className="text-center py-8">
                 <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-                <p className="text-gray-600 mb-4">Activa tu membresía para ver la actividad reciente</p>
+                <p className="text-gray-600 mb-4">Activa tu membresÃ­a para ver la actividad reciente</p>
                 <Link href="/membership">
-                  <Button className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black">Completar Suscripción</Button>
+                  <Button className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black">Completar SuscripciÃ³n</Button>
                 </Link>
               </div>
             ) : loadingActivity ? (
@@ -546,7 +548,7 @@ export default function DashboardPage() {
                       )}
                       <div>
                         <p className="font-medium">
-                          {item.type === 'post' ? 'Nuevo artículo publicado' : 'Evento anunciado'}
+                          {item.type === 'post' ? 'Nuevo artÃ­culo publicado' : 'Evento anunciado'}
                         </p>
                         <div className="flex items-center text-sm text-gray-500">
                           <Link 
@@ -574,7 +576,7 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Enlaces Rápidos</CardTitle>
+            <CardTitle>Enlaces RÃ¡pidos</CardTitle>
             <CardDescription>Accesos directos a secciones importantes</CardDescription>
           </CardHeader>
           <CardContent>
@@ -597,7 +599,7 @@ export default function DashboardPage() {
               {isMember && (
                 <Link href="/dashboard/membership">
                   <Button variant="outline" className="w-full justify-start transition-all hover:bg-black hover:text-white hover:border hover:border-black">
-                    Gestionar Membresía
+                    Gestionar MembresÃ­a
                   </Button>
                 </Link>
               )}
@@ -608,3 +610,4 @@ export default function DashboardPage() {
     </div>
   )
 }
+

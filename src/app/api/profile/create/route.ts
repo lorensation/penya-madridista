@@ -3,7 +3,9 @@ import { NextResponse } from "next/server"
 
 export async function POST(request: Request) {
   try {
-    const { userId, email, name } = await request.json()
+    const { userId, email, name, emailNotifications, marketingEmails } = await request.json()
+    const safeEmailNotifications = emailNotifications !== false
+    const safeMarketingEmails = marketingEmails !== false
 
     if (!userId || !email) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -17,6 +19,8 @@ export async function POST(request: Request) {
         email: email,
         name: name || email.split("@")[0],
         is_member: false,
+        email_notifications: safeEmailNotifications,
+        marketing_emails: safeMarketingEmails,
         created_at: new Date().toISOString(),
       })
 

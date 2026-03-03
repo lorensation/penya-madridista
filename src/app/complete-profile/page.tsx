@@ -68,23 +68,12 @@ interface ProcessedMemberData {
   socio_carnet_madridista: boolean
   num_socio?: number | null // Changed to number to match DB
   num_carnet?: number | null // Changed to number to match DB
-  email_notifications: boolean
-  marketing_emails: boolean
 
   // User identification fields
   id: string
   user_uuid: string
   email: string | undefined
   created_at: string
-
-  // Subscription fields
-  subscription_status?: string
-  subscription_plan?: string
-  subscription_id?: string
-  subscription_updated_at?: string
-  redsys_token?: string | null
-  redsys_token_expiry?: string | null
-  last_four?: string | null
 }
 
 // Loading component
@@ -103,6 +92,19 @@ function sleep(ms: number) {
   return new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms)
   })
+}
+
+function toNullableNumericValue(value?: string): number | null {
+  if (!value) {
+    return null
+  }
+
+  if (!/^\d+$/.test(value)) {
+    throw new Error("Valor numerico invalido")
+  }
+
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 function CompleteProfileContent() {
@@ -344,17 +346,17 @@ function CompleteProfileContent() {
         nacionalidad: formData.nacionalidad,
         es_socio_realmadrid: formData.es_socio_realmadrid,
         socio_carnet_madridista: formData.socio_carnet_madridista,
-        email_notifications: formData.email_notifications,
-        marketing_emails: formData.marketing_emails,
 
-        // Handle fields that need to be converted to numbers
-        telefono: formData.telefono ? Number.parseInt(formData.telefono, 10) || null : null,
-        cp: formData.cp ? Number.parseInt(formData.cp, 10) || null : null,
+        // Strict numeric conversions after schema validation
+        telefono: toNullableNumericValue(formData.telefono),
+        cp: toNullableNumericValue(formData.cp),
         num_socio:
-          formData.es_socio_realmadrid && formData.num_socio ? Number.parseInt(formData.num_socio, 10) || null : null,
+          formData.es_socio_realmadrid && formData.num_socio
+            ? toNullableNumericValue(formData.num_socio)
+            : null,
         num_carnet:
           formData.socio_carnet_madridista && formData.num_carnet
-            ? Number.parseInt(formData.num_carnet, 10) || null
+            ? toNullableNumericValue(formData.num_carnet)
             : null,
 
         // Add user ID and email
@@ -362,17 +364,6 @@ function CompleteProfileContent() {
         user_uuid: userData.user.id, // This is for the public.users table
         email: userData.user.email,
         created_at: new Date().toISOString(),
-      }
-
-      // If we have checkout data, add subscription details to the member record
-      if (checkoutData) {
-        processedData.subscription_status = checkoutData.subscription_status || "active"
-        processedData.subscription_plan = checkoutData.plan_type
-        processedData.subscription_id = checkoutData.id ?? undefined
-        processedData.subscription_updated_at = new Date().toISOString()
-        processedData.redsys_token = checkoutData.redsys_token ?? null
-        processedData.redsys_token_expiry = checkoutData.redsys_token_expiry ?? null
-        processedData.last_four = checkoutData.last_four
       }
 
       // Insert the new member profile (fallback to update if already exists)
@@ -396,7 +387,6 @@ function CompleteProfileContent() {
           .from("miembros")
           .update({
             ...updatableData,
-            subscription_updated_at: new Date().toISOString(),
           } as Record<string, unknown>)
           .eq("user_uuid", userData.user.id)
 
@@ -414,6 +404,8 @@ function CompleteProfileContent() {
         .update({
           is_member: true,
           name: formData.name, // Also update the name to keep it in sync
+          email_notifications: formData.email_notifications,
+          marketing_emails: formData.marketing_emails,
           updated_at: new Date().toISOString()
         })
         .eq("id", userData.user.id)
@@ -443,6 +435,7 @@ function CompleteProfileContent() {
             member_id: userData.user.id,
             plan_type: checkoutData.plan_type,
             payment_type: checkoutData.payment_type || "monthly",
+            last_four: checkoutData.last_four ?? null,
             redsys_token: checkoutData.redsys_token ?? null,
             redsys_token_expiry: checkoutData.redsys_token_expiry ?? null,
             redsys_cof_txn_id: checkoutData.cof_txn_id ?? null,

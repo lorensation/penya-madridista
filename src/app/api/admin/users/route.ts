@@ -18,8 +18,8 @@ export async function GET(request: NextRequest) {
     const { data: profile, error: profileError } = await supabaseClient
       .from("miembros")
       .select("role")
-      .eq("id", user.id)
-      .single()
+      .eq("user_uuid", user.id)
+      .maybeSingle()
 
     if (profileError || profile?.role !== "admin") {
       return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     // Merge auth users with profiles
     const mergedUsers = authUsers.map((authUser) => {
-      const profile = profiles.find((p) => p.id === authUser.id) || {}
+      const profile = profiles.find((p) => p.user_uuid === authUser.id) || {}
       return {
         ...authUser,
         ...profile,

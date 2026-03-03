@@ -14,6 +14,173 @@ export type Database = {
   }
   public: {
     Tables: {
+      communication_preference_audit: {
+        Row: {
+          id: string
+          email: string
+          user_id: string | null
+          channel: string
+          old_value: boolean | null
+          new_value: boolean
+          source: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          email: string
+          user_id?: string | null
+          channel: string
+          old_value?: boolean | null
+          new_value: boolean
+          source: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string
+          user_id?: string | null
+          channel?: string
+          old_value?: boolean | null
+          new_value?: boolean
+          source?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communication_preference_audit_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_campaigns: {
+        Row: {
+          id: string
+          kind: string
+          status: string
+          subject: string
+          preview_text: string | null
+          html_body: string
+          text_body: string | null
+          event_id: string | null
+          segment: string
+          recipient_count: number
+          sent_count: number
+          failed_count: number
+          created_by: string
+          created_at: string
+          updated_at: string
+          sent_at: string | null
+        }
+        Insert: {
+          id?: string
+          kind: string
+          status?: string
+          subject: string
+          preview_text?: string | null
+          html_body: string
+          text_body?: string | null
+          event_id?: string | null
+          segment: string
+          recipient_count?: number
+          sent_count?: number
+          failed_count?: number
+          created_by: string
+          created_at?: string
+          updated_at?: string
+          sent_at?: string | null
+        }
+        Update: {
+          id?: string
+          kind?: string
+          status?: string
+          subject?: string
+          preview_text?: string | null
+          html_body?: string
+          text_body?: string | null
+          event_id?: string | null
+          segment?: string
+          recipient_count?: number
+          sent_count?: number
+          failed_count?: number
+          created_by?: string
+          created_at?: string
+          updated_at?: string
+          sent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_campaigns_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_campaigns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_deliveries: {
+        Row: {
+          id: string
+          campaign_id: string
+          recipient_email: string
+          recipient_user_id: string | null
+          recipient_source: string
+          status: string
+          provider_message_id: string | null
+          error_message: string | null
+          sent_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          campaign_id: string
+          recipient_email: string
+          recipient_user_id?: string | null
+          recipient_source: string
+          status?: string
+          provider_message_id?: string | null
+          error_message?: string | null
+          sent_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          campaign_id?: string
+          recipient_email?: string
+          recipient_user_id?: string | null
+          recipient_source?: string
+          status?: string
+          provider_message_id?: string | null
+          error_message?: string | null
+          sent_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_deliveries_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "email_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_deliveries_recipient_user_id_fkey"
+            columns: ["recipient_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blocked_users: {
         Row: {
           blocked_by: string
@@ -294,12 +461,9 @@ export type Database = {
           direccion_extra: string | null
           dni_pasaporte: string
           email: string
-          email_notifications: boolean | null
           es_socio_realmadrid: boolean
           fecha_nacimiento: string
           id: string
-          last_four: string | null
-          marketing_emails: boolean | null
           nacionalidad: string
           name: string
           num_carnet: number | null
@@ -307,17 +471,11 @@ export type Database = {
           pais: string | null
           poblacion: string | null
           provincia: string | null
-          redsys_token: string | null
-          redsys_token_expiry: string | null
           role: string | null
           socio_carnet_madridista: boolean
-          subscription_id: string | null
-          subscription_plan: string | null
-          subscription_status: string | null
-          subscription_updated_at: string | null
           telefono: number
           user_id: number
-          user_uuid: string | null
+          user_uuid: string
         }
         Insert: {
           apellido1?: string
@@ -329,12 +487,9 @@ export type Database = {
           direccion_extra?: string | null
           dni_pasaporte?: string
           email?: string
-          email_notifications?: boolean | null
           es_socio_realmadrid: boolean
           fecha_nacimiento: string
           id?: string
-          last_four?: string | null
-          marketing_emails?: boolean | null
           nacionalidad?: string
           name?: string
           num_carnet?: number | null
@@ -342,17 +497,11 @@ export type Database = {
           pais?: string | null
           poblacion?: string | null
           provincia?: string | null
-          redsys_token?: string | null
-          redsys_token_expiry?: string | null
           role?: string | null
           socio_carnet_madridista: boolean
-          subscription_id?: string | null
-          subscription_plan?: string | null
-          subscription_status?: string | null
-          subscription_updated_at?: string | null
           telefono: number
           user_id?: number
-          user_uuid?: string | null
+          user_uuid: string
         }
         Update: {
           apellido1?: string
@@ -364,12 +513,9 @@ export type Database = {
           direccion_extra?: string | null
           dni_pasaporte?: string
           email?: string
-          email_notifications?: boolean | null
           es_socio_realmadrid?: boolean
           fecha_nacimiento?: string
           id?: string
-          last_four?: string | null
-          marketing_emails?: boolean | null
           nacionalidad?: string
           name?: string
           num_carnet?: number | null
@@ -377,23 +523,17 @@ export type Database = {
           pais?: string | null
           poblacion?: string | null
           provincia?: string | null
-          redsys_token?: string | null
-          redsys_token_expiry?: string | null
           role?: string | null
           socio_carnet_madridista?: boolean
-          subscription_id?: string | null
-          subscription_plan?: string | null
-          subscription_status?: string | null
-          subscription_updated_at?: string | null
           telefono?: number
           user_id?: number
-          user_uuid?: string | null
+          user_uuid?: string
         }
         Relationships: [
           {
             foreignKeyName: "miembros_user_uuid_fkey"
             columns: ["user_uuid"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -406,6 +546,7 @@ export type Database = {
           id: string
           name: string | null
           status: string | null
+          unsubscribed_at: string | null
         }
         Insert: {
           created_at?: string | null
@@ -413,6 +554,7 @@ export type Database = {
           id?: string
           name?: string | null
           status?: string | null
+          unsubscribed_at?: string | null
         }
         Update: {
           created_at?: string | null
@@ -420,6 +562,7 @@ export type Database = {
           id?: string
           name?: string | null
           status?: string | null
+          unsubscribed_at?: string | null
         }
         Relationships: []
       }
@@ -769,6 +912,7 @@ export type Database = {
           created_at: string | null
           end_date: string | null
           id: string
+          last_four: string | null
           member_id: string
           payment_type: string
           plan_type: string
@@ -787,6 +931,7 @@ export type Database = {
           created_at?: string | null
           end_date?: string | null
           id?: string
+          last_four?: string | null
           member_id: string
           payment_type: string
           plan_type: string
@@ -805,6 +950,7 @@ export type Database = {
           created_at?: string | null
           end_date?: string | null
           id?: string
+          last_four?: string | null
           member_id?: string
           payment_type?: string
           plan_type?: string
@@ -822,7 +968,7 @@ export type Database = {
             foreignKeyName: "subscriptions_member_id_fkey"
             columns: ["member_id"]
             isOneToOne: true
-            referencedRelation: "miembros"
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -831,24 +977,33 @@ export type Database = {
         Row: {
           created_at: string
           email: string
+          email_notifications: boolean
+          event_notifications: boolean
           id: string
           is_member: boolean
+          marketing_emails: boolean
           name: string | null
           updated_at: string | null
         }
         Insert: {
           created_at?: string
           email: string
+          email_notifications?: boolean
+          event_notifications?: boolean
           id: string
           is_member?: boolean
+          marketing_emails?: boolean
           name?: string | null
           updated_at?: string | null
         }
         Update: {
           created_at?: string
           email?: string
+          email_notifications?: boolean
+          event_notifications?: boolean
           id?: string
           is_member?: boolean
+          marketing_emails?: boolean
           name?: string | null
           updated_at?: string | null
         }

@@ -18,8 +18,8 @@ export async function POST(request: NextRequest) {
     const { data: profile, error: profileError } = await supabaseClient
       .from("miembros")
       .select("role")
-      .eq("id", user.id)
-      .single()
+      .eq("user_uuid", user.id)
+      .maybeSingle()
 
     if (profileError || profile?.role !== "admin") {
       return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     const serviceClient = getServiceSupabase()
 
     // Update user role
-    const { error } = await serviceClient.from("miembros").update({ role }).eq("id", userId)
+    const { error } = await serviceClient.from("miembros").update({ role }).eq("user_uuid", userId)
 
     if (error) {
       throw error

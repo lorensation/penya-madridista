@@ -73,23 +73,57 @@ export default function FixSubscriptionPage() {
     setResult(null)
 
     try {
-      // Update subscription status directly in the database
-      const { error: updateError } = await supabase
-        .from("miembros")
-        .update({
-          subscription_status: "active",
-          subscription_id: subscriptionId || undefined,
-          subscription_updated_at: new Date().toISOString(),
-        })
-        .eq("user_uuid", userId)
+      const nowIso = new Date().toISOString()
+      let targetSubscriptionId = subscriptionId || null
 
-      if (updateError) {
-        throw new Error(updateError.message)
+      if (!targetSubscriptionId) {
+        const { data: latestSubscription, error: latestSubscriptionError } = await supabase
+          .from("subscriptions")
+          .select("id")
+          .eq("member_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (latestSubscriptionError) {
+          throw new Error(latestSubscriptionError.message)
+        }
+
+        if (!latestSubscription) {
+          throw new Error("No subscription found for this user")
+        }
+
+        targetSubscriptionId = latestSubscription.id
+      }
+
+      const { error: updateSubscriptionError } = await supabase
+        .from("subscriptions")
+        .update({
+          status: "active",
+          updated_at: nowIso,
+        })
+        .eq("id", targetSubscriptionId)
+        .eq("member_id", userId)
+
+      if (updateSubscriptionError) {
+        throw new Error(updateSubscriptionError.message)
+      }
+
+      const { error: updateUserError } = await supabase
+        .from("users")
+        .update({
+          is_member: true,
+          updated_at: nowIso,
+        })
+        .eq("id", userId)
+
+      if (updateUserError) {
+        throw new Error(updateUserError.message)
       }
 
       setResult({
         success: true,
-        message: "Subscription updated successfully",
+        message: "Subscription updated successfully in subscriptions/users",
       })
     } catch (error) {
       setResult({
@@ -130,7 +164,7 @@ export default function FixSubscriptionPage() {
       <Card className="max-w-md mx-auto">
         <CardHeader>
           <CardTitle>Fix User Subscription</CardTitle>
-          <CardDescription>Manually update a user&apos;s subscription status in the miembros table</CardDescription>
+          <CardDescription>Manually update a user&apos;s subscription status in the subscriptions table</CardDescription>
         </CardHeader>
         <CardContent>
           {result && (

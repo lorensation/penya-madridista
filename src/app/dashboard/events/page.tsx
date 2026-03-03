@@ -1,11 +1,11 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { supabase } from "@/lib/supabase"
 import { hasMembershipAccess } from "@/lib/membership-access"
+import { getLatestSubscriptionByUserId } from "@/lib/data/subscription"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -26,20 +26,12 @@ interface Event {
   updated_at: string | null
 }
 
-interface Profile {
-  id: string
-  subscription_status?: string | null
-  [key: string]: string | number | boolean | null | undefined
-}
-
 interface Subscription {
   status: string | null
   end_date: string | null
 }
 
 export default function EventsPage() {
-  const router = useRouter()
-  const [profile, setProfile] = useState<Profile | null>(null)
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
@@ -58,34 +50,23 @@ export default function EventsPage() {
 
         const userId = userData.user.id
 
-        // Fetch user profile
-        const { data: profileData, error: profileError } = await supabase
-          .from("miembros")
-          .select("*")
-          .eq("id", userId)
-          .single()
-
-        if (profileError) {
-          console.log("Profile fetch error:", profileError)
-          // Don't throw error, just set profile to null
-          setProfile(null)
-        } else {
-          setProfile(profileData)
-        }
-
-        const { data: subscriptionData, error: subscriptionError } = await supabase
-          .from("subscriptions")
-          .select("status, end_date")
-          .eq("member_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle()
+        const { data: subscriptionData, error: subscriptionError } = await getLatestSubscriptionByUserId(
+          supabase,
+          userId,
+        )
 
         if (subscriptionError) {
           console.error("Subscription fetch error:", subscriptionError)
           setSubscription(null)
         } else {
-          setSubscription(subscriptionData as Subscription | null)
+          setSubscription(
+            subscriptionData
+              ? {
+                  status: subscriptionData.status,
+                  end_date: subscriptionData.end_date,
+                }
+              : null,
+          )
         }
 
         // Fetch events from database
@@ -96,7 +77,7 @@ export default function EventsPage() {
         
         if (eventsError) {
           console.error("Error fetching events:", eventsError)
-          setError("No se pudieron cargar los eventos. Por favor, inténtalo de nuevo más tarde.")
+          setError("No se pudieron cargar los eventos. Por favor, intÃ©ntalo de nuevo mÃ¡s tarde.")
         } else {
           setEvents(eventsData || [])
         }
@@ -110,7 +91,7 @@ export default function EventsPage() {
     }
 
     checkUser()
-  }, [router])
+  }, [])
 
   if (loading) {
     return (
@@ -135,7 +116,7 @@ export default function EventsPage() {
     )
   }
 
-  const subscriptionStatus = subscription?.status || profile?.subscription_status || "inactive"
+  const subscriptionStatus = subscription?.status || "inactive"
   const hasPrivilegedAccess = hasMembershipAccess({
     status: subscriptionStatus,
     endDate: subscription?.end_date ?? null,
@@ -144,7 +125,7 @@ export default function EventsPage() {
   // Create a WhatsApp chat link for event reservation
   const createWhatsAppLink = (eventTitle: string) => {
     // Format the message for WhatsApp
-    const message = encodeURIComponent(`Hola, me gustaría reservar una plaza para el evento: ${eventTitle}`);
+    const message = encodeURIComponent(`Hola, me gustarÃ­a reservar una plaza para el evento: ${eventTitle}`);
     return `https://wa.me/34665652251?text=${message}`; // Replace with your actual WhatsApp number
   };
 
@@ -152,16 +133,16 @@ export default function EventsPage() {
     <div className="space-y-6 p-6 md:p-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Eventos</h1>
-        <p className="text-gray-500">Descubre y reserva tu plaza en los próximos eventos exclusivos para socios</p>
+        <p className="text-gray-500">Descubre y reserva tu plaza en los prÃ³ximos eventos exclusivos para socios</p>
       </div>
 
       {!hasPrivilegedAccess && (
         <Alert className="mb-8 bg-yellow-50 border-yellow-200">
           <AlertTriangle className="h-4 w-4 text-yellow-800" />
           <AlertDescription className="text-yellow-800">
-            Para reservar plazas en los eventos, necesitas tener una membresía activa.
+            Para reservar plazas en los eventos, necesitas tener una membresÃ­a activa.
             <Link href="/membership" className="font-medium underline ml-1">
-              Completa tu suscripción
+              Completa tu suscripciÃ³n
             </Link>
             .
           </AlertDescription>
@@ -227,23 +208,33 @@ export default function EventsPage() {
                     </div>
                   )}
                 </div>
-                <a 
-                  href={createWhatsAppLink(event.title)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full mt-auto"
-                >
-                  <Button 
-                    className={`w-full transition-all flex items-center justify-center gap-2 
-                    ${hasPrivilegedAccess
-                      ? "hover:bg-white hover:text-primary hover:border hover:border-black" 
-                      : "bg-gray-400 hover:bg-gray-500 cursor-not-allowed"}`} 
-                    disabled={!hasPrivilegedAccess}
+                                {hasPrivilegedAccess ? (
+                  <a
+                    href={createWhatsAppLink(event.title)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full mt-auto"
                   >
-                    <PhoneOutgoing className="h-4 w-4" />
-                    {hasPrivilegedAccess ? "Reservar Plaza por WhatsApp" : "Membresía Requerida"}
-                  </Button>
-                </a>
+                    <Button className="w-full transition-all flex items-center justify-center gap-2 hover:bg-white hover:text-primary hover:border hover:border-black">
+                      <PhoneOutgoing className="h-4 w-4" />
+                      Reservar Plaza por WhatsApp
+                    </Button>
+                  </a>
+                ) : (
+                  <div className="w-full mt-auto space-y-2">
+                    <Button
+                      className="w-full transition-all flex items-center justify-center gap-2 bg-gray-400 hover:bg-gray-500 cursor-not-allowed"
+                      disabled
+                      aria-disabled="true"
+                    >
+                      <PhoneOutgoing className="h-4 w-4" />
+                      Membresia Requerida
+                    </Button>
+                    <Link href="/membership" className="block text-center text-xs text-primary hover:underline">
+                      Hazte miembro
+                    </Link>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -252,4 +243,5 @@ export default function EventsPage() {
     </div>
   )
 }
+
 

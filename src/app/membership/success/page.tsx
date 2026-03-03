@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
+import { getLatestSubscriptionByUserId } from "@/lib/data/subscription"
 import { Suspense } from "react"
 
 function SuccessContent() {
@@ -21,37 +22,33 @@ function SuccessContent() {
   useEffect(() => {
     const verifyMembership = async () => {
       try {
-        // Get the user
         const { data: userData, error: userError } = await supabase.auth.getUser()
-        
+
         if (userError || !userData.user) {
           console.error("Error fetching user data:", userError)
           router.push("/login")
           return
         }
 
-        // Check if the user has a member profile
-        const { data: memberData, error: memberError } = await supabase
-          .from("miembros")
-          .select("id, subscription_status")
-          .eq("id", userData.user.id)
-          .single()
+        const { data: subscriptionData, error: subscriptionError } = await getLatestSubscriptionByUserId(
+          supabase,
+          userData.user.id,
+        )
 
-        if (memberError) {
-          if (memberError.code === "PGRST116") {
-            // No member profile — redirect to complete profile
-            router.push("/complete-profile")
-            return
-          }
-          console.error("Error checking member profile:", memberError)
-          setError("Error al verificar tu estado de socio. Contacta con soporte.")
+        if (subscriptionError) {
+          console.error("Error checking subscription:", subscriptionError)
+          setError("Error al verificar tu estado de suscripcion. Contacta con soporte.")
           setLoading(false)
           return
         }
 
-        // Member exists — check subscription status
-        if (memberData.subscription_status !== "active") {
-          console.log("Member found but subscription not active:", memberData.subscription_status)
+        if (!subscriptionData) {
+          router.push("/complete-profile")
+          return
+        }
+
+        if (subscriptionData.status !== "active") {
+          console.log("Subscription found but not active:", subscriptionData.status)
         }
 
         setLoading(false)
@@ -70,7 +67,7 @@ function SuccessContent() {
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto">
-            <p className="mt-4 text-gray-600">Procesando tu suscripción...</p>
+            <p className="mt-4 text-gray-600">Procesando tu suscripcion...</p>
           </div>
         </div>
       </div>
@@ -95,11 +92,11 @@ function SuccessContent() {
               d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-red-600">Error en el Proceso</h2>
+          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-red-600">Error en el proceso</h2>
           <p className="mt-2 text-center text-sm text-gray-600">{error}</p>
           <div className="mt-6">
             <Link href="/membership">
-              <Button className="w-full bg-primary hover:bg-secondary">Volver a Intentar</Button>
+              <Button className="w-full bg-primary hover:bg-secondary">Volver a intentar</Button>
             </Link>
           </div>
         </div>
@@ -119,20 +116,20 @@ function SuccessContent() {
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
-        <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-primary">¡Suscripción Exitosa!</h2>
+        <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-primary">Suscripcion exitosa</h2>
         <p className="mt-2 text-center text-sm text-gray-600">
-          Gracias por unirte a la Peña Lorenzo Sanz. Tu suscripción ha sido procesada correctamente.
+          Gracias por unirte a la Pena Lorenzo Sanz. Tu suscripcion ha sido procesada correctamente.
         </p>
         <p className="mt-4 text-center text-sm text-gray-600">
           Ahora puedes acceder a todos los beneficios exclusivos para socios desde tu panel de control.
         </p>
         <div className="mt-6 space-y-4">
           <Link href="/dashboard">
-            <Button className="w-full bg-primary hover:bg-secondary">Ir al Panel de Socio</Button>
+            <Button className="w-full bg-primary hover:bg-secondary">Ir al panel de socio</Button>
           </Link>
           <Link href="/">
             <Button variant="outline" className="w-full border-primary text-primary hover:bg-primary hover:text-white">
-              Volver al Inicio
+              Volver al inicio
             </Button>
           </Link>
         </div>
