@@ -406,8 +406,11 @@ export async function sendCampaign(campaignId: string): Promise<SendResult> {
       .update({ recipient_count: recipients.length })
       .eq("id", campaignId)
 
+    // eslint-disable-next-line prefer-const
     let sentCount = 0
+    // eslint-disable-next-line prefer-const
     let failedCount = 0
+    // eslint-disable-next-line prefer-const
     let skippedCount = 0
 
     // Send to each recipient

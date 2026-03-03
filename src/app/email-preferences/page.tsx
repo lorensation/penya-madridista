@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -14,7 +14,7 @@ interface Preferences {
   event_notifications: boolean
 }
 
-export default function EmailPreferencesPage() {
+function EmailPreferencesContent() {
   const searchParams = useSearchParams()
   const token = searchParams.get("token")
 
@@ -212,5 +212,24 @@ export default function EmailPreferencesPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+        <p className="mt-4 text-gray-600">Cargando preferencias...</p>
+      </div>
+    </div>
+  )
+}
+
+export default function EmailPreferencesPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <EmailPreferencesContent />
+    </Suspense>
   )
 }
