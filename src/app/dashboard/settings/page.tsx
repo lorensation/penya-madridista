@@ -52,6 +52,7 @@ interface FormData {
   country: string
   emailNotifications: boolean
   marketingEmails: boolean
+  eventNotifications: boolean
 }
 
 // Define a proper interface for user data
@@ -62,6 +63,7 @@ interface UserData {
   is_member?: boolean
   email_notifications?: boolean | null
   marketing_emails?: boolean | null
+  event_notifications?: boolean | null
   created_at?: string
   updated_at?: string | null
   [key: string]: unknown // For any other properties that might exist
@@ -106,6 +108,7 @@ export default function SettingsPage() {
     country: "",
     emailNotifications: true,
     marketingEmails: true,
+    eventNotifications: true,
   })
 
   // Update form with user data from users table - wrapped in useCallback
@@ -116,6 +119,7 @@ export default function SettingsPage() {
       email: userRecord.email || "",
       emailNotifications: userRecord.email_notifications !== false,
       marketingEmails: userRecord.marketing_emails !== false,
+      eventNotifications: userRecord.event_notifications !== false,
     }))
   }, []);
 
@@ -543,6 +547,7 @@ export default function SettingsPage() {
         .update({
           email_notifications: formData.emailNotifications,
           marketing_emails: formData.marketingEmails,
+          event_notifications: formData.eventNotifications,
           updated_at: nowIso,
         })
         .eq("id", user.id)
@@ -557,6 +562,7 @@ export default function SettingsPage() {
           ...prev,
           email_notifications: formData.emailNotifications,
           marketing_emails: formData.marketingEmails,
+          event_notifications: formData.eventNotifications,
           updated_at: nowIso,
         }
       })
@@ -1017,6 +1023,17 @@ const handleSendPasswordReset = async () => {
                       id="marketingEmails"
                       checked={formData.marketingEmails}
                       onCheckedChange={(checked) => handleSwitchChange("marketingEmails", checked)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="eventNotifications">Notificaciones de eventos</Label>
+                      <p className="text-sm text-gray-500">Recibe información sobre eventos y actividades de la peña</p>
+                    </div>
+                    <Switch
+                      id="eventNotifications"
+                      checked={formData.eventNotifications}
+                      onCheckedChange={(checked) => handleSwitchChange("eventNotifications", checked)}
                     />
                   </div>
                 </div>

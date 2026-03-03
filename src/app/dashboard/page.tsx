@@ -74,7 +74,7 @@ export default function DashboardPage() {
         locale: es 
       })
     } catch (e) {
-      return "fecha invÃ¡lida: " + e;
+      return "fecha inválida: " + e;
     }
   }
 
@@ -257,7 +257,7 @@ export default function DashboardPage() {
             <AlertDescription className="text-center">{error}</AlertDescription>
           </Alert>
         </div>
-        <Button onClick={() => router.push("/login")}>Volver a Iniciar SesiÃ³n</Button>
+        <Button onClick={() => router.push("/login")}>Volver a Iniciar Sesión</Button>
       </div>
     )
   }
@@ -280,7 +280,7 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-gray-500">Bienvenido a tu Ã¡rea personal</p>
+          <p className="text-gray-500">Bienvenido a tu área personal</p>
         </div>
       </div>
 
@@ -288,9 +288,9 @@ export default function DashboardPage() {
         <Alert className="mb-8 bg-red-50 border-red-200">
           <AlertTriangle className="h-4 w-4 text-red-800" />
           <AlertDescription className="text-red-800">
-            Tienes tu membresÃ­a cancelada. Para seguir disfrutando de los beneficios,
+            Tienes tu membresía cancelada. Para seguir disfrutando de los beneficios,
             <Link href="/dashboard/membership" className="font-medium underline ml-1">
-              renuÃ©vala
+              renuévala
             </Link>
             .
           </AlertDescription>
@@ -299,9 +299,9 @@ export default function DashboardPage() {
         <Alert className="mb-8 bg-yellow-50 border-yellow-200">
           <AlertTriangle className="h-4 w-4 text-yellow-800" />
           <AlertDescription className="text-yellow-800">
-            Tu membresÃ­a no estÃ¡ activa. Para disfrutar de todos los beneficios,
+            Tu membresía no está activa. Para disfrutar de todos los beneficios,
             <Link href="/membership" className="font-medium underline ml-1">
-              completa tu suscripciÃ³n
+              completa tu suscripción
             </Link>
             .
           </AlertDescription>
@@ -313,7 +313,7 @@ export default function DashboardPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium flex items-center">
               <CreditCard className="mr-2 h-5 w-5 text-primary" />
-              Estado de MembresÃ­a
+              Estado de Membresía
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col flex-grow">
@@ -359,7 +359,7 @@ export default function DashboardPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium flex items-center">
               <Calendar className="mr-2 h-5 w-5 text-primary" />
-              PrÃ³ximos Eventos
+              Próximos Eventos
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col flex-grow">
@@ -368,7 +368,7 @@ export default function DashboardPage() {
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
               </div>
             ) : events.length === 0 ? (
-              <p className="text-sm text-gray-500">No hay eventos prÃ³ximos</p>
+              <p className="text-sm text-gray-500">No hay eventos próximos</p>
             ) : (
               <div className="space-y-3">
                 {!isMember && (
@@ -384,7 +384,7 @@ export default function DashboardPage() {
                       <span>{formatEventDate(event.date)}</span>
                       {event.time && (
                         <>
-                          <span className="mx-1">â€¢</span>
+                          <span className="mx-1">•</span>
                           <Clock className="h-3 w-3 mr-1" />
                           <span>{event.time}</span>
                         </>
@@ -425,7 +425,7 @@ export default function DashboardPage() {
             <p className="text-sm text-gray-500">
               {isMember
                 ? "Accede a contenido exclusivo"
-                : "Activa tu membresÃ­a para ver contenido"}
+                : "Activa tu membresía para ver contenido"}
             </p>
             
             {isMember && (
@@ -434,11 +434,11 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-1 gap-2">
                   <div className="flex items-center">
                     <div className="w-10 h-10 relative flex-shrink-0">
-                      <Image src="/lorenzosanz-bufanda.jpg" alt="Fotos histÃ³ricas" width={50} height={50} className="object-cover w-full h-full rounded-sm" />
+                      <Image src="/lorenzosanz-bufanda.jpg" alt="Fotos históricas" width={50} height={50} className="object-cover w-full h-full rounded-sm" />
                     </div>
                     <div className="ml-2 truncate">
-                      <p className="text-xs font-medium line-clamp-1">ColecciÃ³n de fotos histÃ³ricas</p>
-                      <p className="text-xs text-gray-500"><Link href="/content/galleries/fotos-historicas" className="hover:underline">GalerÃ­a</Link> â€¢ 45 imÃ¡genes</p>
+                      <p className="text-xs font-medium line-clamp-1">Colección de fotos históricas</p>
+                      <p className="text-xs text-gray-500"><Link href="/content/galleries/fotos-historicas" className="hover:underline">Galería</Link> • 45 imágenes</p>
                     </div>
                   </div>
                   <div className="flex items-center">
@@ -452,12 +452,12 @@ export default function DashboardPage() {
                     </div>
                     <div className="ml-2 truncate">
                       <p className="text-xs font-medium line-clamp-1">Entrevista exclusiva con Lorenzo Sanz</p>
-                      <p className="text-xs text-gray-500"><Link href="/dashboard/content/" className="hover:underline">Video</Link> â€¢ 100 min</p>
+                      <p className="text-xs text-gray-500"><Link href="/dashboard/content/" className="hover:underline">Video</Link> • 100 min</p>
                     </div>
                   </div>
                   {/*<div className="flex items-center">
                     <div className="w-10 h-10 relative flex-shrink-0">
-                      <img src="/reportaje-movistar.jpg" alt="La SÃ©ptima" className="object-cover w-full h-full rounded-sm" />
+                      <img src="/reportaje-movistar.jpg" alt="La Séptima" className="object-cover w-full h-full rounded-sm" />
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="w-4 h-4 rounded-full bg-white/80 flex items-center justify-center">
                           <div className="w-0 h-0 border-y-2 border-y-transparent border-l-3 border-l-primary ml-0.5"></div>
@@ -465,8 +465,8 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="ml-2 truncate">
-                      <p className="text-xs font-medium line-clamp-1">La SÃ©ptima: El camino hacia la gloria</p>
-                      <p className="text-xs text-gray-500"><Link href="/dashboard/content/" className="hover:underline">Video</Link> â€¢ 60 min</p>
+                      <p className="text-xs font-medium line-clamp-1">La Séptima: El camino hacia la gloria</p>
+                      <p className="text-xs text-gray-500"><Link href="/dashboard/content/" className="hover:underline">Video</Link> • 60 min</p>
                     </div>
                   </div>*/}
                 </div>
@@ -491,7 +491,7 @@ export default function DashboardPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium flex items-center">
               <Settings className="mr-2 h-5 w-5 text-primary" />
-              ConfiguraciÃ³n
+              Configuración
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col flex-grow">
@@ -517,15 +517,15 @@ export default function DashboardPage() {
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Actividad Reciente</CardTitle>
-            <CardDescription>Ãšltimas actualizaciones y actividades de la peÃ±a</CardDescription>
+            <CardDescription>Últimas actualizaciones y actividades de la peña</CardDescription>
           </CardHeader>
           <CardContent>
             {!isMember ? (
               <div className="text-center py-8">
                 <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-                <p className="text-gray-600 mb-4">Activa tu membresÃ­a para ver la actividad reciente</p>
+                <p className="text-gray-600 mb-4">Activa tu membresía para ver la actividad reciente</p>
                 <Link href="/membership">
-                  <Button className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black">Completar SuscripciÃ³n</Button>
+                  <Button className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black">Completar Suscripción</Button>
                 </Link>
               </div>
             ) : loadingActivity ? (
@@ -548,7 +548,7 @@ export default function DashboardPage() {
                       )}
                       <div>
                         <p className="font-medium">
-                          {item.type === 'post' ? 'Nuevo artÃ­culo publicado' : 'Evento anunciado'}
+                          {item.type === 'post' ? 'Nuevo artículo publicado' : 'Evento anunciado'}
                         </p>
                         <div className="flex items-center text-sm text-gray-500">
                           <Link 
@@ -576,7 +576,7 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Enlaces RÃ¡pidos</CardTitle>
+            <CardTitle>Enlaces Rápidos</CardTitle>
             <CardDescription>Accesos directos a secciones importantes</CardDescription>
           </CardHeader>
           <CardContent>
@@ -599,7 +599,7 @@ export default function DashboardPage() {
               {isMember && (
                 <Link href="/dashboard/membership">
                   <Button variant="outline" className="w-full justify-start transition-all hover:bg-black hover:text-white hover:border hover:border-black">
-                    Gestionar MembresÃ­a
+                    Gestionar Membresía
                   </Button>
                 </Link>
               )}

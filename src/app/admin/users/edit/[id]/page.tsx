@@ -384,7 +384,7 @@ export default function UserDetailsPage() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>
-            {error || "No se encontrÃ³ el miembro solicitado"}
+            {error || "No se encontró el miembro solicitado"}
           </AlertDescription>
         </Alert>
         <Button 
@@ -432,12 +432,12 @@ export default function UserDetailsPage() {
               variant={effectiveSubscriptionStatus === 'active' ? "default" : "outline"}
               className={effectiveSubscriptionStatus === 'active' ? "bg-green-600" : ""}
             >
-              {effectiveSubscriptionStatus === 'active' ? 'SuscripciÃ³n Activa' : 'Sin SuscripciÃ³n'}
+              {effectiveSubscriptionStatus === 'active' ? 'Suscripción Activa' : 'Sin Suscripción'}
             </Badge>
             {hasInfiniteSubscription && (
               <Badge className="bg-blue-600">
                 <Infinity className="h-3 w-3 mr-1" />
-                SuscripciÃ³n Permanente
+                Suscripción Permanente
               </Badge>
             )}
           </div>
@@ -504,7 +504,7 @@ export default function UserDetailsPage() {
           </TabsTrigger>
           <TabsTrigger value="subscription" className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" />
-            <span>SuscripciÃ³n</span>
+            <span>Suscripción</span>
           </TabsTrigger>
           <TabsTrigger value="account" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
@@ -516,9 +516,9 @@ export default function UserDetailsPage() {
         <TabsContent value="personal">
           <Card>
             <CardHeader>
-              <CardTitle>InformaciÃ³n Personal</CardTitle>
+              <CardTitle>Información Personal</CardTitle>
               <CardDescription>
-                Datos personales del miembro de la PeÃ±a Lorenzo Sanz
+                Datos personales del miembro de la Peña Lorenzo Sanz
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -561,7 +561,7 @@ export default function UserDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="telefono">TelÃ©fono</Label>
+                  <Label htmlFor="telefono">Teléfono</Label>
                   <Input 
                     id="telefono" 
                     value={miembro.telefono || ''} 
@@ -593,10 +593,10 @@ export default function UserDetailsPage() {
               <Separator className="my-6" />
               
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">DirecciÃ³n</h3>
+                <h3 className="text-lg font-medium">Dirección</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="direccion">DirecciÃ³n</Label>
+                    <Label htmlFor="direccion">Dirección</Label>
                     <Input 
                       id="direccion" 
                       value={miembro.direccion || ''} 
@@ -605,7 +605,7 @@ export default function UserDetailsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="direccion_extra">DirecciÃ³n Extra</Label>
+                    <Label htmlFor="direccion_extra">Dirección Extra</Label>
                     <Input 
                       id="direccion_extra" 
                       value={miembro.direccion_extra || ''} 
@@ -614,7 +614,7 @@ export default function UserDetailsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="cp">CÃ³digo Postal</Label>
+                    <Label htmlFor="cp">Código Postal</Label>
                     <Input 
                         id="cp" 
                         value={miembro.cp || ''} 
@@ -641,7 +641,7 @@ export default function UserDetailsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="pais">PaÃ­s</Label>
+                    <Label htmlFor="pais">País</Label>
                     <Input 
                       id="pais" 
                       value={miembro.pais || ''} 
@@ -655,7 +655,7 @@ export default function UserDetailsPage() {
               <Separator className="my-6" />
               
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">InformaciÃ³n del Real Madrid</h3>
+                <h3 className="text-lg font-medium">Información del Real Madrid</h3>
                 <div className="flex items-center space-x-2">
                   <Checkbox 
                     id="es_socio_realmadrid" 
@@ -669,7 +669,7 @@ export default function UserDetailsPage() {
                 </div>
                 {(miembro.es_socio_realmadrid && isEditing) && (
                   <div className="space-y-2">
-                    <Label htmlFor="num_socio">NÃºmero de Socio</Label>
+                    <Label htmlFor="num_socio">Número de Socio</Label>
                     <Input 
                       id="num_socio" 
                       value={miembro.num_socio || ''} 
@@ -691,7 +691,7 @@ export default function UserDetailsPage() {
                 </div>
                 {(miembro.socio_carnet_madridista && isEditing) && (
                   <div className="space-y-2">
-                    <Label htmlFor="num_socio">NÃºmero de Carnet Madridista</Label>
+                    <Label htmlFor="num_socio">Número de Carnet Madridista</Label>
                     <Input 
                       id="num_socio" 
                       value={miembro.num_carnet || ''} 
@@ -709,15 +709,15 @@ export default function UserDetailsPage() {
         <TabsContent value="subscription">
           <Card>
             <CardHeader>
-              <CardTitle>InformaciÃ³n de SuscripciÃ³n</CardTitle>
+              <CardTitle>Información de Suscripción</CardTitle>
               <CardDescription>
-                Detalles de la suscripciÃ³n del miembro
+                Detalles de la suscripción del miembro
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label>Estado de SuscripciÃ³n</Label>
+                  <Label>Estado de Suscripción</Label>
                   <div className="flex items-center space-x-2">
                     <Badge 
                       className={effectiveSubscriptionStatus === 'active' 
@@ -732,12 +732,12 @@ export default function UserDetailsPage() {
                 
                 {effectiveSubscriptionStatus === 'active' && (
                   <div className="space-y-2">
-                    <Label>Tipo de SuscripciÃ³n</Label>
+                    <Label>Tipo de Suscripción</Label>
                     <div>
                       {hasInfiniteSubscription ? (
                         <div className="flex items-center">
                           <Infinity className="h-4 w-4 mr-2 text-blue-600" />
-                          <span className="text-blue-600 font-medium">SuscripciÃ³n Permanente</span>
+                          <span className="text-blue-600 font-medium">Suscripción Permanente</span>
                         </div>
                       ) : (
                         <div className="flex items-center">
@@ -763,7 +763,7 @@ export default function UserDetailsPage() {
                 
                 {subscription?.last_four && (
                   <div className="space-y-2">
-                    <Label>Ãšltimos 4 dÃ­gitos de tarjeta</Label>
+                    <Label>Últimos 4 dígitos de tarjeta</Label>
                     <div className="flex items-center">
                       <CreditCard className="h-4 w-4 mr-2 text-gray-500" />
                       <span className="text-sm">**** **** **** {subscription.last_four}</span>
@@ -773,7 +773,7 @@ export default function UserDetailsPage() {
                 
                 {subscription?.updated_at && (
                   <div className="space-y-2">
-                    <Label>Ãšltima ActualizaciÃ³n de SuscripciÃ³n</Label>
+                    <Label>Última Actualización de Suscripción</Label>
                     <div className="flex items-center">
                       <Clock className="h-4 w-4 mr-2 text-gray-500" />
                       <span>{formatDate(subscription.updated_at)}</span>
@@ -785,20 +785,20 @@ export default function UserDetailsPage() {
               <Separator className="my-6" />
               
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">Acciones de SuscripciÃ³n</h3>
+                <h3 className="text-lg font-medium">Acciones de Suscripción</h3>
                 <div className="flex flex-wrap gap-4">
                   <Dialog open={infiniteSubscriptionDialogOpen} onOpenChange={setInfiniteSubscriptionDialogOpen}>
                     <DialogTrigger asChild>
                       <Button variant="outline">
                         <Infinity className="mr-2 h-4 w-4" />
-                        Establecer SuscripciÃ³n Permanente
+                        Establecer Suscripción Permanente
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Establecer SuscripciÃ³n Permanente</DialogTitle>
+                        <DialogTitle>Establecer Suscripción Permanente</DialogTitle>
                         <DialogDescription>
-                          Esta acciÃ³n establecerÃ¡ una suscripciÃ³n que nunca expira para este miembro.
+                          Esta acción establecerá una suscripción que nunca expira para este miembro.
                           Normalmente se usa para miembros de la junta directiva o miembros honorarios.
                         </DialogDescription>
                       </DialogHeader>
@@ -812,7 +812,7 @@ export default function UserDetailsPage() {
                           <Alert className="mt-4 bg-blue-50 border-blue-200">
                             <Infinity className="h-4 w-4 text-blue-600" />
                             <AlertDescription className="text-blue-800">
-                              Este miembro ya tiene una suscripciÃ³n permanente.
+                              Este miembro ya tiene una suscripción permanente.
                             </AlertDescription>
                           </Alert>
                         )}
@@ -847,7 +847,7 @@ export default function UserDetailsPage() {
                   
                   <Button variant="outline" onClick={() => window.alert('Funcionalidad en desarrollo')}>
                     <Clock className="mr-2 h-4 w-4" />
-                    Extender SuscripciÃ³n
+                    Extender Suscripción
                   </Button>
                   
                   <Button
@@ -856,7 +856,7 @@ export default function UserDetailsPage() {
                     onClick={() => window.alert('Funcionalidad en desarrollo')}
                   >
                     <XCircle className="mr-2 h-4 w-4" />
-                    Cancelar SuscripciÃ³n
+                    Cancelar Suscripción
                   </Button>
                 </div>
               </div>
@@ -868,7 +868,7 @@ export default function UserDetailsPage() {
         <TabsContent value="account">
           <Card>
             <CardHeader>
-              <CardTitle>InformaciÃ³n de Cuenta</CardTitle>
+              <CardTitle>Información de Cuenta</CardTitle>
               <CardDescription>
                 Detalles de la cuenta y permisos del usuario
               </CardDescription>
@@ -911,7 +911,7 @@ export default function UserDetailsPage() {
                     <div className="flex-1">
                       <Label htmlFor="admin-role" className="font-medium">Administrador</Label>
                       <p className="text-sm text-gray-500">
-                        Los administradores pueden gestionar todos los aspectos de la web, incluyendo usuarios, contenido y configuraciÃ³n.
+                        Los administradores pueden gestionar todos los aspectos de la web, incluyendo usuarios, contenido y configuración.
                       </p>
                     </div>
                     <Switch 
@@ -970,8 +970,8 @@ export default function UserDetailsPage() {
                       <DialogHeader>
                         <DialogTitle>Eliminar Miembro</DialogTitle>
                         <DialogDescription>
-                          Esta acciÃ³n eliminarÃ¡ permanentemente al miembro de la base de datos.
-                          Esta acciÃ³n no se puede deshacer.
+                          Esta acción eliminará permanentemente al miembro de la base de datos.
+                          Esta acción no se puede deshacer.
                         </DialogDescription>
                       </DialogHeader>
                       <div className="py-4">
@@ -979,8 +979,8 @@ export default function UserDetailsPage() {
                           <AlertTriangle className="h-4 w-4" />
                           <AlertTitle>Advertencia</AlertTitle>
                           <AlertDescription>
-                            EstÃ¡s a punto de eliminar a {miembro.name} {miembro.apellido1} {miembro.apellido2 || ''}.
-                            Todos sus datos serÃ¡n eliminados permanentemente.
+                            Estás a punto de eliminar a {miembro.name} {miembro.apellido1} {miembro.apellido2 || ''}.
+                            Todos sus datos serán eliminados permanentemente.
                           </AlertDescription>
                         </Alert>
                       </div>

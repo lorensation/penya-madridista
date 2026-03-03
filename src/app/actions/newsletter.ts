@@ -1,7 +1,8 @@
 "use server"
 
 import { createServerSupabaseClient } from "@/lib/supabase"
-import { generateWelcomeEmailTemplate, sendEmail } from "@/lib/email"
+import { generateWelcomeEmailTemplate, sendEmail, getWelcomeEmailHeaders } from "@/lib/email"
+import { generatePreferencesToken } from "@/lib/email/preferences-token"
 import { revalidatePath } from "next/cache"
 
 export type ApiResponse = {
@@ -45,11 +46,13 @@ export async function addUserToNewsletter(email: string, name?: string): Promise
       return false
     }
 
-    // Send welcome email
+    // Send welcome email with unsubscribe token
+    const preferencesToken = generatePreferencesToken(email)
     await sendEmail({
       to: email,
       subject: "¡Bienvenido a la Newsletter de la Peña Lorenzo Sanz!",
-      html: generateWelcomeEmailTemplate(name),
+      html: generateWelcomeEmailTemplate(name, preferencesToken),
+      headers: getWelcomeEmailHeaders(preferencesToken),
     })
 
     return true
@@ -149,11 +152,13 @@ export async function subscribeToNewsletter(formData: FormData): Promise<ApiResp
       throw dbError; // Re-throw if it's not a duplicate key error
     }
 
-    // Send welcome email
+    // Send welcome email with unsubscribe token
+    const preferencesToken = generatePreferencesToken(email)
     await sendEmail({
       to: email,
       subject: "¡Bienvenido a la Newsletter de la Peña Lorenzo Sanz!",
-      html: generateWelcomeEmailTemplate(name),
+      html: generateWelcomeEmailTemplate(name, preferencesToken),
+      headers: getWelcomeEmailHeaders(preferencesToken),
     })
 
     // Revalidate relevant paths

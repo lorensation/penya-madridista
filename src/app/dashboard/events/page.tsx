@@ -77,7 +77,7 @@ export default function EventsPage() {
         
         if (eventsError) {
           console.error("Error fetching events:", eventsError)
-          setError("No se pudieron cargar los eventos. Por favor, intÃ©ntalo de nuevo mÃ¡s tarde.")
+          setError("No se pudieron cargar los eventos. Por favor, inténtalo de nuevo más tarde.")
         } else {
           setEvents(eventsData || [])
         }
@@ -125,7 +125,7 @@ export default function EventsPage() {
   // Create a WhatsApp chat link for event reservation
   const createWhatsAppLink = (eventTitle: string) => {
     // Format the message for WhatsApp
-    const message = encodeURIComponent(`Hola, me gustarÃ­a reservar una plaza para el evento: ${eventTitle}`);
+    const message = encodeURIComponent(`Hola, me gustaría reservar una plaza para el evento: ${eventTitle}`);
     return `https://wa.me/34665652251?text=${message}`; // Replace with your actual WhatsApp number
   };
 
@@ -133,16 +133,16 @@ export default function EventsPage() {
     <div className="space-y-6 p-6 md:p-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Eventos</h1>
-        <p className="text-gray-500">Descubre y reserva tu plaza en los prÃ³ximos eventos exclusivos para socios</p>
+        <p className="text-gray-500">Descubre y reserva tu plaza en los próximos eventos exclusivos para socios</p>
       </div>
 
       {!hasPrivilegedAccess && (
         <Alert className="mb-8 bg-yellow-50 border-yellow-200">
           <AlertTriangle className="h-4 w-4 text-yellow-800" />
           <AlertDescription className="text-yellow-800">
-            Para reservar plazas en los eventos, necesitas tener una membresÃ­a activa.
+            Para reservar plazas en los eventos, necesitas tener una membresía activa.
             <Link href="/membership" className="font-medium underline ml-1">
-              Completa tu suscripciÃ³n
+              Completa tu suscripción
             </Link>
             .
           </AlertDescription>
