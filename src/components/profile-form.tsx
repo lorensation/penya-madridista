@@ -99,7 +99,7 @@ const profileFormSchema = z
   .object({
     name: requiredOnlyText("El nombre"),
     apellido1: requiredOnlyText("El primer apellido"),
-    apellido2: optionalOnlyText("El segundo apellido"),
+    apellido2: requiredOnlyText("El segundo apellido"),
     dni_pasaporte: z
       .string()
       .transform((value) => value.trim().replace(/\s+/g, "").toUpperCase())
@@ -148,6 +148,7 @@ const profileFormSchema = z
     num_socio: optionalDigits("El numero de socio", 1, 20),
     socio_carnet_madridista: z.boolean().default(false),
     num_carnet: optionalDigits("El numero de carnet", 1, 20),
+    ni_socio_ni_carnet: z.boolean().default(false),
     email_notifications: z.boolean().default(true),
     marketing_emails: z.boolean().default(true),
   })
@@ -201,6 +202,7 @@ export function ProfileForm({ onSubmit, initialData, lockedFields = [] }: Profil
       num_socio: "",
       socio_carnet_madridista: false,
       num_carnet: "",
+      ni_socio_ni_carnet: false,
       email_notifications: true,
       marketing_emails: true,
     },
@@ -259,7 +261,7 @@ export function ProfileForm({ onSubmit, initialData, lockedFields = [] }: Profil
               name="apellido2"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Segundo Apellido (Opcional)</FormLabel>
+                  <FormLabel>Segundo Apellido</FormLabel>
                   <FormControl>
                     <Input placeholder="Segundo apellido" {...field} />
                   </FormControl>
@@ -434,7 +436,13 @@ export function ProfileForm({ onSubmit, initialData, lockedFields = [] }: Profil
                 <FormControl>
                   <Checkbox
                     checked={field.value}
-                    onCheckedChange={field.onChange}
+                    onCheckedChange={(checked) => {
+                      field.onChange(checked)
+                      if (checked) {
+                        form.setValue("ni_socio_ni_carnet", false)
+                      }
+                    }}
+                    disabled={form.watch("ni_socio_ni_carnet")}
                   />
                 </FormControl>
                 <div className="space-y-1 leading-none">
@@ -468,7 +476,13 @@ export function ProfileForm({ onSubmit, initialData, lockedFields = [] }: Profil
                 <FormControl>
                   <Checkbox
                     checked={field.value}
-                    onCheckedChange={field.onChange}
+                    onCheckedChange={(checked) => {
+                      field.onChange(checked)
+                      if (checked) {
+                        form.setValue("ni_socio_ni_carnet", false)
+                      }
+                    }}
+                    disabled={form.watch("ni_socio_ni_carnet")}
                   />
                 </FormControl>
                 <div className="space-y-1 leading-none">
@@ -483,7 +497,7 @@ export function ProfileForm({ onSubmit, initialData, lockedFields = [] }: Profil
               control={form.control}
               name="num_carnet"
               render={({ field }) => (
-                <FormItem className="ml-7">
+                <FormItem className="ml-7 mb-4">
                   <FormLabel>Número de Carnet Madridista</FormLabel>
                   <FormControl>
                     <Input placeholder="Número de carnet" {...field} />
@@ -493,6 +507,32 @@ export function ProfileForm({ onSubmit, initialData, lockedFields = [] }: Profil
               )}
             />
           )}
+          
+          <FormField
+            control={form.control}
+            name="ni_socio_ni_carnet"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-start space-x-3 space-y-0 mb-4">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={(checked) => {
+                      field.onChange(checked)
+                      if (checked) {
+                        form.setValue("es_socio_realmadrid", false)
+                        form.setValue("num_socio", "")
+                        form.setValue("socio_carnet_madridista", false)
+                        form.setValue("num_carnet", "")
+                      }
+                    }}
+                  />
+                </FormControl>
+                <div className="space-y-1 leading-none">
+                  <FormLabel>No soy ni socio del Real Madrid ni tengo Carnet Madridista</FormLabel>
+                </div>
+              </FormItem>
+            )}
+          />
         </div>
         
         <div className="bg-white p-6 rounded-lg shadow-sm border">

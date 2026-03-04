@@ -29,7 +29,7 @@ interface CheckoutSessionData {
 type ProfileFormValues = {
   name: string
   apellido1: string
-  apellido2?: string
+  apellido2: string
   dni_pasaporte: string
   telefono: string
   fecha_nacimiento: string
@@ -44,6 +44,7 @@ type ProfileFormValues = {
   num_socio?: string
   socio_carnet_madridista: boolean
   num_carnet?: string
+  ni_socio_ni_carnet: boolean
   email_notifications: boolean
   marketing_emails: boolean
 }
