@@ -44,15 +44,6 @@ const requiredOnlyText = (field: string, minLength = 2) =>
       message: `${field} solo puede contener letras`,
     })
 
-const optionalOnlyText = (field: string) =>
-  z
-    .string()
-    .transform(normalizeOptionalText)
-    .refine((value) => value === undefined || ONLY_TEXT_REGEX.test(value), {
-      message: `${field} solo puede contener letras`,
-    })
-    .optional()
-
 const requiredDigits = (field: string, minLength = 1, maxLength?: number) =>
   z.preprocess(
     (value) => (typeof value === "string" ? value.trim() : value),
