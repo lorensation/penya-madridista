@@ -289,6 +289,14 @@ export async function chargeMIT(options: {
   }
 }
 
+/** Map of known SIS error codes to human-readable messages */
+const SIS_ERROR_MESSAGES: Record<string, string> = {
+  SIS0034: "Error de acceso a la base de datos de Redsys. Posibles causas: el pedido original no se encuentra, el terminal no tiene habilitadas las devoluciones, o error temporal del sistema. Contacta con Getnet/Redsys para verificar que tu terminal tiene permisos de devolución.",
+  SIS0218: "El terminal no tiene habilitadas operaciones seguras vía WebService/REST.",
+  SIS0256: "El comercio no permite devoluciones.",
+  SIS0057: "El importe de la devolución supera el de la operación original.",
+}
+
 export async function processRefund(options: {
   originalOrder: string
   amountCents: number
@@ -303,6 +311,10 @@ export async function processRefund(options: {
     DS_MERCHANT_TRANSACTIONTYPE: "3",
     DS_MERCHANT_ORDER: originalOrder,
     DS_MERCHANT_AMOUNT: String(amountCents),
+    DS_MERCHANT_DIRECTPAYMENT: "true",
+    // Exclude notification URL for synchronous refund — set to undefined
+    // so buildSignedRequest's cleanParams loop will omit it
+    DS_MERCHANT_MERCHANTURL: undefined as unknown as string,
   }
 
   try {
@@ -330,11 +342,24 @@ export async function processRefund(options: {
       errorCode: dsResponse,
     }
   } catch (error) {
-    console.error("[redsys/client] processRefund failed", { originalOrder, error })
+    const message = error instanceof Error ? error.message : "Error de red"
+    // Check if the error contains a known SIS code
+    const sisMatch = message.match(/SIS(\d{4})/)
+    const sisCode = sisMatch ? `SIS${sisMatch[1]}` : null
+    const friendlyMsg = sisCode && SIS_ERROR_MESSAGES[sisCode]
+      ? `${SIS_ERROR_MESSAGES[sisCode]} (${sisCode})`
+      : message
+
+    console.error("[redsys/client] processRefund failed", {
+      originalOrder,
+      error,
+      sisCode,
+      friendlyMessage: friendlyMsg,
+    })
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Error de red",
-      errorCode: "NETWORK",
+      error: friendlyMsg,
+      errorCode: sisCode ?? "NETWORK",
     }
   }
 }

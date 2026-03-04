@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { FileText, Users, Settings, Webhook, AlertCircle } from "lucide-react"
+import { FileText, Users, Settings, Webhook, AlertCircle, Mail, RotateCcw } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { supabase } from "@/lib/supabase"
 
@@ -156,6 +156,52 @@ export default function AdminDashboard() {
                   className="w-full transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
                 >
                   Manage Events
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Email Campaigns Card */}
+        <Card className="flex flex-col h-full">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Mail className="mr-2 h-5 w-5 text-primary" />
+              Email Campaigns
+            </CardTitle>
+            <CardDescription>Envía campañas de email a los socios</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col flex-grow justify-between">
+            <p className="mb-4">Crea y gestiona campañas de email, newsletters y comunicaciones a los socios.</p>
+            <div className="mt-auto pt-4">
+              <Link href="/admin/emails" className="w-full block">
+                <Button 
+                  className="w-full transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
+                >
+                  Manage Emails
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Refunds Card */}
+        <Card className="flex flex-col h-full">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <RotateCcw className="mr-2 h-5 w-5 text-primary" />
+              Reembolsos
+            </CardTitle>
+            <CardDescription>Gestiona las solicitudes de reembolso</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col flex-grow justify-between">
+            <p className="mb-4">Revisa, aprueba o rechaza las solicitudes de reembolso de los socios.</p>
+            <div className="mt-auto pt-4">
+              <Link href="/admin/refunds" className="w-full block">
+                <Button 
+                  className="w-full transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
+                >
+                  Manage Refunds
                 </Button>
               </Link>
             </div>

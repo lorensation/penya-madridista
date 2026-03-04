@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { processRefund, generateOrderNumber } from "@/lib/redsys"
 import { sendEmail } from "@/lib/email"
+import { generatePreferencesToken } from "@/lib/email/preferences-token"
 import {
   renderRefundRequestNotificationEmail,
   renderRefundApprovedEmail,
@@ -239,9 +240,11 @@ export async function declineRefund(input: {
       .single()
 
     if (memberData?.email) {
+      const preferencesToken = generatePreferencesToken(memberData.email)
       const html = renderRefundDeclinedEmail({
         memberName: memberData.name || "Socio",
         adminResponse: responseMessage.trim(),
+        preferencesToken,
       })
 
       await sendEmail({
@@ -414,10 +417,12 @@ export async function approveRefund(input: {
       .single()
 
     if (memberData?.email) {
+      const preferencesToken = generatePreferencesToken(memberData.email)
       const html = renderRefundApprovedEmail({
         memberName: memberData.name || "Socio",
         amountCents: request.amount_cents,
         last4: originalTxn.last_four,
+        preferencesToken,
       })
 
       await sendEmail({
