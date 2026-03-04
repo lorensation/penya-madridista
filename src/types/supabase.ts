@@ -725,6 +725,96 @@ export type Database = {
         }
         Relationships: []
       }
+      refund_requests: {
+        Row: {
+          id: string
+          member_id: string
+          subscription_id: string
+          original_transaction_id: string
+          amount_cents: number
+          reason: string
+          details: string
+          status: string
+          admin_notes: string | null
+          admin_response: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          refund_transaction_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          member_id: string
+          subscription_id: string
+          original_transaction_id: string
+          amount_cents: number
+          reason: string
+          details: string
+          status?: string
+          admin_notes?: string | null
+          admin_response?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          refund_transaction_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          member_id?: string
+          subscription_id?: string
+          original_transaction_id?: string
+          amount_cents?: number
+          reason?: string
+          details?: string
+          status?: string
+          admin_notes?: string | null
+          admin_response?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          refund_transaction_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refund_requests_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refund_requests_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refund_requests_original_transaction_id_fkey"
+            columns: ["original_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "payment_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refund_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refund_requests_refund_transaction_id_fkey"
+            columns: ["refund_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "payment_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posts: {
         Row: {
           author: string

@@ -10,6 +10,8 @@ import {
   cancelMembershipSubscription,
   prepareCardUpdate,
 } from "@/app/actions/payment"
+import { getMemberRefundStatus } from "@/app/actions/refunds"
+import { RefundRequestDialog } from "@/components/subscription/refund-request-dialog"
 import { createBrowserSupabaseClient } from "@/lib/supabase"
 import { hasMembershipAccess } from "@/lib/membership-access"
 import { getLatestSubscriptionByUserId } from "@/lib/data/subscription"
@@ -38,6 +40,7 @@ export default function MembershipPage() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null)
   const [canceling, setCanceling] = useState(false)
+  const [refundStatus, setRefundStatus] = useState<{ canRequest: boolean; pendingRequest: boolean; reason?: string } | null>(null)
 
   const [cardUpdateLoading, setCardUpdateLoading] = useState(false)
   const [redirectActionUrl, setRedirectActionUrl] = useState<string | null>(null)
@@ -73,6 +76,14 @@ export default function MembershipPage() {
           setSubscription(null)
         } else {
           setSubscription((subData as SubscriptionData) ?? null)
+        }
+
+        // Load refund status
+        try {
+          const rStatus = await getMemberRefundStatus()
+          setRefundStatus(rStatus)
+        } catch {
+          // Non-critical, ignore
         }
       } catch (err) {
         console.error("Error loading membership data:", err)
@@ -320,6 +331,19 @@ export default function MembershipPage() {
               >
                 {canceling ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Cancelando...</> : "Cancelar suscripcion"}
               </Button>
+              {refundStatus?.pendingRequest ? (
+                <Badge variant="outline" className="text-amber-600 border-amber-300 py-2 px-3">
+                  Solicitud de reembolso pendiente
+                </Badge>
+              ) : (
+                <RefundRequestDialog
+                  disabled={!refundStatus?.canRequest}
+                  onSuccess={async () => {
+                    const rStatus = await getMemberRefundStatus()
+                    setRefundStatus(rStatus)
+                  }}
+                />
+              )}
               <Button
                 onClick={handleStartCardUpdate}
                 variant="outline"

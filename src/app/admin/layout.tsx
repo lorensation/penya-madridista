@@ -35,6 +35,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 Emails
               </Button>
             </Link>
+            <Link href="/admin/refunds">
+              <Button variant="ghost" className="text-white hover:text-black transition-all hover:bg-white hover:border hover:border-white">
+                Reembolsos
+              </Button>
+            </Link>
             <Link href="/admin/settings">
               <Button variant="ghost" className="text-white hover:text-black transition-all hover:bg-white hover:border hover:border-white">
                 Settings
