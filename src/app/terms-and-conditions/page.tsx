@@ -170,6 +170,31 @@ export default function TermsAndConditionsPage() {
             <li>Algunos beneficios pueden estar sujetos a disponibilidad y pueden tener términos adicionales específicos.</li>
             <li>La suscripción de la Peña no implica suscripción o afiliación oficial con el Real Madrid C.F.</li>
           </ul>
+          
+          <h3 className="text-xl font-medium mt-4 mb-2">7.7 Veracidad de datos y verificación de edad</h3>
+          <p>
+            El usuario se compromete a proporcionar información veraz y exacta en el momento de la suscripción, incluyendo su fecha de nacimiento.
+            La Peña ofrece planes de suscripción con tarifas diferenciadas en función de la edad del socio.
+          </p>
+          <div className="bg-red-50 p-4 rounded-lg border border-red-200 my-4">
+            <p className="font-medium text-red-800">
+              La falsificación o alteración de la fecha de nacimiento u otros datos personales con el fin de acceder a una tarifa de suscripción inferior
+              a la que corresponde constituye un fraude y un incumplimiento grave de estos términos y condiciones.
+            </p>
+            <p className="font-medium text-red-800 mt-2">
+              En caso de detectarse dicha falsificación, la Peña se reserva el derecho de:
+            </p>
+            <ul className="list-disc pl-6 mt-2 space-y-1 text-red-800">
+              <li>Bloquear de forma permanente la cuenta del usuario infractor.</li>
+              <li>Cancelar la suscripción de forma inmediata, sin derecho a reembolso alguno de las cantidades abonadas.</li>
+              <li>Reclamar la diferencia entre la tarifa abonada y la tarifa que hubiera correspondido.</li>
+              <li>Emprender las acciones legales que estime oportunas.</li>
+            </ul>
+          </div>
+          <p>
+            La Peña se reserva el derecho de solicitar documentación acreditativa (DNI, pasaporte u otro documento oficial) para verificar la edad del socio
+            en cualquier momento durante la vigencia de la suscripción.
+          </p>
         </div>
 
         <div className="mb-8">

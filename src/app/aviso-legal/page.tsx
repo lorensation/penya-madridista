@@ -69,7 +69,16 @@ export default function AvisoLegalPage() {
             <li>No provocar daños en los sistemas físicos y lógicos del sitio web, de sus proveedores o de terceros.</li>
             <li>No introducir o difundir virus informáticos o cualesquiera otros sistemas que puedan causar daños.</li>
             <li>No intentar acceder y, en su caso, utilizar las cuentas de correo electrónico de otros usuarios.</li>
+            <li>Proporcionar información veraz y exacta, especialmente en lo relativo a datos personales y fecha de nacimiento, no pudiendo falsificar dichos datos para obtener condiciones económicas más favorables en la contratación de suscripciones.</li>
           </ul>
+          
+          <div className="bg-red-50 p-4 rounded-lg border border-red-200 my-4">
+            <p className="font-medium text-red-800">
+              La falsificación de la fecha de nacimiento o de cualquier otro dato personal con el fin de acceder a tarifas de suscripción reducidas
+              se considerará un incumplimiento grave de estas condiciones y podrá dar lugar al bloqueo permanente de la cuenta del usuario,
+              la cancelación inmediata de su suscripción sin derecho a reembolso, y la reclamación de las cantidades correspondientes a la tarifa aplicable.
+            </p>
+          </div>
           
           <p>La asociación se reserva el derecho a denegar o retirar el acceso al sitio web y/o los servicios ofrecidos sin necesidad de preaviso, a instancia propia o de un tercero, a aquellos usuarios que incumplan las presentes condiciones.</p>
         </div>
