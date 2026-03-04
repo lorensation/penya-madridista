@@ -29,7 +29,7 @@ interface CheckoutSessionData {
 type ProfileFormValues = {
   name: string
   apellido1: string
-  apellido2: string
+  apellido2?: string
   dni_pasaporte: string
   telefono: string
   fecha_nacimiento: string

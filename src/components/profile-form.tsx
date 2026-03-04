@@ -18,6 +18,17 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2 } from "lucide-react"
 
+// Override Zod's default English messages with Spanish equivalents
+z.setErrorMap((issue, ctx) => {
+  if (issue.code === z.ZodIssueCode.invalid_type && issue.received === "undefined") {
+    return { message: "Campo obligatorio" }
+  }
+  if (issue.code === z.ZodIssueCode.too_small && issue.type === "string" && issue.minimum === 1) {
+    return { message: "Campo obligatorio" }
+  }
+  return { message: ctx.defaultError }
+})
+
 const ONLY_TEXT_REGEX = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ\s'-]+$/
 const DNI_PASSPORT_REGEX = /^[A-Za-z0-9]+$/
 const ADDRESS_REGEX = /^[A-Za-z0-9ÁÉÍÓÚÜÑáéíóúüñ\s.,ºª#\/-]+$/
@@ -90,7 +101,13 @@ const profileFormSchema = z
   .object({
     name: requiredOnlyText("El nombre"),
     apellido1: requiredOnlyText("El primer apellido"),
-    apellido2: requiredOnlyText("El segundo apellido"),
+    apellido2: z
+      .string()
+      .transform(normalizeOptionalText)
+      .refine((value) => value === undefined || ONLY_TEXT_REGEX.test(value), {
+        message: "El segundo apellido solo puede contener letras",
+      })
+      .optional(),
     dni_pasaporte: z
       .string()
       .transform((value) => value.trim().replace(/\s+/g, "").toUpperCase())
