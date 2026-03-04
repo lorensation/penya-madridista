@@ -86,7 +86,7 @@ export function DashboardSidebar({ onStateChange }: DashboardSidebarProps) {
       icon: <Home className="h-5 w-5" />,
     },
     {
-      name: "Membresía",
+      name: "Suscripción",
       href: "/dashboard/membership",
       icon: <CreditCard className="h-5 w-5" />,
     },

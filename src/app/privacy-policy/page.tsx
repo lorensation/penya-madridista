@@ -37,11 +37,11 @@ export default function PrivacyPolicyPage() {
             El propósito de esta política de privacidad es proporcionarle información sobre cómo la Peña Madridista 
             Lorenzo Sanz Siempre Presente recopila y procesa sus datos personales a través de su uso de este sitio web, incluyendo 
             cualquier dato que pueda proporcionar a través de este sitio web cuando se registra como usuario, 
-            se suscribe a nuestra newsletter, adquiere una membresía, realiza compras en nuestra tienda o utiliza nuestros servicios.
+            se suscribe a nuestra newsletter, adquiere una suscripción, realiza compras en nuestra tienda o utiliza nuestros servicios.
           </p>
           <p>
             Este sitio web no está destinado a niños y no recopilamos datos relacionados con niños 
-            conscientemente, salvo como parte de una membresía familiar cuando los datos son proporcionados 
+            conscientemente, salvo como parte de una suscripción familiar cuando los datos son proporcionados 
             por un adulto responsable.
           </p>
           <p>
@@ -117,7 +117,7 @@ export default function PrivacyPolicyPage() {
               <strong>Datos financieros</strong> como detalles de tarjetas de pago. Nota importante: Los datos de su tarjeta de crédito o débito son procesados directamente por nuestro proveedor de servicios de pago, <strong>Redsys Servicios de Procesamiento, S.L.</strong> (en adelante, &quot;RedSys&quot;), a través de su pasarela de pago segura, y nunca son almacenados en nuestros servidores. RedSys es un proveedor certificado PCI-DSS Nivel 1, regulado por el Banco de España.
             </li>
             <li>
-              <strong>Datos de transacciones</strong> como detalles sobre los pagos de y hacia usted (importes, fechas, conceptos), historial de membresías y compras realizadas en nuestra tienda.
+              <strong>Datos de transacciones</strong> como detalles sobre los pagos de y hacia usted (importes, fechas, conceptos), historial de suscripciones y compras realizadas en nuestra tienda.
             </li>
             <li>
               <strong>Datos técnicos</strong> como dirección IP, datos de inicio de sesión, tipo y versión de 
@@ -170,7 +170,7 @@ export default function PrivacyPolicyPage() {
               correo electrónico o de otra manera. Esto incluye datos personales que proporciona cuando:
               <ul className="list-disc pl-6 my-2 space-y-1">
                 <li>se registra para una cuenta en nuestro sitio web;</li>
-                <li>se suscribe a una membresía;</li>
+                <li>se suscribe a una suscripción;</li>
                 <li>se suscribe a nuestras publicaciones o newsletters;</li>
                 <li>solicita que se le envíe información;</li>
                 <li>participa en un concurso, promoción o encuesta; o</li>
@@ -251,7 +251,7 @@ export default function PrivacyPolicyPage() {
                 </tr>
                 <tr>
                   <td className="py-2 px-4 border-b border-r">
-                    Procesar y entregar su membresía incluyendo:<br />
+                    Procesar y entregar su suscripción incluyendo:<br />
                     (a) Gestionar pagos, tarifas y cargos<br />
                     (b) Cobrar y recuperar dinero que se nos debe
                   </td>
@@ -337,7 +337,7 @@ export default function PrivacyPolicyPage() {
           </p>
           <p>
             Recibirá comunicaciones de marketing de nosotros si nos ha solicitado información o ha adquirido 
-            una membresía con nosotros y no ha optado por no recibir ese marketing.
+            una suscripción con nosotros y no ha optado por no recibir ese marketing.
           </p>
           
           <p className="mt-4">
@@ -357,7 +357,7 @@ export default function PrivacyPolicyPage() {
           </p>
           <p>
             Cuando opte por no recibir estos mensajes de marketing, esto no se aplicará a los datos personales que 
-            nos proporcione como resultado de la compra de una membresía u otros servicios.
+            nos proporcione como resultado de la compra de una suscripción u otros servicios.
           </p>
           
           <p className="mt-4">
@@ -396,7 +396,7 @@ export default function PrivacyPolicyPage() {
           </p>
           <ul className="list-disc pl-6 my-4 space-y-2">
             <li>
-              <strong>Redsys Servicios de Procesamiento, S.L.</strong> (España) como encargado del tratamiento para el procesamiento de pagos de membresías y compras a través de su pasarela de pago segura. RedSys está autorizado y regulado por el Banco de España y cumple con PCI-DSS Nivel 1.
+              <strong>Redsys Servicios de Procesamiento, S.L.</strong> (España) como encargado del tratamiento para el procesamiento de pagos de suscripciones y compras a través de su pasarela de pago segura. RedSys está autorizado y regulado por el Banco de España y cumple con PCI-DSS Nivel 1.
             </li>
             <li>
               Proveedores de servicios que actúan como procesadores que proporcionan servicios de TI, alojamiento web y administración de sistemas (Vercel, Supabase).

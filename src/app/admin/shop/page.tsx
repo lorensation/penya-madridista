@@ -176,7 +176,7 @@ export default async function ShopAdminPage() {
                           #{order.id.substring(0, 8)}
                         </Link>
                       </div>
-                      <div>{order.created_at ? new Date(order.created_at as string).toLocaleDateString() : '-'}</div>
+                      <div>{order.created_at ? new Date(order.created_at as string).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" }) : '-'}</div>
                       <div>
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           order.status === 'paid' ? 'bg-green-100 text-green-800' :

@@ -764,7 +764,7 @@ const handleSendPasswordReset = async () => {
         
         <Card className={`flex-1 ${hasActiveMembership ? "border-green-200" : isMiembro ? "border-orange-200" : "border-yellow-200"}`}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Estado de Membresía</CardTitle>
+            <CardTitle className="text-sm font-medium">Estado de Suscripción</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
@@ -787,7 +787,7 @@ const handleSendPasswordReset = async () => {
             {!isMiembro && (
               <div className="mt-2">
                 <Link href="/membership" className="text-xs text-primary hover:underline">
-                  Ver opciones de membresía →
+                  Ver opciones de suscripción →
                 </Link>
               </div>
             )}
@@ -947,7 +947,7 @@ const handleSendPasswordReset = async () => {
             <Card>
               <CardHeader>
                 <CardTitle>Información de Suscripción</CardTitle>
-                <CardDescription>Estado de tu membresía y suscripción</CardDescription>
+                <CardDescription>Estado de tu suscripción</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -978,7 +978,7 @@ const handleSendPasswordReset = async () => {
                 <div className="flex justify-end">
                   <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/membership")} className="transition-all border-black text-black bg-white hover:bg-black hover:text-white">
                     <Settings className="mr-2 h-4 w-4" />
-                    Gestionar membresía
+                    Gestionar suscripción
                   </Button>
                 </div>
               </CardContent>
@@ -1005,7 +1005,7 @@ const handleSendPasswordReset = async () => {
                     <div className="space-y-0.5">
                       <Label htmlFor="emailNotifications">Notificaciones por correo</Label>
                       <p className="text-sm text-gray-500">
-                        Recibe notificaciones sobre eventos, actualizaciones de membresía y más
+                        Recibe notificaciones sobre eventos, actualizaciones de suscripción y más
                       </p>
                     </div>
                     <Switch

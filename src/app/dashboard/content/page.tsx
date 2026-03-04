@@ -277,7 +277,7 @@ export default function ContentPage() {
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                No tienes una membresía activa. Hazte socio para acceder a todo nuestro contenido exclusivo.
+                No tienes una suscripción activa. Hazte socio para acceder a todo nuestro contenido exclusivo.
               </AlertDescription>
             </Alert>
             
@@ -319,7 +319,7 @@ export default function ContentPage() {
               onClick={() => router.push("/dashboard/membership")}
               className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
             >
-              Ver Planes de Membresía
+              Ver Planes de Suscripción
             </Button>
           </CardFooter>
         </Card>
@@ -343,7 +343,7 @@ export default function ContentPage() {
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                     <div className="text-white text-center p-4">
                       <p className="font-medium">{content.title}</p>
-                      <p className="text-xs mt-1">Disponible con membresía</p>
+                      <p className="text-xs mt-1">Disponible con suscripción</p>
                     </div>
                   </div>
                 </div>
@@ -367,7 +367,7 @@ export default function ContentPage() {
 
       <Card className="border-black/5 mb-8">
         <CardHeader>
-          <CardTitle className="font-medium">Membresía Activa</CardTitle>
+          <CardTitle className="font-medium">Suscripción Activa</CardTitle>
           <CardDescription>
             Tienes acceso completo a todo el contenido exclusivo de la Peña Madridista Lorenzo Sanz.
           </CardDescription>

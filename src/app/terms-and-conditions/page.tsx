@@ -21,7 +21,7 @@ export default function TermsAndConditionsPage() {
           </p>
           <p>
             Al usar nuestro sitio o convertirse en socio, confirma que acepta estos términos y condiciones y que acuerda cumplirlos. Si no está de acuerdo con estos términos, 
-            debe abstenerse de usar nuestro sitio y de solicitar la membresía a la Peña.
+            debe abstenerse de usar nuestro sitio y de solicitar la suscripción a la Peña.
           </p>
           <p>
             Le recomendamos que imprima una copia de estos términos para futuras referencias.
@@ -95,14 +95,14 @@ export default function TermsAndConditionsPage() {
         </div>
 
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">7. Membresía y suscripciones</h2>
+          <h2 className="text-2xl font-semibold mb-4">7. Suscripción y planes</h2>
           <p>
-            La Peña ofrece distintos tipos de membresía que pueden incluir cuotas anuales o mensuales. Al adquirir una membresía, usted acepta los siguientes términos:
+            La Peña ofrece distintos tipos de suscripción que pueden incluir cuotas anuales o mensuales. Al adquirir una suscripción, usted acepta los siguientes términos:
           </p>
           
           <h3 className="text-xl font-medium mt-4 mb-2">7.1 Naturaleza del servicio</h3>
           <p>
-            La membresía de la Peña constituye un servicio de contenido digital y acceso a beneficios exclusivos. Al contratar una membresía, usted adquiere:
+            La suscripción de la Peña constituye un servicio de contenido digital y acceso a beneficios exclusivos. Al contratar una suscripción, usted adquiere:
           </p>
           <ul className="list-disc pl-6 my-4 space-y-2">
             <li>Acceso a contenido exclusivo en el sitio web.</li>
@@ -114,20 +114,20 @@ export default function TermsAndConditionsPage() {
           
           <h3 className="text-xl font-medium mt-4 mb-2">7.2 Duración y renovación</h3>
           <ul className="list-disc pl-6 my-4 space-y-2">
-            <li>Las membresías mensuales se renuevan automáticamente cada mes hasta que se cancelen.</li>
-            <li>Las membresías anuales se renuevan automáticamente al final del período anual hasta que se cancelen.</li>
-            <li>Debe cancelar su membresía al menos 7 días antes de la fecha de renovación para evitar cargos.</li>
+            <li>Las suscripciones mensuales se renuevan automáticamente cada mes hasta que se cancelen.</li>
+            <li>Las suscripciones anuales se renuevan automáticamente al final del período anual hasta que se cancelen.</li>
+            <li>Debe cancelar su suscripción al menos 7 días antes de la fecha de renovación para evitar cargos.</li>
             <li>La renovación se realizará al precio vigente en el momento de la renovación, que le será comunicado con al menos 30 días de antelación en caso de modificación.</li>
           </ul>
           
           <h3 className="text-xl font-medium mt-4 mb-2">7.3 Precios y pagos</h3>
           <ul className="list-disc pl-6 my-4 space-y-2">
-            <li>Los precios de las membresías están claramente indicados en nuestro sitio en el momento de la compra, con todos los impuestos incluidos.</li>
+            <li>Los precios de las suscripciones están claramente indicados en nuestro sitio en el momento de la compra, con todos los impuestos incluidos.</li>
             <li>Todos los pagos se procesan a través de la pasarela de pago segura de <strong>Redsys Servicios de Procesamiento, S.L.</strong> (RedSys), proveedor de servicios de pago autorizado y regulado por el Banco de España.</li>
             <li>Los datos de su tarjeta son tratados directamente por RedSys conforme a los estándares PCI-DSS y con autenticación reforzada 3D Secure (EMV 3DS). La Peña no almacena datos de tarjetas en sus servidores.</li>
             <li>Al realizar el pago, usted autoriza el procesamiento del cargo a través de la pasarela segura de RedSys.</li>
-            <li>Nos reservamos el derecho de cambiar los precios de las membresías con un preaviso de al menos 30 días antes de la próxima renovación.</li>
-            <li>Si no podemos cobrar su pago por cualquier motivo, su membresía puede ser suspendida o cancelada.</li>
+            <li>Nos reservamos el derecho de cambiar los precios de las suscripciones con un preaviso de al menos 30 días antes de la próxima renovación.</li>
+            <li>Si no podemos cobrar su pago por cualquier motivo, su suscripción puede ser suspendida o cancelada.</li>
             <li>Recibirá un recibo electrónico por cada pago realizado, enviado a su dirección de correo electrónico.</li>
           </ul>
           
@@ -140,11 +140,11 @@ export default function TermsAndConditionsPage() {
               El derecho de desistimiento no será aplicable a los contratos de suministro de contenido digital que no se preste en un soporte material cuando la ejecución haya comenzado con el previo consentimiento expreso del consumidor y usuario con el conocimiento por su parte de que en consecuencia pierde su derecho de desistimiento.
             </p>
           </div>
-          <p>Al contratar su membresía y acceder al contenido digital exclusivo, usted:</p>
+          <p>Al contratar su suscripción y acceder al contenido digital exclusivo, usted:</p>
           <ul className="list-disc pl-6 my-4 space-y-2">
             <li>Consiente expresamente que la ejecución del contrato comience de inmediato.</li>
             <li>Reconoce que, al comenzar la ejecución, pierde el derecho de desistimiento.</li>
-            <li>Acepta que no procederán reembolsos por períodos parciales o no utilizados de membresía.</li>
+            <li>Acepta que no procederán reembolsos por períodos parciales o no utilizados de suscripción.</li>
           </ul>
           <p>
             No obstante lo anterior, podrá solicitar el reembolso en los siguientes casos excepcionales:
@@ -157,18 +157,18 @@ export default function TermsAndConditionsPage() {
           
           <h3 className="text-xl font-medium mt-4 mb-2">7.5 Cancelación</h3>
           <ul className="list-disc pl-6 my-4 space-y-2">
-            <li>Puede cancelar su membresía en cualquier momento a través de su cuenta en nuestro sitio (Área de Socio &gt; Membresía &gt; Cancelar) o contactándonos en info@lorenzosanz.com.</li>
+            <li>Puede cancelar su suscripción en cualquier momento a través de su cuenta en nuestro sitio (Área de Socio &gt; Suscripción &gt; Cancelar) o contactándonos en info@lorenzosanz.com.</li>
             <li>La cancelación será efectiva al final del período de facturación actual. Podrá seguir disfrutando de los beneficios hasta dicha fecha.</li>
             <li>Recibirá confirmación por correo electrónico de la cancelación.</li>
-            <li>Nos reservamos el derecho de cancelar su membresía en cualquier momento si viola estos términos y condiciones, sin derecho a reembolso.</li>
+            <li>Nos reservamos el derecho de cancelar su suscripción en cualquier momento si viola estos términos y condiciones, sin derecho a reembolso.</li>
           </ul>
           
-          <h3 className="text-xl font-medium mt-4 mb-2">7.6 Beneficios de membresía</h3>
+          <h3 className="text-xl font-medium mt-4 mb-2">7.6 Beneficios de suscripción</h3>
           <ul className="list-disc pl-6 my-4 space-y-2">
-            <li>Los beneficios específicos de cada tipo de membresía se detallan en nuestro sitio.</li>
-            <li>Nos reservamos el derecho de modificar los beneficios de las membresías con un preaviso razonable de al menos 30 días.</li>
+            <li>Los beneficios específicos de cada tipo de suscripción se detallan en nuestro sitio.</li>
+            <li>Nos reservamos el derecho de modificar los beneficios de las suscripciones con un preaviso razonable de al menos 30 días.</li>
             <li>Algunos beneficios pueden estar sujetos a disponibilidad y pueden tener términos adicionales específicos.</li>
-            <li>La membresía de la Peña no implica membresía o afiliación oficial con el Real Madrid C.F.</li>
+            <li>La suscripción de la Peña no implica suscripción o afiliación oficial con el Real Madrid C.F.</li>
           </ul>
         </div>
 

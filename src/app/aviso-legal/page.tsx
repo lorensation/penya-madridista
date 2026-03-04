@@ -41,7 +41,7 @@ export default function AvisoLegalPage() {
             <li>Facilitar la participación de los socios en eventos deportivos.</li>
             <li>Crear una comunidad de aficionados comprometidos.</li>
           </ul>
-          <p>La asociación no tiene ánimo de lucro. Los ingresos obtenidos mediante cuotas de membresía, donaciones o ventas se destinan íntegramente a la consecución de los fines sociales y al mantenimiento de las actividades de la peña.</p>
+          <p>La asociación no tiene ánimo de lucro. Los ingresos obtenidos mediante cuotas de suscripción, donaciones o ventas se destinan íntegramente a la consecución de los fines sociales y al mantenimiento de las actividades de la peña.</p>
         </div>
 
         <div className="mb-8">
@@ -49,8 +49,8 @@ export default function AvisoLegalPage() {
           <p>El presente sitio web tiene como finalidad:</p>
           <ul className="list-disc pl-6 my-4 space-y-2">
             <li>Proporcionar información sobre la asociación, sus actividades y eventos.</li>
-            <li>Permitir el registro de usuarios y la gestión de membresías.</li>
-            <li>Facilitar la contratación de servicios de membresía mediante pago electrónico.</li>
+            <li>Permitir el registro de usuarios y la gestión de suscripciones.</li>
+            <li>Facilitar la contratación de servicios de suscripción mediante pago electrónico.</li>
             <li>Ofrecer contenido exclusivo a los socios.</li>
             <li>Comercializar productos y merchandising relacionado con la peña.</li>
             <li>Facilitar la comunicación entre la asociación y sus miembros.</li>
@@ -87,7 +87,7 @@ export default function AvisoLegalPage() {
 
         <div className="mb-8">
           <h2 className="text-2xl font-semibold mb-4">6. Pagos y Transacciones Electrónicas</h2>
-          <p>El sitio web ofrece la posibilidad de contratar membresías y adquirir productos mediante pago electrónico. Todos los pagos se procesan a través de la pasarela de pago segura de <strong>Redsys Servicios de Procesamiento, S.L.</strong> (RedSys), proveedor de servicios de pago autorizado y regulado por el Banco de España.</p>
+          <p>El sitio web ofrece la posibilidad de contratar suscripciones y adquirir productos mediante pago electrónico. Todos los pagos se procesan a través de la pasarela de pago segura de <strong>Redsys Servicios de Procesamiento, S.L.</strong> (RedSys), proveedor de servicios de pago autorizado y regulado por el Banco de España.</p>
           
           <p className="mt-4">La asociación no almacena datos de tarjetas de crédito o débito en sus servidores. Dichos datos son tratados directamente por RedSys conforme a los estándares de seguridad PCI-DSS (Payment Card Industry Data Security Standard) y con autenticación reforzada mediante 3D Secure (EMV 3DS).</p>
           

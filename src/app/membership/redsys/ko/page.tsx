@@ -44,7 +44,7 @@ export default async function MembershipRedsysKoPage({
             <Link href="/membership">Reintentar pago</Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/dashboard/membership">Ir a mi membresia</Link>
+            <Link href="/dashboard/membership">Ir a mi suscripción</Link>
           </Button>
         </div>
       </div>

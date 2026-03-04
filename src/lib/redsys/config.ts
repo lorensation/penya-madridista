@@ -96,14 +96,14 @@ export interface MembershipPlan {
 
 export const MEMBERSHIP_PLANS: MembershipPlan[] = [
   // Under 25
-  { planType: "under25", interval: "monthly", amountCents: 500,   name: "Joven Mensual",    description: "Membresía Joven — Menores de 25" },
-  { planType: "under25", interval: "annual",  amountCents: 5000,  name: "Joven Anual",      description: "Membresía Joven — Menores de 25" },
+  { planType: "under25", interval: "monthly", amountCents: 500,   name: "Joven Mensual",    description: "Suscripción Joven — Menores de 25" },
+  { planType: "under25", interval: "annual",  amountCents: 5000,  name: "Joven Anual",      description: "Suscripción Joven — Menores de 25" },
   // Over 25
-  { planType: "over25",  interval: "monthly", amountCents: 1000,  name: "Adulto Mensual",   description: "Membresía Adulto — Mayores de 25" },
-  { planType: "over25",  interval: "annual",  amountCents: 10000, name: "Adulto Anual",     description: "Membresía Adulto — Mayores de 25" },
+  { planType: "over25",  interval: "monthly", amountCents: 1000,  name: "Adulto Mensual",   description: "Suscripción Adulto — Mayores de 25" },
+  { planType: "over25",  interval: "annual",  amountCents: 10000, name: "Adulto Anual",     description: "Suscripción Adulto — Mayores de 25" },
   // Family
-  { planType: "family",  interval: "monthly", amountCents: 1500,  name: "Familiar Mensual", description: "Membresía Familiar — Un adulto y un menor" },
-  { planType: "family",  interval: "annual",  amountCents: 15000, name: "Familiar Anual",   description: "Membresía Familiar — Un adulto y un menor" },
+  { planType: "family",  interval: "monthly", amountCents: 1500,  name: "Familiar Mensual", description: "Suscripción Familiar — Un adulto y un menor" },
+  { planType: "family",  interval: "annual",  amountCents: 15000, name: "Familiar Anual",   description: "Suscripción Familiar — Un adulto y un menor" },
 ]
 
 export function getMembershipPlan(planType: PlanType, interval: PaymentInterval): MembershipPlan | undefined {

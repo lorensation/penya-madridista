@@ -180,14 +180,14 @@ export default function HistoricGalleryPage() {
           <CardHeader>
             <CardTitle>Contenido Premium</CardTitle>
             <CardDescription>
-              Esta galería de imágenes históricas solo está disponible para socios con membresía activa.
+              Esta galería de imágenes históricas solo está disponible para socios con suscripción activa.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                No tienes una membresía activa. Hazte socio para acceder a todo nuestro contenido exclusivo.
+                No tienes una suscripción activa. Hazte socio para acceder a todo nuestro contenido exclusivo.
               </AlertDescription>
             </Alert>
             
@@ -196,7 +196,7 @@ export default function HistoricGalleryPage() {
                 onClick={() => router.push("/dashboard/membership")}
                 className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
               >
-                Ver Planes de Membresía
+                Ver Planes de Suscripción
               </Button>
             </div>
           </CardContent>

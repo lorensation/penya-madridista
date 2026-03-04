@@ -2,7 +2,7 @@ import { Metadata } from "next"
 
 export const metadata: Metadata = {
   title: "Preguntas Frecuentes | Peña Lorenzo Sanz",
-  description: "Respuestas a las preguntas más frecuentes sobre la Peña Madridista Lorenzo Sanz, membresías, eventos y más.",
+  description: "Respuestas a las preguntas más frecuentes sobre la Peña Madridista Lorenzo Sanz, suscripciones, eventos y más.",
 }
 
 export default function FAQPage() {
@@ -76,14 +76,14 @@ export default function FAQPage() {
         </section>
 
         <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-6 text-primary">Membresía y Suscripciones</h2>
+          <h2 className="text-2xl font-semibold mb-6 text-primary">Suscripción y Planes</h2>
           
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
               <h3 className="text-lg font-medium mb-2">¿Cómo puedo hacerme socio de la Peña?</h3>
               <div className="text-gray-700">
                 <p>
-                  Para hacerte socio, simplemente debes registrarte en nuestra web y seleccionar el tipo de membresía que prefieras (Joven, Adulto o Familiar). 
+                  Para hacerte socio, simplemente debes registrarte en nuestra web y seleccionar el tipo de suscripción que prefieras (Joven, Adulto o Familiar). 
                   Después de completar el formulario y realizar el pago correspondiente, recibirás un correo electrónico de confirmación con tu carnet digital 
                   y toda la información necesaria para acceder a los beneficios de socio.
                 </p>
@@ -91,28 +91,28 @@ export default function FAQPage() {
             </div>
 
             <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
-              <h3 className="text-lg font-medium mb-2">¿Qué tipos de membresía ofrecéis?</h3>
+              <h3 className="text-lg font-medium mb-2">¿Qué tipos de suscripción ofrecéis?</h3>
               <div className="text-gray-700">
-                <p>Ofrecemos tres tipos de membresía:</p>
+                <p>Ofrecemos tres tipos de suscripción:</p>
                 <ul className="list-disc pl-6 mt-2 space-y-1">
-                  <li><strong>Membresía Joven (Menores de 25 años)</strong>: Con cuota reducida, ideal para estudiantes y jóvenes aficionados.</li>
-                  <li><strong>Membresía Adulto (Mayores de 25 años)</strong>: Nuestra membresía estándar con todos los beneficios.</li>
-                  <li><strong>Membresía Familiar</strong>: Incluye a un adulto y un menor de la misma familia, con beneficios para ambos.</li>
+                  <li><strong>Suscripción Joven (Menores de 25 años)</strong>: Con cuota reducida, ideal para estudiantes y jóvenes aficionados.</li>
+                  <li><strong>Suscripción Adulto (Mayores de 25 años)</strong>: Nuestra suscripción estándar con todos los beneficios.</li>
+                  <li><strong>Suscripción Familiar</strong>: Incluye a un adulto y un menor de la misma familia, con beneficios para ambos.</li>
                 </ul>
                 <p className="mt-2">
-                  Cada tipo de membresía está disponible en modalidad mensual o anual, con descuentos en la suscripción anual.
+                  Cada tipo de suscripción está disponible en modalidad mensual o anual, con descuentos en la suscripción anual.
                 </p>
               </div>
             </div>
 
             <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
-              <h3 className="text-lg font-medium mb-2">¿Cuánto cuesta la membresía?</h3>
+              <h3 className="text-lg font-medium mb-2">¿Cuánto cuesta la suscripción?</h3>
               <div className="text-gray-700">
-                <p>Los precios actuales de nuestras membresías son:</p>
+                <p>Los precios actuales de nuestras suscripciones son:</p>
                 <ul className="list-disc pl-6 mt-2 space-y-1">
-                  <li><strong>Membresía Joven</strong>: 5€/mes o 50€/año</li>
-                  <li><strong>Membresía Adulto</strong>: 10€/mes o 100€/año</li>
-                  <li><strong>Membresía Familiar</strong>: 15€/mes o 150€/año</li>
+                  <li><strong>Suscripción Joven</strong>: 5€/mes o 50€/año</li>
+                  <li><strong>Suscripción Adulto</strong>: 10€/mes o 100€/año</li>
+                  <li><strong>Suscripción Familiar</strong>: 15€/mes o 150€/año</li>
                 </ul>
                 <p className="mt-2">
                   Al elegir la opción anual te beneficias de un descuento equivalente a dos meses gratis.
@@ -121,7 +121,7 @@ export default function FAQPage() {
             </div>
 
             <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
-              <h3 className="text-lg font-medium mb-2">¿Qué beneficios incluye la membresía?</h3>
+              <h3 className="text-lg font-medium mb-2">¿Qué beneficios incluye la suscripción?</h3>
               <div className="text-gray-700">
                 <p>Como socio de la Peña, disfrutarás de múltiples beneficios:</p>
                 <ul className="list-disc pl-6 mt-2 space-y-1">
@@ -141,7 +141,7 @@ export default function FAQPage() {
               <h3 className="text-lg font-medium mb-2">¿Cómo puedo cancelar mi suscripción?</h3>
               <div className="text-gray-700">
                 <p>
-                  Puedes cancelar tu suscripción en cualquier momento a través de tu área personal en la web (Área de Socio &gt; Membresía &gt; Cancelar) o contactando directamente con nosotros en info@lorenzosanz.com.
+                  Puedes cancelar tu suscripción en cualquier momento a través de tu área personal en la web (Área de Socio &gt; Suscripción &gt; Cancelar) o contactando directamente con nosotros en info@lorenzosanz.com.
                   La cancelación será efectiva al final del período de facturación actual, por lo que podrás seguir disfrutando de los beneficios
                   hasta ese momento. Recibirás un correo electrónico de confirmación de la cancelación.
                 </p>
@@ -155,7 +155,7 @@ export default function FAQPage() {
                   Conforme a la legislación española (artículo 103.m del TRLGDCU), el derecho de desistimiento no es aplicable a los contratos de suministro de contenido digital cuando la ejecución ha comenzado con el consentimiento expreso del usuario.
                 </p>
                 <p className="mt-2">
-                  Al contratar tu membresía y acceder al contenido exclusivo, consientes que la ejecución comience de inmediato y reconoces que pierdes el derecho de desistimiento. Por tanto, no proceden reembolsos por períodos parciales o no utilizados.
+                  Al contratar tu suscripción y acceder al contenido exclusivo, consientes que la ejecución comience de inmediato y reconoces que pierdes el derecho de desistimiento. Por tanto, no proceden reembolsos por períodos parciales o no utilizados.
                 </p>
                 <p className="mt-2">
                   No obstante, podrás solicitar un reembolso en casos excepcionales: error técnico que impida el acceso durante más de 7 días, doble cargo indebido, o incumplimiento grave por nuestra parte.
@@ -164,7 +164,7 @@ export default function FAQPage() {
             </div>
 
             <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
-              <h3 className="text-lg font-medium mb-2">¿Es seguro el pago de la membresía?</h3>
+              <h3 className="text-lg font-medium mb-2">¿Es seguro el pago de la suscripción?</h3>
               <div className="text-gray-700">
                 <p>
                   Sí, todos los pagos se procesan a través de <strong>RedSys / Getnet (Comercia Global Payments)</strong>, plataforma de pago autorizada y regulada por el Banco de España. RedSys cumple con los estándares de seguridad PCI-DSS Nivel 1, el nivel más alto de certificación disponible.
@@ -304,7 +304,7 @@ export default function FAQPage() {
                 <ul className="list-disc pl-6 mt-2 space-y-1">
                   <li><a href="/aviso-legal" className="text-primary hover:underline">Aviso Legal</a> - Identificación del titular, CIF, naturaleza jurídica</li>
                   <li><a href="/privacy-policy" className="text-primary hover:underline">Política de Privacidad</a> - Tratamiento de datos personales, derechos RGPD</li>
-                  <li><a href="/terms-and-conditions" className="text-primary hover:underline">Términos y Condiciones</a> - Condiciones de uso, membresías, pagos</li>
+                  <li><a href="/terms-and-conditions" className="text-primary hover:underline">Términos y Condiciones</a> - Condiciones de uso, suscripciones, pagos</li>
                 </ul>
               </div>
             </div>

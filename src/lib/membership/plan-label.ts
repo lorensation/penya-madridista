@@ -1,8 +1,8 @@
 const PLAN_BASE_LABELS: Record<string, string> = {
-  under25: "Membresia Joven",
-  over25: "Membresia Individual",
-  family: "Membresia Familiar",
-  infinite: "Membresia Honoraria",
+  under25: "Suscripción Joven",
+  over25: "Suscripción Individual",
+  family: "Suscripción Familiar",
+  infinite: "Suscripción Honoraria",
 }
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -20,7 +20,7 @@ export function getMembershipPlanLabel(options: {
   const paymentType = options.paymentType ?? null
 
   if (!planType) {
-    return "Membresia"
+    return "Suscripción"
   }
 
   // Honorary plan should always display as honorary, regardless of payment type.
@@ -28,7 +28,7 @@ export function getMembershipPlanLabel(options: {
     return PLAN_BASE_LABELS.infinite
   }
 
-  const baseLabel = PLAN_BASE_LABELS[planType] ?? "Membresia"
+  const baseLabel = PLAN_BASE_LABELS[planType] ?? "Suscripción"
   const paymentLabel = paymentType ? PAYMENT_LABELS[paymentType] : null
 
   return paymentLabel ? `${baseLabel} - ${paymentLabel}` : baseLabel

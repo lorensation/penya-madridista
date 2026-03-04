@@ -123,7 +123,7 @@ export default function JuntaDirectiva() {
 
   return (
     <div className="w-full py-8 px-4">
-      <h2 className="text-3xl font-bold text-center mb-8">Junta Directiva</h2>
+      {/*<h2 className="text-3xl font-bold text-center mb-8">Junta Directiva</h2>*/}
       
       <div className="relative max-w-6xl mx-auto">
         {/* Previous button */}

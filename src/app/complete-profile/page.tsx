@@ -462,6 +462,22 @@ function CompleteProfileContent() {
     }
   }
 
+  
+  // Read fecha_nacimiento from user metadata to pre-fill and lock
+  const [metadataDob, setMetadataDob] = useState<string | null>(null)
+
+  // Fetch DOB from metadata when user is available
+  useEffect(() => {
+    async function fetchDob() {
+      const { data: userData } = await supabase.auth.getUser()
+      const dob = userData?.user?.user_metadata?.fecha_nacimiento as string | undefined
+      if (dob) {
+        setMetadataDob(dob)
+      }
+    }
+    fetchDob()
+  }, [])
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -579,11 +595,15 @@ function CompleteProfileContent() {
         {checkoutData && (
           <Alert className="mb-6 bg-green-50 border-green-200">
             <AlertDescription className="text-green-700 font-medium">
-              ¡Tu pago ha sido procesado correctamente! Por favor, completa tu perfil para activar tu membresía.
+              ¡Tu pago ha sido procesado correctamente! Por favor, completa tu perfil para activar tu suscripción.
             </AlertDescription>
           </Alert>
         )}
-        <ProfileForm onSubmit={handleProfileSubmit} />
+        <ProfileForm
+          onSubmit={handleProfileSubmit}
+          initialData={metadataDob ? { fecha_nacimiento: metadataDob } : undefined}
+          lockedFields={metadataDob ? ["fecha_nacimiento"] : []}
+        />
       </div>
     </div>
   )

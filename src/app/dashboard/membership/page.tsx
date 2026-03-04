@@ -76,7 +76,7 @@ export default function MembershipPage() {
         }
       } catch (err) {
         console.error("Error loading membership data:", err)
-        setError("Ocurrio un error al cargar los datos de membresia")
+        setError("Ocurrio un error al cargar los datos de suscripción")
       } finally {
         setLoading(false)
       }
@@ -139,7 +139,7 @@ export default function MembershipPage() {
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando informacion de membresia...</p>
+          <p className="mt-4 text-gray-600">Cargando informacion de suscripción...</p>
         </div>
       </div>
     )
@@ -158,8 +158,8 @@ export default function MembershipPage() {
     return (
       <div className="space-y-6 p-6 md:p-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold">Membresia</h1>
-          <p className="text-gray-500">Gestiona tu membresia de la Pena Lorenzo Sanz</p>
+          <h1 className="text-3xl font-bold">Suscripción</h1>
+          <p className="text-gray-500">Gestiona tu suscripción de la Pena Lorenzo Sanz</p>
         </div>
 
         {error && (
@@ -171,16 +171,16 @@ export default function MembershipPage() {
 
         <Card className="bg-gray-50 border-dashed">
           <CardHeader>
-            <CardTitle>Informacion de membresia</CardTitle>
+            <CardTitle>Informacion de suscripción</CardTitle>
             <CardDescription>
-              Los ajustes de membresia solo estan disponibles para usuarios con suscripcion activa.
+              Los ajustes de suscripción solo estan disponibles para usuarios con suscripcion activa.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                No tienes una membresia activa. Hazte socio para disfrutar de todos los beneficios.
+                No tienes una suscripción activa. Hazte socio para disfrutar de todos los beneficios.
               </AlertDescription>
             </Alert>
           </CardContent>
@@ -196,14 +196,14 @@ export default function MembershipPage() {
               onClick={() => router.push("/membership")}
               className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black"
             >
-              Ver planes de membresia
+              Ver planes de suscripción
             </Button>
           </CardFooter>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Beneficios de membresia</CardTitle>
+            <CardTitle>Beneficios de suscripción</CardTitle>
             <CardDescription>Disfruta de estos beneficios exclusivos como miembro</CardDescription>
           </CardHeader>
           <CardContent>
@@ -236,8 +236,8 @@ export default function MembershipPage() {
     <div className="space-y-6 p-6 md:p-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Membresia</h1>
-          <p className="text-gray-500">Gestiona tu membresia de la Pena Lorenzo Sanz</p>
+          <h1 className="text-3xl font-bold">Suscripción</h1>
+          <p className="text-gray-500">Gestiona tu suscripción de la Pena Lorenzo Sanz</p>
         </div>
       </div>
 
@@ -258,7 +258,7 @@ export default function MembershipPage() {
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>Estado de membresia</CardTitle>
+            <CardTitle>Estado de suscripción</CardTitle>
             {isActive ? (
               <Badge className="bg-green-500">Activa</Badge>
             ) : isCanceled ? (
@@ -269,7 +269,7 @@ export default function MembershipPage() {
               <Badge variant="outline" className="text-red-500 border-red-200">Inactiva</Badge>
             )}
           </div>
-          <CardDescription>Detalles de tu membresia actual</CardDescription>
+          <CardDescription>Detalles de tu suscripción actual</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -361,14 +361,14 @@ export default function MembershipPage() {
         <Alert className="border-yellow-200 bg-yellow-50">
           <AlertCircle className="h-4 w-4 text-yellow-600" />
           <AlertDescription className="text-yellow-800">
-            No se pudo procesar tu ultimo pago. Actualiza tu tarjeta para evitar la cancelacion de tu membresia.
+            No se pudo procesar tu ultimo pago. Actualiza tu tarjeta para evitar la cancelacion de tu suscripción.
           </AlertDescription>
         </Alert>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle>Beneficios de membresia</CardTitle>
+          <CardTitle>Beneficios de suscripción</CardTitle>
           <CardDescription>Disfruta de estos beneficios exclusivos como miembro</CardDescription>
         </CardHeader>
         <CardContent>

@@ -9,10 +9,6 @@ const nextConfig = {
         protocol: 'https', 
         hostname: 'kuxnugwdppajyxdoygzy.supabase.co',
       },
-      {
-        protocol: 'https',
-        hostname: 'maps.googleapis.com',
-      },
     ],
   },
   async headers() {
@@ -34,7 +30,7 @@ const nextConfig = {
               // Allow API calls to Redsys REST + own API + Supabase
               "connect-src 'self' https://sis-t.redsys.es:25443 https://sis.redsys.es https://*.supabase.co",
               // Allow images from self + data URIs + Supabase storage
-              "img-src 'self' data: blob: https://*.supabase.co https://maps.googleapis.com",
+              "img-src 'self' data: blob: https://*.supabase.co",
               // Allow fonts from self
               "font-src 'self' data:",
             ].join("; "),

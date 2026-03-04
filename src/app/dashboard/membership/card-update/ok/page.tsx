@@ -41,7 +41,7 @@ export default async function CardUpdateOkPage({
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center mt-8">
           <Button asChild>
-            <Link href="/dashboard/membership">Volver a membresia</Link>
+            <Link href="/dashboard/membership">Volver a suscripción</Link>
           </Button>
           <Button variant="outline" asChild>
             <Link href="/dashboard">Ir al dashboard</Link>

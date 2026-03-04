@@ -140,7 +140,7 @@ export default function EventsPage() {
         <Alert className="mb-8 bg-yellow-50 border-yellow-200">
           <AlertTriangle className="h-4 w-4 text-yellow-800" />
           <AlertDescription className="text-yellow-800">
-            Para reservar plazas en los eventos, necesitas tener una membresía activa.
+            Para reservar plazas en los eventos, necesitas tener una suscripción activa.
             <Link href="/membership" className="font-medium underline ml-1">
               Completa tu suscripción
             </Link>
@@ -228,7 +228,7 @@ export default function EventsPage() {
                       aria-disabled="true"
                     >
                       <PhoneOutgoing className="h-4 w-4" />
-                      Membresia Requerida
+                      Suscripción Requerida
                     </Button>
                     <Link href="/membership" className="block text-center text-xs text-primary hover:underline">
                       Hazte miembro

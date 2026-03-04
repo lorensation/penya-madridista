@@ -33,6 +33,9 @@ const formSchema = z.object({
   password: z.string().min(8, {
     message: "La contraseña debe tener al menos 8 caracteres.",
   }),
+  fecha_nacimiento: z.string().min(1, {
+    message: "La fecha de nacimiento es obligatoria.",
+  }),
   subscribeToNewsletter: z.boolean().default(true),
 })
 
@@ -50,6 +53,7 @@ export function RegisterForm() {
       name: "",
       email: "",
       password: "",
+      fecha_nacimiento: "",
       subscribeToNewsletter: true,
     },
   })
@@ -72,6 +76,7 @@ export function RegisterForm() {
         options: {
           data: {
             name: values.name,
+            fecha_nacimiento: values.fecha_nacimiento,
             subscribeToNewsletter: values.subscribeToNewsletter
           },
         },
@@ -201,6 +206,26 @@ export function RegisterForm() {
                 Usa al menos 8 caracteres con una combinación de letras, números y símbolos.
               </FormDescription>
               <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="fecha_nacimiento"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Fecha de Nacimiento</FormLabel>
+              <FormControl>
+                <Input type="date" {...field} />
+              </FormControl>
+              <FormDescription>
+                Necesaria para verificar tu elegibilidad en planes de suscripción.
+              </FormDescription>
+              <FormMessage />
+              <p className="text-xs text-gray-500 mt-1">
+                Declaro que mi fecha de nacimiento es correcta. La peña se reserva el derecho de solicitar documentación acreditativa.
+                Proporcionar datos falsos para obtener una tarifa reducida puede suponer la cancelación de la cuenta sin reembolso.
+              </p>
             </FormItem>
           )}
         />

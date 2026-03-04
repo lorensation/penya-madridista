@@ -31,7 +31,7 @@ export function renderMemberInviteEmail(data: MemberInviteTemplateData): string 
       <li>Carnet oficial de socio de la Peña Lorenzo Sanz</li>
     </ul>
     
-    <p><strong>Esta invitación incluye una membresía permanente sin necesidad de pago.</strong></p>
+    <p><strong>Esta invitación incluye una suscripción permanente sin necesidad de pago.</strong></p>
     
     <p>Para completar tu registro, por favor haz clic en el botón de abajo:</p>
     

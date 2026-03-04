@@ -301,7 +301,7 @@ export async function prepareMembershipRedirectPayment(
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return { success: false, error: "Debes iniciar sesion para contratar una membresia" }
+      return { success: false, error: "Debes iniciar sesion para contratar una suscripción" }
     }
 
     const admin = getAdminClient()
@@ -325,9 +325,35 @@ export async function prepareMembershipRedirectPayment(
       return { success: false, error: "Ya tienes una suscripcion activa" }
     }
 
+    // ── Age verification for under-25 plan ──
+    if (planType === "under25") {
+      const dob = user.user_metadata?.fecha_nacimiento as string | undefined
+      if (!dob) {
+        return {
+          success: false,
+          error: "Necesitamos tu fecha de nacimiento para verificar tu edad. Por favor, actualiza tu perfil.",
+        }
+      }
+
+      const birthDate = new Date(dob)
+      const today = new Date()
+      let age = today.getFullYear() - birthDate.getFullYear()
+      const m = today.getMonth() - birthDate.getMonth()
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--
+      }
+
+      if (age >= 25) {
+        return {
+          success: false,
+          error: "La suscripción Joven está disponible solo para menores de 25 años. Por favor, selecciona la suscripción Adulto.",
+        }
+      }
+    }
+
     const plan = getMembershipPlan(planType, interval)
     if (!plan) {
-      return { success: false, error: "Plan de membresia no valido" }
+      return { success: false, error: "Plan de suscripción no valido" }
     }
 
     const order = generateOrderNumber("M")
@@ -357,7 +383,7 @@ export async function prepareMembershipRedirectPayment(
         order,
         error: insertError,
       })
-      return { success: false, error: "Error al preparar el pago de membresia" }
+      return { success: false, error: "Error al preparar el pago de suscripción" }
     }
 
     const returnUrls = getRedirectReturnUrls("membership", order, user.id)
@@ -368,7 +394,7 @@ export async function prepareMembershipRedirectPayment(
       DS_MERCHANT_AMOUNT: String(plan.amountCents),
       DS_MERCHANT_URLOK: returnUrls.ok,
       DS_MERCHANT_URLKO: returnUrls.ko,
-      DS_MERCHANT_PRODUCTDESCRIPTION: `Membresia Pena Lorenzo Sanz - ${plan.name}`,
+      DS_MERCHANT_PRODUCTDESCRIPTION: `Suscripción Pena Lorenzo Sanz - ${plan.name}`,
       DS_MERCHANT_IDENTIFIER: "REQUIRED",
       DS_MERCHANT_COF_INI: "S",
       DS_MERCHANT_COF_TYPE: "R",

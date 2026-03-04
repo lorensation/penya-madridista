@@ -29,7 +29,7 @@ export default function About() {
             <div className="space-y-6">
               <h2 className="text-2xl md:text-3xl font-bold text-primary">Nuestra Historia</h2>
               <p className="text-gray-600">
-                La Peña Lorenzo Sanz fue fundada en 2021 por un grupo de madridistas apasionados que querían honrar la
+                La Peña Lorenzo Sanz fue fundada en 2024 por un grupo de madridistas apasionados que querían honrar la
                 memoria y el legado de Lorenzo Sanz, presidente del Real Madrid entre 1995 y 2000.
               </p>
               <p className="text-gray-600">

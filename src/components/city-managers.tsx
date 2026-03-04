@@ -1,19 +1,21 @@
 "use client"
 
-import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { MapPin, Phone } from "lucide-react"
-import Image from "next/image"
-
-// You should create a .env.local file with your Google Maps API key
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY'
+import { Phone } from "lucide-react"
 
 interface CityManagerProps {
   name: string
   city: string
   whatsapp: string
-  mapUrl: string
+  lat: number
+  lon: number
   countryCode: string
+}
+
+function getEmbedUrl(lat: number, lon: number): string {
+  const delta = 0.08
+  const bbox = `${lon - delta},${lat - delta},${lon + delta},${lat + delta}`
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lon}`
 }
 
 const cityManagers: CityManagerProps[] = [
@@ -21,79 +23,74 @@ const cityManagers: CityManagerProps[] = [
     name: "Hugo de Vicente",
     city: "Londres",
     whatsapp: "447387550544",
-    mapUrl: `https://maps.googleapis.com/maps/api/staticmap?center=London,UK&zoom=11&size=300x200&key=${GOOGLE_MAPS_API_KEY}&markers=color:red|London,UK`,
+    lat: 51.5074,
+    lon: -0.1278,
     countryCode: "🇬🇧"
   },
   {
     name: "Tomás Giovanetti",
     city: "Buenos Aires",
     whatsapp: "549116832-6743",
-    mapUrl: `https://maps.googleapis.com/maps/api/staticmap?center=Buenos+Aires,Argentina&zoom=11&size=300x200&key=${GOOGLE_MAPS_API_KEY}&markers=color:red|Buenos+Aires,Argentina`,
+    lat: -34.6037,
+    lon: -58.3816,
     countryCode: "🇦🇷"
   },
   {
     name: "Manuel Izquierdo",
     city: "Qatar",
     whatsapp: "971552047375",
-    mapUrl: `https://maps.googleapis.com/maps/api/staticmap?center=Doha,Qatar&zoom=11&size=300x200&key=${GOOGLE_MAPS_API_KEY}&markers=color:red|Doha,Qatar`,
+    lat: 25.2854,
+    lon: 51.5310,
     countryCode: "🇶🇦"
   },
   {
     name: "Malula Sanz",
     city: "Dubái",
     whatsapp: "971507453300",
-    mapUrl: `https://maps.googleapis.com/maps/api/staticmap?center=Dubai,UAE&zoom=11&size=300x200&key=${GOOGLE_MAPS_API_KEY}&markers=color:red|Dubai,UAE`,
+    lat: 25.2048,
+    lon: 55.2708,
     countryCode: "🇦🇪"
   },
   {
     name: "Alex Ponte",
     city: "Miami",
     whatsapp: "1305215-5049",
-    mapUrl: `https://maps.googleapis.com/maps/api/staticmap?center=Miami,USA&zoom=11&size=300x200&key=${GOOGLE_MAPS_API_KEY}&markers=color:red|Miami,USA`,
+    lat: 25.7617,
+    lon: -80.1918,
     countryCode: "🇺🇸"
   },
   {
     name: "Jaime Homedes",
     city: "Paris",
     whatsapp: "34630394156",
-    mapUrl: `https://maps.googleapis.com/maps/api/staticmap?center=Paris,France&zoom=11&size=300x200&key=${GOOGLE_MAPS_API_KEY}&markers=color:red|Paris,France`,
+    lat: 48.8566,
+    lon: 2.3522,
     countryCode: "🇫🇷"
   },
   {
     name: "Marcos Rollan",
     city: "Nueva York",
     whatsapp: "19172257557",
-    mapUrl: `https://maps.googleapis.com/maps/api/staticmap?center=New+York,USA&zoom=11&size=300x200&key=${GOOGLE_MAPS_API_KEY}&markers=color:red|New+York,USA`,
+    lat: 40.7128,
+    lon: -74.0060,
     countryCode: "🇺🇸"
   }
 ]
 
 const CityManagerCard = ({ manager }: { manager: CityManagerProps }) => {
-  const [mapLoadFailed, setMapLoadFailed] = useState(false)
-  const showMapFallback = GOOGLE_MAPS_API_KEY === 'YOUR_API_KEY' || mapLoadFailed
-
   return (
     <div className="bg-white rounded-lg shadow-md p-5 hover:shadow-lg transition-shadow">
       <div className="flex flex-col md:flex-row items-center gap-4">
         <div className="relative w-full md:w-[300px] h-[200px] rounded-md overflow-hidden">
-          {showMapFallback ? (
-            // Fallback when API key is missing or Google rejects map loading
-            <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
-              <MapPin className="h-10 w-10 text-gray-400" />
-              <span className="absolute text-2xl">{manager.countryCode}</span>
-            </div>
-          ) : (
-            <Image 
-              src={manager.mapUrl} 
-              alt={`Map of ${manager.city}`} 
-              fill 
-              sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
-              className="object-cover"
-              priority
-              unoptimized
-              onError={() => setMapLoadFailed(true)}
-            />
-          )}
+          <iframe
+            src={getEmbedUrl(manager.lat, manager.lon)}
+            width="100%"
+            height="100%"
+            style={{ border: 0 }}
+            loading="lazy"
+            title={`Map of ${manager.city}`}
+            referrerPolicy="no-referrer"
+          />
         </div>
         
         <div className="flex-1 text-center md:text-left">

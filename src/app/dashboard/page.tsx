@@ -288,7 +288,7 @@ export default function DashboardPage() {
         <Alert className="mb-8 bg-red-50 border-red-200">
           <AlertTriangle className="h-4 w-4 text-red-800" />
           <AlertDescription className="text-red-800">
-            Tienes tu membresía cancelada. Para seguir disfrutando de los beneficios,
+            Tienes tu suscripción cancelada. Para seguir disfrutando de los beneficios,
             <Link href="/dashboard/membership" className="font-medium underline ml-1">
               renuévala
             </Link>
@@ -299,7 +299,7 @@ export default function DashboardPage() {
         <Alert className="mb-8 bg-yellow-50 border-yellow-200">
           <AlertTriangle className="h-4 w-4 text-yellow-800" />
           <AlertDescription className="text-yellow-800">
-            Tu membresía no está activa. Para disfrutar de todos los beneficios,
+            Tu suscripción no está activa. Para disfrutar de todos los beneficios,
             <Link href="/membership" className="font-medium underline ml-1">
               completa tu suscripción
             </Link>
@@ -313,7 +313,7 @@ export default function DashboardPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium flex items-center">
               <CreditCard className="mr-2 h-5 w-5 text-primary" />
-              Estado de Membresía
+              Estado de Suscripción
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col flex-grow">
@@ -425,7 +425,7 @@ export default function DashboardPage() {
             <p className="text-sm text-gray-500">
               {isMember
                 ? "Accede a contenido exclusivo"
-                : "Activa tu membresía para ver contenido"}
+                : "Activa tu suscripción para ver contenido"}
             </p>
             
             {isMember && (
@@ -523,7 +523,7 @@ export default function DashboardPage() {
             {!isMember ? (
               <div className="text-center py-8">
                 <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-                <p className="text-gray-600 mb-4">Activa tu membresía para ver la actividad reciente</p>
+                <p className="text-gray-600 mb-4">Activa tu suscripción para ver la actividad reciente</p>
                 <Link href="/membership">
                   <Button className="transition-all hover:bg-white hover:text-primary hover:border hover:border-black">Completar Suscripción</Button>
                 </Link>
@@ -599,7 +599,7 @@ export default function DashboardPage() {
               {isMember && (
                 <Link href="/dashboard/membership">
                   <Button variant="outline" className="w-full justify-start transition-all hover:bg-black hover:text-white hover:border hover:border-black">
-                    Gestionar Membresía
+                    Gestionar Suscripción
                   </Button>
                 </Link>
               )}

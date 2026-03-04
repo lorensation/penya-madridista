@@ -148,9 +148,9 @@ export const subscriptionService = {
     
     // Get plan name
     const planNames: Record<PlanType, string> = {
-      'under25': 'Membresía Joven (Menores de 25)',
-      'over25': 'Membresía Adulto (Mayores de 25)',
-      'family': 'Membresía Familiar'
+      'under25': 'Suscripción Joven (Menores de 25)',
+      'over25': 'Suscripción Adulto (Mayores de 25)',
+      'family': 'Suscripción Familiar'
     }
     
     // Get payment type name

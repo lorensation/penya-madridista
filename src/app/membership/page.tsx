@@ -4,9 +4,10 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
-import { CheckCircle, Calendar, CreditCard, Award, Gift, Loader2, AlertCircle, BadgeCheck } from "lucide-react"
+import { CheckCircle, Calendar, CreditCard, Award, Gift, Loader2, AlertCircle, BadgeCheck, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Input } from "@/components/ui/input"
 import { supabase } from "@/lib/supabase"
 import { hasMembershipAccess } from "@/lib/membership-access"
 import type { PaymentInterval, PlanType, RedsysSignedRequest } from "@/lib/redsys"
@@ -16,50 +17,51 @@ import { RedsysRedirectAutoSubmitForm } from "@/components/payments/redsys-redir
 const membershipPlans = [
   {
     id: "under25" as PlanType,
-    name: "Membresia Joven (Menores de 25)",
+    name: "Suscripción Joven (Menores de 25)",
     paymentOptions: [
       { id: "monthly" as PaymentInterval, name: "Mensual", price: "5 €", period: "/mes" },
       { id: "annual" as PaymentInterval, name: "Anual", price: "50 €", period: "/año", discount: "¡Ahorra 2 meses!" },
     ],
     features: [
-      "Acceso a eventos exclusivos organizados por la pena",
+      "Acceso a eventos exclusivos organizados por la peña",
       "Descuentos en viajes organizados para ver partidos",
       "Participacion en sorteos y promociones exclusivas",
       "Acceso al contenido exclusivo en nuestra web",
-      "Carnet oficial de socio de la Pena Lorenzo Sanz",
+      "Carnet oficial de socio de la Peña Lorenzo Sanz",
     ],
   },
   {
     id: "over25" as PlanType,
-    name: "Membresia Adulto (Mayores de 25)",
+    name: "Suscripción Adulto (Mayores de 25)",
     paymentOptions: [
       { id: "monthly" as PaymentInterval, name: "Mensual", price: "10 €", period: "/mes" },
       { id: "annual" as PaymentInterval, name: "Anual", price: "100 €", period: "/año", discount: "¡Ahorra 2 meses!" },
     ],
     features: [
-      "Acceso a eventos exclusivos organizados por la pena",
+      "Acceso a eventos exclusivos organizados por la peña",
       "Descuentos en viajes organizados para ver partidos",
       "Participacion en sorteos y promociones exclusivas",
       "Acceso al contenido exclusivo en nuestra web",
-      "Carnet oficial de socio de la Pena Lorenzo Sanz",
+      "Carnet oficial de socio de la Peña Lorenzo Sanz",
     ],
     popular: true,
   },
-  {
-    id: "family" as PlanType,
-    name: "Membresia Familiar (Un adulto y un menor)",
-    paymentOptions: [
-      { id: "monthly" as PaymentInterval, name: "Mensual", price: "15 €", period: "/mes" },
-      { id: "annual" as PaymentInterval, name: "Anual", price: "150 €", period: "/año", discount: "¡Ahorra 2 meses!" },
-    ],
-    features: [
-      "Todos los beneficios de la membresia individual",
-      "Valido para un adulto y un menor miembros de la familia",
-      "Descuentos adicionales en eventos familiares",
-      "Carnets oficiales para todos los miembros incluidos",
-      "Actividades para los mas pequenos",
-    ],
-  },
+  // Family plan hidden from UI — kept in backend for potential future use
+  // {
+  //   id: "family" as PlanType,
+  //   name: "Suscripción Familiar (Un adulto y un menor)",
+  //   paymentOptions: [
+  //     { id: "monthly" as PaymentInterval, name: "Mensual", price: "15 €", period: "/mes" },
+  //     { id: "annual" as PaymentInterval, name: "Anual", price: "150 €", period: "/año", discount: "¡Ahorra 2 meses!" },
+  //   ],
+  //   features: [
+  //     "Todos los beneficios de la suscripción individual",
+  //     "Valido para un adulto y un menor miembros de la familia",
+  //     "Descuentos adicionales en eventos familiares",
+  //     "Carnets oficiales para todos los miembros incluidos",
+  //     "Actividades para los más pequenos",
+  //   ],
+  // },
 ]
 
 type MembershipStep = "select" | "processing" | "redirecting"
@@ -75,6 +77,9 @@ export default function MembershipPage() {
   const [isMember, setIsMember] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [userAge, setUserAge] = useState<number | null>(null)
+  const [needsDob, setNeedsDob] = useState(false)
+  const [fallbackDob, setFallbackDob] = useState("")
 
   const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null)
   const [selectedPaymentOption, setSelectedPaymentOption] = useState<PaymentInterval | null>(null)
@@ -93,6 +98,22 @@ export default function MembershipPage() {
 
         if (!userData.user) {
           return
+        }
+
+        // Read fecha_nacimiento from user metadata and compute age
+        const dob = userData.user.user_metadata?.fecha_nacimiento as string | undefined
+        if (dob) {
+          const birthDate = new Date(dob)
+          const today = new Date()
+          let age = today.getFullYear() - birthDate.getFullYear()
+          const m = today.getMonth() - birthDate.getMonth()
+          if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--
+          }
+          setUserAge(age)
+        } else {
+          // Existing user without DOB in metadata — will need fallback
+          setNeedsDob(true)
         }
 
         const { data: memberData, error: memberError } = await supabase
@@ -128,7 +149,7 @@ export default function MembershipPage() {
         setIsMember(hasCurrentAccess)
       } catch (loadError) {
         console.error("[membership] Error checking user status", loadError)
-        setError("Error al comprobar el estado de membresia")
+        setError("Error al comprobar el estado de suscripción")
       } finally {
         setIsLoading(false)
       }
@@ -137,7 +158,40 @@ export default function MembershipPage() {
     checkUserAndMembership()
   }, [])
 
+  // Helper to compute age from a date string
+  const computeAge = (dob: string): number => {
+    const birthDate = new Date(dob)
+    const today = new Date()
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const m = today.getMonth() - birthDate.getMonth()
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--
+    }
+    return age
+  }
+
+  // Handle fallback DOB submission for existing users without metadata
+  const handleFallbackDobSubmit = async () => {
+    if (!fallbackDob || !user) return
+    const age = computeAge(fallbackDob)
+    setUserAge(age)
+    setNeedsDob(false)
+
+    // Persist to user metadata so they don't have to enter it again
+    try {
+      await supabase.auth.updateUser({
+        data: { fecha_nacimiento: fallbackDob },
+      })
+    } catch (e) {
+      console.error("[membership] Failed to persist DOB to user metadata", e)
+    }
+  }
+
   const handleSelectPlan = (planId: PlanType) => {
+    if (planId === "under25" && userAge !== null && userAge >= 25) {
+      setError("La suscripción Joven está disponible solo para menores de 25 años. Por favor, selecciona la suscripción Adulto.")
+      return
+    }
     setSelectedPlan(planId)
     setSelectedPaymentOption(null)
     setError(null)
@@ -180,7 +234,7 @@ export default function MembershipPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 md:py-24">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando informacion de membresia...</p>
+          <p className="mt-4 text-gray-600">Cargando informacion de suscripción...</p>
         </div>
       </div>
     )
@@ -196,15 +250,15 @@ export default function MembershipPage() {
                 <BadgeCheck className="h-8 w-8 text-green-600" />
               </div>
               <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Gracias por ser socio</h1>
-              <p className="text-lg text-gray-600">Eres un miembro activo de la Pena Lorenzo Sanz.</p>
+              <p className="text-lg text-gray-600">Eres un miembro activo de la Peña Lorenzo Sanz.</p>
             </div>
 
             <div className="bg-gray-50 rounded-lg p-6 mb-8">
-              <h2 className="text-xl font-bold text-primary mb-4">Beneficios de tu membresia</h2>
+              <h2 className="text-xl font-bold text-primary mb-4">Beneficios de tu suscripción</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex items-start">
                   <Award className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
-                  <span>Acceso a eventos exclusivos organizados por la pena</span>
+                  <span>Acceso a eventos exclusivos organizados por la peña</span>
                 </div>
                 <div className="flex items-start">
                   <Gift className="h-5 w-5 text-primary mr-2 flex-shrink-0 mt-0.5" />
@@ -222,10 +276,10 @@ export default function MembershipPage() {
             </div>
 
             <div className="text-center">
-              <p className="mb-6 text-gray-600">Gestiona tu membresia, actualiza tus datos o consulta renovaciones.</p>
+              <p className="mb-6 text-gray-600">Gestiona tu suscripción, actualiza tus datos o consulta renovaciones.</p>
               <Link href="/dashboard/membership">
                 <Button size="lg" className="px-6 py-5 text-lg hover:bg-white hover:text-black hover:border hover:border-black">
-                  Gestionar mi membresia
+                  Gestionar mi suscripción
                 </Button>
               </Link>
             </div>
@@ -267,7 +321,7 @@ export default function MembershipPage() {
     <div className="min-h-screen bg-gray-50 py-12 md:py-24">
       <div className="container mx-auto px-4">
         <div className="text-center max-w-3xl mx-auto mb-12">
-          <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Hazte socio de la Pena Lorenzo Sanz</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">Hazte socio de la Peña Lorenzo Sanz</h1>
           <p className="text-lg text-gray-600">Unete a nuestra comunidad madridista y disfruta de beneficios exclusivos.</p>
         </div>
 
@@ -278,15 +332,49 @@ export default function MembershipPage() {
           </Alert>
         )}
 
+        {/* Fallback: ask for DOB if existing user has no fecha_nacimiento in metadata */}
+        {user && needsDob && (
+          <div className="max-w-md mx-auto mb-8 bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-start gap-3 mb-3">
+              <Info className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-primary">Necesitamos tu fecha de nacimiento</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Para verificar tu elegibilidad en los distintos planes de suscripción, introduce tu fecha de nacimiento.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-4">
+              <Input
+                type="date"
+                value={fallbackDob}
+                onChange={(e) => setFallbackDob(e.target.value)}
+                className="flex-grow"
+              />
+              <Button onClick={handleFallbackDobSubmit} disabled={!fallbackDob}>
+                Confirmar
+              </Button>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Declaro que mi fecha de nacimiento es correcta. La peña se reserva el derecho de solicitar documentación acreditativa.
+            </p>
+          </div>
+        )}
+
         <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {membershipPlans.map((plan) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+            {membershipPlans.map((plan) => {
+              const isUnder25Disabled = plan.id === "under25" && userAge !== null && userAge >= 25
+              return (
               <button
                 key={plan.id}
                 type="button"
+                disabled={isUnder25Disabled}
                 className={`bg-white rounded-lg shadow-md overflow-hidden text-left transition-all flex flex-col h-full ${
                   plan.popular ? "border-2 border-secondary" : ""
-                } ${selectedPlan === plan.id ? "ring-2 ring-primary" : ""}`}
+                } ${selectedPlan === plan.id ? "ring-2 ring-primary" : ""} ${
+                  isUnder25Disabled ? "opacity-50 cursor-not-allowed" : ""
+                }`}
                 onClick={() => handleSelectPlan(plan.id)}
               >
                 <div className="bg-primary text-white p-6 text-center relative">
@@ -329,7 +417,8 @@ export default function MembershipPage() {
                   </ul>
                 </div>
               </button>
-            ))}
+              )
+            })}
           </div>
 
           {selectedPlanData && (
@@ -373,8 +462,8 @@ export default function MembershipPage() {
           </div>
 
           <div className="mt-12 bg-white rounded-lg shadow-md p-8 text-center">
-            <h2 className="text-2xl font-bold text-primary mb-4">Tienes preguntas sobre la membresia?</h2>
-            <p className="text-gray-600 mb-6">Estamos aqui para ayudarte con cualquier duda sobre nuestros planes.</p>
+            <h2 className="text-2xl font-bold text-primary mb-4">¿Tienes preguntas sobre la suscripción?</h2>
+            <p className="text-gray-600 mb-6">Estamos aquí para ayudarte con cualquier duda sobre nuestros planes.</p>
             <Link href="/contact">
               <Button variant="outline" className="transition-colors duration-300 bg-black text-white hover:bg-white hover:text-black hover:border hover:border-black">
                 Contactar

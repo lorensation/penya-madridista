@@ -173,9 +173,11 @@ type ProfileFormValues = z.infer<typeof profileFormSchema>
 interface ProfileFormProps {
   onSubmit: (data: ProfileFormValues) => void
   initialData?: Partial<ProfileFormValues>
+  /** Field names that should be displayed as read-only (pre-filled from user metadata) */
+  lockedFields?: string[]
 }
 
-export function ProfileForm({ onSubmit, initialData }: ProfileFormProps) {
+export function ProfileForm({ onSubmit, initialData, lockedFields = [] }: ProfileFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Initialize the form with default values
@@ -301,8 +303,16 @@ export function ProfileForm({ onSubmit, initialData }: ProfileFormProps) {
                 <FormItem>
                   <FormLabel>Fecha de Nacimiento</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <Input
+                      type="date"
+                      {...field}
+                      readOnly={lockedFields.includes("fecha_nacimiento")}
+                      className={lockedFields.includes("fecha_nacimiento") ? "bg-gray-100 cursor-not-allowed" : ""}
+                    />
                   </FormControl>
+                  {lockedFields.includes("fecha_nacimiento") && (
+                    <p className="text-xs text-gray-500">Este dato proviene de tu registro y no puede modificarse.</p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -502,7 +512,7 @@ export function ProfileForm({ onSubmit, initialData }: ProfileFormProps) {
                 <div className="space-y-1 leading-none">
                   <FormLabel>Recibir notificaciones por email sobre mi cuenta y eventos</FormLabel>
                   <FormDescription>
-                    Te enviaremos información importante sobre tu membresía y eventos exclusivos.
+                    Te enviaremos información importante sobre tu suscripción y eventos exclusivos.
                   </FormDescription>
                 </div>
               </FormItem>
