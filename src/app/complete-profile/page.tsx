@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { resolveMembershipRedirectPayment } from "@/app/actions/payment"
+import { sendWelcomeMemberEmail } from "@/app/actions/welcome-member-email"
 import { ProfileForm } from "@/components/profile-form"
 import { Loader2 } from "lucide-react"
 import { Suspense } from "react"
@@ -451,6 +452,39 @@ function CompleteProfileContent() {
           console.error("Error creating subscription record:", subscriptionError)
           // Continue anyway, as the member profile was created successfully
         }
+      }
+
+      // ── Send welcome email (fire-and-forget, never blocks redirect) ──
+      try {
+        const planLabels: Record<string, string> = {
+          under25: "Joven",
+          over25: "Adulto",
+          family: "Familiar",
+          infinite: "Invitación permanente",
+        }
+        const intervalLabels: Record<string, string> = {
+          monthly: "Mensual",
+          annual: "Anual",
+          decade: "Década",
+        }
+        const planLabel = checkoutData?.plan_type
+          ? planLabels[checkoutData.plan_type] ?? checkoutData.plan_type
+          : undefined
+        const intervalLabel = checkoutData?.payment_type
+          ? intervalLabels[checkoutData.payment_type] ?? checkoutData.payment_type
+          : undefined
+        const planName =
+          planLabel && intervalLabel ? `${planLabel} ${intervalLabel}` : planLabel
+
+        await sendWelcomeMemberEmail({
+          email: userData.user.email!,
+          memberName: formData.name,
+          userId: userData.user.id,
+          planName: planName ?? undefined,
+        })
+      } catch (emailError) {
+        // Non-critical — log but never block the user flow
+        console.error("Welcome email failed (non-blocking):", emailError)
       }
 
       // Redirect to dashboard
