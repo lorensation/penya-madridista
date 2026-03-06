@@ -10,7 +10,6 @@ interface BoardMember {
   id: number;
   name: string;
   title: string;
-  description: string;
   image: string;
 }
 
@@ -25,56 +24,48 @@ export default function JuntaDirectiva() {
       id: 1,
       name: "Lorenzo Sanz Duran",
       title: "Presidente",
-      description: "Lidera la peña con dedicación y pasión por el Real Madrid desde su fundación.",
       image: "/presidente.jpg",
     },
     {
       id: 2,
       name: "Joaquín Napoleón Calderón Barrios",
       title: "Vicepresidente",
-      description: "Apoya la dirección estratégica y representa a la peña en eventos.",
       image: "/vicepresidente2.jpg",
     },
     {
       id: 3,
       name: "Luis Yáñez Sanz",
       title: "Secretario",
-      description: "Responsable de la documentación oficial y comunicaciones de la peña.",
       image: "/secretario.jpg",
     },
     {
       id: 4,
       name: "Carla Mª Salgado Fernández",
       title: "Tesorera y Vocal",
-      description: "Gestiona las finanzas y participa activamente en la toma de decisiones.",
       image: "/tesorera-vocal2.jpg",
     },
     {
       id: 5,
       name: "Diego Calleja de Pinedo",
       title: "Vocal",
-      description: "Aporta su visión y experiencia en la planificación de actividades.",
       image: "/vocal1.jpg",
     },
     {
       id: 6,
       name: "Miguel Redondo González",
       title: "Vocal",
-      description: "Colabora en la organización de eventos y representa a los socios.",
       image: "/vocal2.jpg",
     },
     {
       id: 7,
       name: "Fabián Blanco Ortiz",
       title: "Vocal",
-      description: "Contribuye con nuevas ideas para el crecimiento de la peña.",
       image: "/vocal3.jpg",
     },
     {
        id: 8,
        name: "Rodrigo Sanz Trucharte",
        title: "Director de Actividades",
-       description: "Encargado de la planificación y ejecución de eventos y actividades.",
        image: "/director-actividades.jpg",
     },
   ];
@@ -167,14 +158,11 @@ export default function JuntaDirectiva() {
                         }}
                       />
                     </div>
-                    <div className="flex flex-col items-center flex-grow justify-between">
-                      <div className="flex flex-col items-center">
-                        <h3 className="text-xl font-semibold text-center mb-2">{member.name}</h3>
-                        <div className="bg-primary text-white px-3 py-1 rounded-full text-sm mb-4">
-                          {member.title}
-                        </div>
+                    <div className="flex flex-col items-center flex-grow justify-center">
+                      <h3 className="text-xl font-semibold text-center mb-2">{member.name}</h3>
+                      <div className="bg-primary text-white px-3 py-1 rounded-full text-sm">
+                        {member.title}
                       </div>
-                      <p className="text-center text-gray-600">{member.description}</p>
                     </div>
                   </CardContent>
                 </Card>
