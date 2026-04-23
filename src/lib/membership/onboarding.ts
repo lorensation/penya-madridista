@@ -199,6 +199,23 @@ function isCompletedMemberProfile(member: MemberRow | null): boolean {
   )
 }
 
+async function loadMemberProfile(
+  admin: AdminClient,
+  userId: string,
+): Promise<MemberRow | null> {
+  const { data: member, error: memberError } = await admin
+    .from("miembros")
+    .select("*")
+    .eq("user_uuid", userId)
+    .maybeSingle()
+
+  if (memberError) {
+    throw new Error(`Failed loading member profile: ${memberError.message}`)
+  }
+
+  return member
+}
+
 async function resolveProfileCompletedAt(
   admin: AdminClient,
   user: Pick<UserRow, "id" | "profile_completed_at" | "updated_at" | "created_at">,
@@ -207,15 +224,7 @@ async function resolveProfileCompletedAt(
     return user.profile_completed_at
   }
 
-  const { data: member, error: memberError } = await admin
-    .from("miembros")
-    .select("*")
-    .eq("user_uuid", user.id)
-    .maybeSingle()
-
-  if (memberError) {
-    throw new Error(`Failed loading member profile: ${memberError.message}`)
-  }
+  const member = await loadMemberProfile(admin, user.id)
 
   if (!isCompletedMemberProfile(member)) {
     return null
@@ -549,6 +558,11 @@ export async function completeMembershipOnboarding(
   try {
     const admin = createAdminSupabaseClient()
     const nowIso = new Date().toISOString()
+    const member = await loadMemberProfile(admin, userId)
+
+    if (!isCompletedMemberProfile(member)) {
+      return { success: false, error: "MEMBER_PROFILE_INCOMPLETE" }
+    }
 
     const { data: user, error: userError } = await admin
       .from("users")
