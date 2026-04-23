@@ -653,6 +653,7 @@ export type Database = {
       payment_transactions: {
         Row: {
           amount_cents: number
+          authorized_at: string | null
           cof_txn_id: string | null
           context: string
           created_at: string
@@ -666,10 +667,17 @@ export type Database = {
           last_four: string | null
           member_id: string | null
           metadata: Json | null
+          onboarding_completed_at: string | null
+          onboarding_status: string
           order_id: string | null
           redsys_order: string
+          refund_review_flagged_at: string | null
+          refund_review_status: string
           redsys_token: string | null
           redsys_token_expiry: string | null
+          grace_expires_at: string | null
+          final_reminder_sent_at: string | null
+          first_reminder_sent_at: string | null
           status: string
           subscription_id: string | null
           transaction_type: string
@@ -677,6 +685,7 @@ export type Database = {
         }
         Insert: {
           amount_cents?: number
+          authorized_at?: string | null
           cof_txn_id?: string | null
           context?: string
           created_at?: string
@@ -690,10 +699,17 @@ export type Database = {
           last_four?: string | null
           member_id?: string | null
           metadata?: Json | null
+          onboarding_completed_at?: string | null
+          onboarding_status?: string
           order_id?: string | null
           redsys_order: string
+          refund_review_flagged_at?: string | null
+          refund_review_status?: string
           redsys_token?: string | null
           redsys_token_expiry?: string | null
+          grace_expires_at?: string | null
+          final_reminder_sent_at?: string | null
+          first_reminder_sent_at?: string | null
           status?: string
           subscription_id?: string | null
           transaction_type?: string
@@ -701,6 +717,7 @@ export type Database = {
         }
         Update: {
           amount_cents?: number
+          authorized_at?: string | null
           cof_txn_id?: string | null
           context?: string
           created_at?: string
@@ -714,10 +731,17 @@ export type Database = {
           last_four?: string | null
           member_id?: string | null
           metadata?: Json | null
+          onboarding_completed_at?: string | null
+          onboarding_status?: string
           order_id?: string | null
           redsys_order?: string
+          refund_review_flagged_at?: string | null
+          refund_review_status?: string
           redsys_token?: string | null
           redsys_token_expiry?: string | null
+          grace_expires_at?: string | null
+          final_reminder_sent_at?: string | null
+          first_reminder_sent_at?: string | null
           status?: string
           subscription_id?: string | null
           transaction_type?: string
@@ -1073,6 +1097,7 @@ export type Database = {
           is_member: boolean
           marketing_emails: boolean
           name: string | null
+          profile_completed_at: string | null
           updated_at: string | null
         }
         Insert: {
@@ -1084,6 +1109,7 @@ export type Database = {
           is_member?: boolean
           marketing_emails?: boolean
           name?: string | null
+          profile_completed_at?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1095,6 +1121,7 @@ export type Database = {
           is_member?: boolean
           marketing_emails?: boolean
           name?: string | null
+          profile_completed_at?: string | null
           updated_at?: string | null
         }
         Relationships: []

@@ -6,6 +6,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { processRefund, generateOrderNumber } from "@/lib/redsys"
 import { sendEmail } from "@/lib/email"
 import { generatePreferencesToken } from "@/lib/email/preferences-token"
+import { completeMembershipOnboarding as finalizeMembershipOnboarding } from "@/lib/membership/onboarding"
 import {
   renderRefundRequestNotificationEmail,
   renderRefundApprovedEmail,
@@ -472,6 +473,99 @@ export interface RefundRequestRow {
   last_four: string | null
 }
 
+export interface IncompleteOnboardingReviewRow {
+  id: string
+  member_id: string
+  subscription_id: string | null
+  redsys_order: string
+  amount_cents: number
+  status: string
+  onboarding_status: string
+  refund_review_status: string
+  authorized_at: string | null
+  grace_expires_at: string | null
+  first_reminder_sent_at: string | null
+  final_reminder_sent_at: string | null
+  refund_review_flagged_at: string | null
+  onboarding_completed_at: string | null
+  created_at: string
+  updated_at: string
+  member_name: string | null
+  member_email: string | null
+  profile_completed_at: string | null
+  plan_type: string | null
+  payment_type: string | null
+  subscription_status: string | null
+  admin_notes: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+}
+
+function parseReviewMetadata(metadata: unknown): {
+  admin_notes: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+} {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return {
+      admin_notes: null,
+      reviewed_by: null,
+      reviewed_at: null,
+    }
+  }
+
+  const metadataRecord = metadata as Record<string, unknown>
+  const onboardingReviewCandidate = metadataRecord.onboarding_review
+  const onboardingReview =
+    onboardingReviewCandidate &&
+    typeof onboardingReviewCandidate === "object" &&
+    !Array.isArray(onboardingReviewCandidate)
+      ? (onboardingReviewCandidate as Record<string, unknown>)
+      : null
+
+  if (!onboardingReview) {
+    return {
+      admin_notes: null,
+      reviewed_by: null,
+      reviewed_at: null,
+    }
+  }
+
+  return {
+    admin_notes:
+      typeof onboardingReview.admin_notes === "string" ? onboardingReview.admin_notes : null,
+    reviewed_by:
+      typeof onboardingReview.reviewed_by === "string" ? onboardingReview.reviewed_by : null,
+    reviewed_at:
+      typeof onboardingReview.reviewed_at === "string" ? onboardingReview.reviewed_at : null,
+  }
+}
+
+function buildOnboardingReviewMetadata(
+  metadata: unknown,
+  input: {
+    action: "resolved_completed" | "refunded_manually" | "dismissed"
+    adminNotes?: string
+    reviewedBy: string
+    reviewedAt: string
+  },
+) {
+  const base =
+    metadata && typeof metadata === "object" && !Array.isArray(metadata)
+      ? { ...metadata }
+      : {}
+
+  return {
+    ...base,
+    onboarding_review: {
+      action: input.action,
+      admin_notes: input.adminNotes?.trim() || null,
+      reviewed_by: input.reviewedBy,
+      reviewed_at: input.reviewedAt,
+    },
+  }
+}
+
 export async function getRefundRequests(statusFilter?: string): Promise<{
   success: boolean
   data?: RefundRequestRow[]
@@ -586,6 +680,318 @@ export async function getRefundRequests(statusFilter?: string): Promise<{
 }
 
 // ─── getPendingRefundCount (for admin badge) ────────────────────────────────
+
+export async function getIncompleteOnboardingReviews(statusFilter = "pending_review"): Promise<{
+  success: boolean
+  data?: IncompleteOnboardingReviewRow[]
+  error?: string
+}> {
+  try {
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: "No autenticado" }
+    }
+
+    const admin = getAdminClient()
+    const { data: memberRow } = await admin
+      .from("miembros")
+      .select("role")
+      .eq("user_uuid", user.id)
+      .single()
+
+    if (memberRow?.role !== "admin") {
+      return { success: false, error: "No autorizado" }
+    }
+
+    let query = admin
+      .from("payment_transactions")
+      .select(`
+        id,
+        member_id,
+        subscription_id,
+        redsys_order,
+        amount_cents,
+        status,
+        onboarding_status,
+        refund_review_status,
+        authorized_at,
+        grace_expires_at,
+        first_reminder_sent_at,
+        final_reminder_sent_at,
+        refund_review_flagged_at,
+        onboarding_completed_at,
+        metadata,
+        created_at,
+        updated_at
+      `)
+      .eq("context", "membership")
+      .in("refund_review_status", [
+        "pending_review",
+        "resolved_completed",
+        "refunded_manually",
+        "dismissed",
+      ])
+      .order("refund_review_flagged_at", { ascending: false })
+      .order("authorized_at", { ascending: false })
+
+    if (statusFilter !== "all") {
+      query = query.eq("refund_review_status", statusFilter)
+    }
+
+    const { data: transactions, error: transactionsError } = await query
+
+    if (transactionsError) {
+      console.error("[refunds] getIncompleteOnboardingReviews query failed", transactionsError)
+      return { success: false, error: "Error al cargar la cola de onboarding" }
+    }
+
+    if (!transactions || transactions.length === 0) {
+      return { success: true, data: [] }
+    }
+
+    const memberIds = [
+      ...new Set(
+        transactions
+          .map((transaction) => transaction.member_id)
+          .filter((value): value is string => typeof value === "string"),
+      ),
+    ]
+    const subscriptionIds = [
+      ...new Set(
+        transactions
+          .map((transaction) => transaction.subscription_id)
+          .filter((value): value is string => typeof value === "string"),
+      ),
+    ]
+
+    const [usersResult, subscriptionsResult] = await Promise.all([
+      admin.from("users").select("id, name, email, profile_completed_at").in("id", memberIds),
+      subscriptionIds.length > 0
+        ? admin
+            .from("subscriptions")
+            .select("id, plan_type, payment_type, status")
+            .in("id", subscriptionIds)
+        : Promise.resolve({ data: [], error: null }),
+    ])
+
+    const usersMap = new Map(
+      (usersResult.data || []).map((row) => [
+        row.id,
+        {
+          name: row.name,
+          email: row.email,
+          profile_completed_at: row.profile_completed_at,
+        },
+      ]),
+    )
+
+    const subscriptionsMap = new Map(
+      ((subscriptionsResult.data as Array<{
+        id: string
+        plan_type: string | null
+        payment_type: string | null
+        status: string | null
+      }> | null) || []).map((row) => [
+        row.id,
+        {
+          plan_type: row.plan_type,
+          payment_type: row.payment_type,
+          subscription_status: row.status,
+        },
+      ]),
+    )
+
+    const enriched: IncompleteOnboardingReviewRow[] = transactions.map((transaction) => {
+      const userInfo = transaction.member_id ? usersMap.get(transaction.member_id) : null
+      const subscriptionInfo = transaction.subscription_id
+        ? subscriptionsMap.get(transaction.subscription_id)
+        : null
+      const reviewMetadata = parseReviewMetadata(transaction.metadata)
+
+      return {
+        id: transaction.id,
+        member_id: transaction.member_id || "",
+        subscription_id: transaction.subscription_id,
+        redsys_order: transaction.redsys_order,
+        amount_cents: transaction.amount_cents,
+        status: transaction.status,
+        onboarding_status: transaction.onboarding_status,
+        refund_review_status: transaction.refund_review_status,
+        authorized_at: transaction.authorized_at,
+        grace_expires_at: transaction.grace_expires_at,
+        first_reminder_sent_at: transaction.first_reminder_sent_at,
+        final_reminder_sent_at: transaction.final_reminder_sent_at,
+        refund_review_flagged_at: transaction.refund_review_flagged_at,
+        onboarding_completed_at: transaction.onboarding_completed_at,
+        created_at: transaction.created_at,
+        updated_at: transaction.updated_at,
+        member_name: userInfo?.name ?? null,
+        member_email: userInfo?.email ?? null,
+        profile_completed_at: userInfo?.profile_completed_at ?? null,
+        plan_type: subscriptionInfo?.plan_type ?? null,
+        payment_type: subscriptionInfo?.payment_type ?? null,
+        subscription_status: subscriptionInfo?.subscription_status ?? null,
+        admin_notes: reviewMetadata.admin_notes,
+        reviewed_by: reviewMetadata.reviewed_by,
+        reviewed_at: reviewMetadata.reviewed_at,
+      }
+    })
+
+    return { success: true, data: enriched }
+  } catch (error) {
+    console.error("[refunds] getIncompleteOnboardingReviews failed", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error inesperado",
+    }
+  }
+}
+
+export async function resolveIncompleteOnboardingReview(input: {
+  transactionId: string
+  action: "resolved_completed" | "refunded_manually" | "dismissed"
+  adminNotes?: string
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: "No autenticado" }
+    }
+
+    const admin = getAdminClient()
+    const { data: memberRow } = await admin
+      .from("miembros")
+      .select("role")
+      .eq("user_uuid", user.id)
+      .single()
+
+    if (memberRow?.role !== "admin") {
+      return { success: false, error: "No autorizado" }
+    }
+
+    const { data: transaction, error: transactionError } = await admin
+      .from("payment_transactions")
+      .select("*")
+      .eq("id", input.transactionId)
+      .eq("context", "membership")
+      .single()
+
+    if (transactionError || !transaction) {
+      return { success: false, error: "Transaccion no encontrada" }
+    }
+
+    const nowIso = new Date().toISOString()
+    const metadata = buildOnboardingReviewMetadata(transaction.metadata, {
+      action: input.action,
+      adminNotes: input.adminNotes,
+      reviewedBy: user.id,
+      reviewedAt: nowIso,
+    })
+
+    if (input.action === "resolved_completed") {
+      if (!transaction.member_id) {
+        return { success: false, error: "La transaccion no tiene socio asociado" }
+      }
+
+      const onboardingResult = await finalizeMembershipOnboarding(
+        transaction.member_id,
+        transaction.redsys_order,
+      )
+
+      if (!onboardingResult.success) {
+        return {
+          success: false,
+          error: "No se pudo finalizar el onboarding antes de cerrar la revision",
+        }
+      }
+
+      const { error: updateError } = await admin
+        .from("payment_transactions")
+        .update({
+          refund_review_status: "resolved_completed",
+          onboarding_status: "completed",
+          onboarding_completed_at: transaction.onboarding_completed_at ?? nowIso,
+          metadata,
+          updated_at: nowIso,
+        })
+        .eq("id", transaction.id)
+
+      if (updateError) {
+        return { success: false, error: "No se pudo cerrar la revision" }
+      }
+    } else if (input.action === "dismissed") {
+      const { error: updateError } = await admin
+        .from("payment_transactions")
+        .update({
+          refund_review_status: "dismissed",
+          metadata,
+          updated_at: nowIso,
+        })
+        .eq("id", transaction.id)
+
+      if (updateError) {
+        return { success: false, error: "No se pudo actualizar la revision" }
+      }
+    } else {
+      const { error: updateError } = await admin
+        .from("payment_transactions")
+        .update({
+          status: "refunded",
+          onboarding_status: "not_applicable",
+          refund_review_status: "refunded_manually",
+          metadata,
+          updated_at: nowIso,
+        })
+        .eq("id", transaction.id)
+
+      if (updateError) {
+        return { success: false, error: "No se pudo registrar el reembolso manual" }
+      }
+
+      if (transaction.subscription_id) {
+        await admin
+          .from("subscriptions")
+          .update({
+            status: "canceled",
+            canceled_at: nowIso,
+            updated_at: nowIso,
+          })
+          .eq("id", transaction.subscription_id)
+      }
+
+      if (transaction.member_id) {
+        await admin
+          .from("users")
+          .update({
+            is_member: false,
+            updated_at: nowIso,
+          })
+          .eq("id", transaction.member_id)
+      }
+    }
+
+    revalidatePath("/admin/refunds")
+    revalidatePath("/dashboard/membership")
+
+    return { success: true }
+  } catch (error) {
+    console.error("[refunds] resolveIncompleteOnboardingReview failed", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error inesperado",
+    }
+  }
+}
 
 export async function getPendingRefundCount(): Promise<number> {
   try {

@@ -30,6 +30,7 @@ interface SubscriptionData {
   end_date: string | null
   cancel_at_period_end?: boolean
   canceled_at?: string
+  redsys_last_order?: string | null
 }
 
 export default function MembershipPage() {
@@ -41,6 +42,7 @@ export default function MembershipPage() {
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null)
   const [canceling, setCanceling] = useState(false)
   const [refundStatus, setRefundStatus] = useState<{ canRequest: boolean; pendingRequest: boolean; reason?: string } | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   const [cardUpdateLoading, setCardUpdateLoading] = useState(false)
   const [redirectActionUrl, setRedirectActionUrl] = useState<string | null>(null)
@@ -65,6 +67,8 @@ export default function MembershipPage() {
           router.push("/login?redirect=/dashboard/membership")
           return
         }
+
+        setCurrentUserId(userData.user.id)
 
         const { data: subData, error: subError } = await getLatestSubscriptionByUserId(
           supabase,
@@ -161,6 +165,7 @@ export default function MembershipPage() {
     status: effectiveStatus,
     endDate: subscription?.end_date ?? null,
   })
+  const isPendingProfile = effectiveStatus === "pending_profile"
   const isExpiredCanceled = effectiveStatus === "canceled" && !hasCurrentMembershipAccess
   const isWithoutCurrentMembership =
     effectiveStatus === "inactive" || effectiveStatus === "expired" || isExpiredCanceled
@@ -259,6 +264,28 @@ export default function MembershipPage() {
         </Alert>
       )}
 
+      {isPendingProfile && (
+        <Alert className="border-amber-200 bg-amber-50">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800">
+            Hemos recibido tu pago, pero tu membresia sigue pendiente hasta que completes tu perfil.
+            {subscription?.redsys_last_order && currentUserId && (
+              <Button
+                variant="link"
+                className="h-auto p-0 pl-1 text-amber-900 underline"
+                onClick={() =>
+                  router.push(
+                    `/complete-profile?order=${encodeURIComponent(subscription.redsys_last_order || "")}&userId=${encodeURIComponent(currentUserId)}`,
+                  )
+                }
+              >
+                Completar perfil ahora
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -272,6 +299,8 @@ export default function MembershipPage() {
             <CardTitle>Estado de suscripción</CardTitle>
             {isActive ? (
               <Badge className="bg-green-500">Activa</Badge>
+            ) : isPendingProfile ? (
+              <Badge className="bg-amber-500">Pendiente de perfil</Badge>
             ) : isCanceled ? (
               <Badge variant="outline" className="text-orange-500 border-orange-200">Cancelada</Badge>
             ) : isPastDue ? (
@@ -305,6 +334,8 @@ export default function MembershipPage() {
               <p className="text-lg font-semibold capitalize">
                 {effectiveStatus === "active"
                   ? "Activa"
+                  : effectiveStatus === "pending_profile"
+                    ? "Pendiente de perfil"
                   : effectiveStatus === "trialing"
                     ? "Periodo de prueba"
                     : effectiveStatus === "canceled"
@@ -317,7 +348,25 @@ export default function MembershipPage() {
           </div>
         </CardContent>
         <CardFooter className="flex flex-col md:flex-row gap-3 justify-between">
-          {isCanceled ? (
+          {isPendingProfile ? (
+            <>
+              <p className="text-sm text-amber-700">
+                Tu pago esta autorizado, pero no activaremos el acceso hasta completar los datos obligatorios.
+              </p>
+              {subscription?.redsys_last_order && currentUserId && (
+                <Button
+                  onClick={() =>
+                    router.push(
+                      `/complete-profile?order=${encodeURIComponent(subscription.redsys_last_order || "")}&userId=${encodeURIComponent(currentUserId)}`,
+                    )
+                  }
+                  className="transition-all hover:border hover:border-black hover:bg-white hover:text-primary"
+                >
+                  Completar perfil
+                </Button>
+              )}
+            </>
+          ) : isCanceled ? (
             <p className="text-orange-500 text-sm">
               Tu suscripcion se cancelara el {renewalDate}. Hasta entonces sigues disfrutando de todos los beneficios.
             </p>

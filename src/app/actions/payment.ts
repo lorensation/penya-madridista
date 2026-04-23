@@ -7,8 +7,8 @@ import {
   authorizeWithIdOper,
   buildSignedRequest,
   decodeMerchantParams,
-  generateOrderNumber,
   getBaseUrl,
+  generateOrderNumber,
   getMembershipPlan,
   getRealizarPagoUrl,
   getSecretKey,
@@ -25,6 +25,10 @@ import type {
   RedsysResponseParams,
   RedsysSignedRequest,
 } from "@/lib/redsys"
+import {
+  completeMembershipOnboarding as completeMembershipOnboardingState,
+  finalizeMembershipPayment,
+} from "@/lib/membership/onboarding"
 
 interface PrepareRedirectPaymentResult {
   success: boolean
@@ -63,7 +67,7 @@ interface ResolveMembershipRedirectPaymentResult {
     redsys_token_expiry: string | null
     cof_txn_id: string | null
     payment_status: "paid"
-    subscription_status: "active"
+    subscription_status: string
     plan_type: string
     payment_type: string
     last_four: string | null
@@ -126,38 +130,6 @@ function normalizeBase64Payload(value: string): string {
   return value.replace(/ /g, "+").replace(/-/g, "+").replace(/_/g, "/")
 }
 
-function mapMembershipCheckoutData(
-  transaction: {
-    redsys_order: string
-    redsys_token: string | null
-    redsys_token_expiry: string | null
-    cof_txn_id: string | null
-    last_four: string | null
-    metadata: unknown
-  },
-): ResolveMembershipRedirectPaymentResult["checkoutData"] {
-  const metadata =
-    transaction.metadata && typeof transaction.metadata === "object" && !Array.isArray(transaction.metadata)
-      ? (transaction.metadata as Record<string, unknown>)
-      : null
-
-  return {
-    id: transaction.redsys_order,
-    redsys_token: transaction.redsys_token,
-    redsys_token_expiry: transaction.redsys_token_expiry,
-    cof_txn_id: transaction.cof_txn_id,
-    payment_status: "paid",
-    subscription_status: "active",
-    plan_type: typeof metadata?.planType === "string" ? metadata.planType : "over25",
-    payment_type:
-      resolveMembershipInterval(
-        typeof metadata?.planType === "string" ? metadata.planType : "over25",
-        typeof metadata?.interval === "string" ? metadata.interval : null,
-      ) ?? "annual",
-    last_four: transaction.last_four,
-  }
-}
-
 export async function resolveMembershipRedirectPayment(
   order: string,
   dsMerchantParameters?: string | null,
@@ -174,120 +146,32 @@ export async function resolveMembershipRedirectPayment(
       return { success: false, status: "error", error: "AUTH_REQUIRED" }
     }
 
-    const admin = getAdminClient()
-    const { data: transaction, error: transactionError } = await admin
-      .from("payment_transactions")
-      .select("id, redsys_order, member_id, context, amount_cents, status, ds_response, redsys_token, redsys_token_expiry, cof_txn_id, last_four, metadata")
-      .eq("redsys_order", order)
-      .eq("context", "membership")
-      .eq("member_id", user.id)
-      .maybeSingle()
+    let decoded: RedsysResponseParams | null = null
 
-    if (transactionError) {
-      console.error("[payment] resolveMembershipRedirectPayment failed loading transaction", {
-        order,
-        memberId: user.id,
-        error: transactionError,
-      })
-      return { success: false, status: "error", error: "TXN_LOOKUP_FAILED" }
-    }
+    if (dsMerchantParameters && dsSignature) {
+      const normalizedParams = normalizeBase64Payload(dsMerchantParameters)
+      const normalizedSignature = normalizeBase64Payload(dsSignature)
+      const hasValidSignature = verifySignature(getSecretKey(), normalizedParams, normalizedSignature)
 
-    if (!transaction) {
-      return { success: true, status: "not_found" }
-    }
-
-    if (transaction.status === "authorized") {
-      return {
-        success: true,
-        status: "authorized",
-        checkoutData: mapMembershipCheckoutData(transaction),
+      if (hasValidSignature) {
+        const parsed = decodeMerchantParams<RedsysResponseParams>(normalizedParams)
+        if (parsed.Ds_Order === order && isAuthorizationSuccess(parsed.Ds_Response ?? "")) {
+          decoded = parsed
+        }
       }
     }
 
-    if (transaction.status === "denied" || transaction.status === "error") {
-      return { success: true, status: "denied" }
-    }
-
-    if (transaction.status !== "pending") {
-      return { success: true, status: "pending" }
-    }
-
-    if (!dsMerchantParameters || !dsSignature) {
-      return { success: true, status: "pending" }
-    }
-
-    const normalizedParams = normalizeBase64Payload(dsMerchantParameters)
-    const normalizedSignature = normalizeBase64Payload(dsSignature)
-    const hasValidSignature = verifySignature(getSecretKey(), normalizedParams, normalizedSignature)
-    if (!hasValidSignature) {
-      return { success: true, status: "pending" }
-    }
-
-    const decoded = decodeMerchantParams<RedsysResponseParams>(normalizedParams)
-    if (decoded.Ds_Order !== order) {
-      return { success: true, status: "pending" }
-    }
-
-    if (!isAuthorizationSuccess(decoded.Ds_Response ?? "")) {
-      await admin
-        .from("payment_transactions")
-        .update({
-          status: "denied",
-          ds_response: decoded.Ds_Response ?? null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", transaction.id)
-        .eq("status", "pending")
-
-      return { success: true, status: "denied" }
-    }
-
-    const amountFromReturn = Number.parseInt(decoded.Ds_Amount ?? "", 10)
-    if (Number.isNaN(amountFromReturn) || amountFromReturn !== transaction.amount_cents) {
-      return { success: true, status: "pending" }
-    }
-
-    const { data: claimedTransaction, error: claimError } = await admin
-      .from("payment_transactions")
-      .update({
-        status: "authorized",
-        ds_response: decoded.Ds_Response ?? null,
-        ds_authorization_code: decoded.Ds_AuthorisationCode ?? null,
-        ds_card_brand: decoded.Ds_Card_Brand ?? null,
-        ds_card_country: decoded.Ds_Card_Country ?? null,
-        last_four: decoded.Ds_CardNumber ? decoded.Ds_CardNumber.slice(-4) : transaction.last_four,
-        redsys_token: decoded.Ds_Merchant_Identifier ?? transaction.redsys_token,
-        redsys_token_expiry: decoded.Ds_ExpiryDate ?? transaction.redsys_token_expiry,
-        cof_txn_id: decoded.Ds_Merchant_Cof_Txnid ?? transaction.cof_txn_id,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", transaction.id)
-      .eq("status", "pending")
-      .select("redsys_order, redsys_token, redsys_token_expiry, cof_txn_id, last_four, metadata")
-      .maybeSingle()
-
-    if (claimError) {
-      console.error("[payment] resolveMembershipRedirectPayment failed updating pending transaction", {
-        order,
-        memberId: user.id,
-        error: claimError,
-      })
-      return { success: true, status: "pending" }
-    }
-
-    const resolvedTransaction = claimedTransaction ?? {
-      redsys_order: transaction.redsys_order,
-      redsys_token: decoded.Ds_Merchant_Identifier ?? transaction.redsys_token,
-      redsys_token_expiry: decoded.Ds_ExpiryDate ?? transaction.redsys_token_expiry,
-      cof_txn_id: decoded.Ds_Merchant_Cof_Txnid ?? transaction.cof_txn_id,
-      last_four: decoded.Ds_CardNumber ? decoded.Ds_CardNumber.slice(-4) : transaction.last_four,
-      metadata: transaction.metadata,
-    }
+    const finalized = await finalizeMembershipPayment({
+      order,
+      expectedMemberId: user.id,
+      responseParams: decoded,
+    })
 
     return {
-      success: true,
-      status: "authorized",
-      checkoutData: mapMembershipCheckoutData(resolvedTransaction),
+      success: finalized.success,
+      status: finalized.status,
+      checkoutData: finalized.checkoutData,
+      error: finalized.error,
     }
   } catch (error) {
     console.error("[payment] resolveMembershipRedirectPayment unexpected error", { order, error })
@@ -384,6 +268,7 @@ export async function prepareMembershipRedirectPayment(
         amount_cents: plan.amountCents,
         currency: "978",
         status: "pending",
+        authorized_at: null,
         context: "membership",
         member_id: user.id,
         is_mit: false,
@@ -702,6 +587,7 @@ export async function prepareCardUpdate(): Promise<PrepareRedirectPaymentResult>
         amount_cents: amountCents,
         currency: "978",
         status: "pending",
+        authorized_at: null,
         context: "membership",
         member_id: user.id,
         subscription_id: subscription.id,
@@ -739,6 +625,28 @@ export async function prepareCardUpdate(): Promise<PrepareRedirectPaymentResult>
   } catch (error) {
     console.error("[payment] prepareCardUpdate failed", { error })
     return { success: false, error: "Error interno" }
+  }
+}
+
+export async function completeMembershipOnboarding(order?: string | null) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: "No autenticado" }
+    }
+
+    return await completeMembershipOnboardingState(user.id, order)
+  } catch (error) {
+    console.error("[payment] completeMembershipOnboarding failed", { order, error })
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error inesperado",
+    }
   }
 }
 

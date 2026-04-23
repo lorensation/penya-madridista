@@ -50,9 +50,11 @@ export async function middleware(request: NextRequest) {
   // Check for /complete-profile access without checkout session ID
   if (request.nextUrl.pathname === "/complete-profile") {
     const sessionId = request.nextUrl.searchParams.get("session_id")
+    const order = request.nextUrl.searchParams.get("order")
+    const adminInvite = request.nextUrl.searchParams.get("admin_invite")
     
-    // If no session_id is provided, redirect to membership page
-    if (!sessionId) {
+    // Allow legacy session_id, current Redsys order flow, or admin invites.
+    if (!sessionId && !order && !adminInvite) {
       console.log("Attempt to access complete-profile without session_id")
       return NextResponse.redirect(new URL("/membership", request.url))
     }
