@@ -42,6 +42,7 @@ import {
 import { Plus, AlertTriangle, Mail, Send, CheckCircle, Clock, XCircle } from "lucide-react"
 import {
   createMarketingCampaign,
+  createAcquisitionCampaignDraft,
   sendCampaign,
   sendTestCampaign,
   getCampaigns,
@@ -91,6 +92,7 @@ export default function AdminEmailsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [authChecking, setAuthChecking] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
 
@@ -102,6 +104,7 @@ export default function AdminEmailsPage() {
   const [textBody, setTextBody] = useState("")
   const [segment, setSegment] = useState("all_opted_in")
   const [creating, setCreating] = useState(false)
+  const [creatingPreset, setCreatingPreset] = useState(false)
 
   // Send dialog
   const [sendDialogOpen, setSendDialogOpen] = useState(false)
@@ -156,6 +159,7 @@ export default function AdminEmailsPage() {
     if (!subject || !htmlBody) return
     setCreating(true)
     setError(null)
+    setNotice(null)
 
     try {
       const result = await createMarketingCampaign({
@@ -181,6 +185,27 @@ export default function AdminEmailsPage() {
       setError("Error al crear la campaña")
     } finally {
       setCreating(false)
+    }
+  }
+
+  const handleCreateAcquisitionDraft = async () => {
+    setCreatingPreset(true)
+    setError(null)
+    setNotice(null)
+
+    try {
+      const result = await createAcquisitionCampaignDraft()
+
+      if (result.success) {
+        setNotice("Se ha creado un borrador de campaña de captación listo para revisar y enviar.")
+        fetchCampaigns()
+      } else {
+        setError(result.error || "Error al crear la campaña predefinida")
+      }
+    } catch {
+      setError("Error al crear la campaña predefinida")
+    } finally {
+      setCreatingPreset(false)
     }
   }
 
@@ -267,16 +292,38 @@ export default function AdminEmailsPage() {
           <h1 className="text-2xl md:text-3xl font-bold text-primary mb-2">Campañas de Email Marketing</h1>
           <p className="text-gray-600">Crea y envía campañas de marketing a tus suscriptores</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)} className="mt-4 md:mt-0 flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Nueva Campaña
-        </Button>
+        <div className="mt-4 md:mt-0 flex flex-col sm:flex-row gap-3">
+          <Button
+            variant="outline"
+            onClick={handleCreateAcquisitionDraft}
+            disabled={creatingPreset}
+            className="flex items-center gap-2"
+          >
+            {creatingPreset ? (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            ) : (
+              <Mail className="h-4 w-4" />
+            )}
+            Campaña de Captación
+          </Button>
+          <Button onClick={() => setCreateOpen(true)} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Nueva Campaña
+          </Button>
+        </div>
       </div>
 
       {error && (
         <Alert variant="destructive" className="mb-6">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {notice && (
+        <Alert className="mb-6 border-green-200 bg-green-50">
+          <CheckCircle className="h-4 w-4 text-green-700" />
+          <AlertDescription className="text-green-700">{notice}</AlertDescription>
         </Alert>
       )}
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import {
   Card,
   CardContent,
@@ -25,13 +26,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Switch } from "@/components/ui/switch"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Calendar as CalendarIcon, Trash2, Pencil, Plus, AlertTriangle, MoreHorizontal, ImagePlus, Users, Clock, MapPin, Mail, Send, CheckCircle } from "lucide-react"
+import { Calendar as CalendarIcon, Trash2, Pencil, Plus, AlertTriangle, MoreHorizontal, ImagePlus, Users, Clock, MapPin, Mail, Send, CheckCircle, Eye, EyeOff } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -57,6 +59,7 @@ interface Event {
   capacity: number | null
   available: number | null
   image_url: string | null
+  is_hidden: boolean
   created_at: string | null
   updated_at: string | null
 }
@@ -70,7 +73,8 @@ const emptyEvent: Omit<Event, "id" | "created_at" | "updated_at"> = {
   location: "",
   capacity: 0,
   available: 0,
-  image_url: null
+  image_url: null,
+  is_hidden: false,
 }
 
 export default function AdminEventsPage() {
@@ -91,6 +95,7 @@ export default function AdminEventsPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null)
   const [imageUploading, setImageUploading] = useState(false)
+  const [visibilityUpdatingId, setVisibilityUpdatingId] = useState<string | null>(null)
 
   // Email notification state
   const [emailDialogOpen, setEmailDialogOpen] = useState(false)
@@ -232,7 +237,8 @@ export default function AdminEventsPage() {
       location: event.location || "",
       capacity: event.capacity || 0,
       available: event.available || 0,
-      image_url: event.image_url
+      image_url: event.image_url,
+      is_hidden: event.is_hidden,
     })
     setSelectedDate(new Date(event.date))
     setCurrentEventId(event.id)
@@ -270,6 +276,33 @@ export default function AdminEventsPage() {
       setSubmitLoading(false)
       setDeleteConfirmOpen(false)
       setDeleteEventId(null)
+    }
+  }
+
+  const handleToggleVisibility = async (event: Event) => {
+    try {
+      setVisibilityUpdatingId(event.id)
+
+      const { error } = await supabase
+        .from("events")
+        .update({
+          is_hidden: !event.is_hidden,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", event.id)
+
+      if (error) {
+        console.error("Error toggling event visibility:", error)
+        setError("No se pudo actualizar la visibilidad del evento. Por favor, inténtalo de nuevo.")
+        return
+      }
+
+      await fetchEvents()
+    } catch (error) {
+      console.error("Error in handleToggleVisibility:", error)
+      setError("Se produjo un error al actualizar la visibilidad del evento.")
+    } finally {
+      setVisibilityUpdatingId(null)
     }
   }
 
@@ -527,7 +560,15 @@ export default function AdminEventsPage() {
               </div>
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-start">
-                  <CardTitle className="text-xl">{event.title}</CardTitle>
+                  <div className="space-y-2">
+                    <CardTitle className="text-xl">{event.title}</CardTitle>
+                    <Badge
+                      variant="secondary"
+                      className={event.is_hidden ? "bg-gray-200 text-gray-700" : "bg-green-100 text-green-800"}
+                    >
+                      {event.is_hidden ? "Oculto" : "Visible"}
+                    </Badge>
+                  </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -541,7 +582,18 @@ export default function AdminEventsPage() {
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleOpenEmailDialog(event)}>
                         <Mail className="mr-2 h-4 w-4" />
-                        Enviar notificación por email
+                        Notificar evento
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleToggleVisibility(event)}
+                        disabled={visibilityUpdatingId === event.id}
+                      >
+                        {event.is_hidden ? (
+                          <Eye className="mr-2 h-4 w-4" />
+                        ) : (
+                          <EyeOff className="mr-2 h-4 w-4" />
+                        )}
+                        {event.is_hidden ? "Mostrar evento" : "Ocultar evento"}
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         onClick={() => handleDeletePrompt(event.id)}
@@ -583,14 +635,18 @@ export default function AdminEventsPage() {
                   </div>
                 )}
               </CardContent>
-              <CardFooter className="pt-0 mt-auto">
-                <Button 
-                  variant="outline" 
-                  className="w-full" 
+              <CardFooter className="pt-0 mt-auto grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Button
+                  variant="outline"
+                  className="w-full"
                   onClick={() => handleEditEvent(event)}
                 >
                   <Pencil className="mr-2 h-4 w-4" />
                   Editar Evento
+                </Button>
+                <Button className="w-full" onClick={() => handleOpenEmailDialog(event)}>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Notificar Evento
                 </Button>
               </CardFooter>
             </Card>
@@ -718,6 +774,25 @@ export default function AdminEventsPage() {
               </div>
             </div>
 
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div className="space-y-1">
+                <Label htmlFor="event-visibility">Mostrar en la web y dashboard</Label>
+                <p className="text-sm text-gray-500">
+                  Si lo desactivas, el evento seguirá guardado en Supabase pero dejará de aparecer en las vistas públicas y de socios.
+                </p>
+              </div>
+              <Switch
+                id="event-visibility"
+                checked={!formData.is_hidden}
+                onCheckedChange={(checked) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    is_hidden: !checked,
+                  }))
+                }
+              />
+            </div>
+
             <div className="space-y-2">
               <Label>Imagen del Evento</Label>
               <div className="flex items-center space-x-4">
@@ -832,10 +907,10 @@ export default function AdminEventsPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
-              Enviar notificación por email
+              Enviar campaña del evento
             </DialogTitle>
             <DialogDescription>
-              Envía una notificación del evento &quot;{emailEventTitle}&quot; a todos los miembros activos con notificaciones de eventos habilitadas.
+              Envía una campaña del evento &quot;{emailEventTitle}&quot; a los suscriptores activos del boletín de la peña.
             </DialogDescription>
           </DialogHeader>
 
@@ -844,7 +919,7 @@ export default function AdminEventsPage() {
               <Alert>
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  Ya se ha enviado una notificación para este evento anteriormente.
+                  Ya se ha enviado una campaña de este evento anteriormente.
                 </AlertDescription>
               </Alert>
             )}
@@ -867,6 +942,10 @@ export default function AdminEventsPage() {
                 placeholder="Se muestra en la bandeja de entrada antes de abrir el email"
               />
             </div>
+
+            <p className="text-sm text-gray-500">
+              Solo se enviará a contactos activos de <code>newsletter_subscribers</code>.
+            </p>
 
             <div className="border-t pt-4 space-y-2">
               <Label htmlFor="testEmail">Enviar prueba a:</Label>
@@ -921,7 +1000,7 @@ export default function AdminEventsPage() {
               ) : (
                 <>
                   <Send className="mr-2 h-4 w-4" />
-                  Enviar a todos los miembros
+                  Enviar a newsletter
                 </>
               )}
             </Button>
