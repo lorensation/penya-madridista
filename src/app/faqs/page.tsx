@@ -100,7 +100,7 @@ export default function FAQPage() {
                   <li><strong>Suscripción Familiar</strong>: Incluye a un adulto y un menor de la misma familia, con beneficios para ambos.</li>
                 </ul>
                 <p className="mt-2">
-                  Cada tipo de suscripción está disponible en modalidad mensual o anual, con descuentos en la suscripción anual.
+                  Las suscripciones Joven y Adulto se ofrecen exclusivamente con pago anual. La suscripción Familiar mantiene sus condiciones actuales.
                 </p>
               </div>
             </div>
@@ -110,12 +110,12 @@ export default function FAQPage() {
               <div className="text-gray-700">
                 <p>Los precios actuales de nuestras suscripciones son:</p>
                 <ul className="list-disc pl-6 mt-2 space-y-1">
-                  <li><strong>Suscripción Joven</strong>: 5€/mes o 50€/año</li>
-                  <li><strong>Suscripción Adulto</strong>: 10€/mes o 100€/año</li>
+                  <li><strong>Suscripción Joven</strong>: 30€/año</li>
+                  <li><strong>Suscripción Adulto</strong>: 60€/año</li>
                   <li><strong>Suscripción Familiar</strong>: 15€/mes o 150€/año</li>
                 </ul>
                 <p className="mt-2">
-                  Al elegir la opción anual te beneficias de un descuento equivalente a dos meses gratis.
+                  Las suscripciones Joven y Adulto no disponen de modalidad mensual.
                 </p>
               </div>
             </div>

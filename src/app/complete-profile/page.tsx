@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase"
 import { resolveMembershipRedirectPayment } from "@/app/actions/payment"
 import { sendWelcomeMemberEmail } from "@/app/actions/welcome-member-email"
 import { ProfileForm } from "@/components/profile-form"
+import { resolveMembershipInterval } from "@/lib/redsys/config"
 import { Loader2 } from "lucide-react"
 import { Suspense } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -107,6 +108,25 @@ function toNullableNumericValue(value?: string): number | null {
 
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+function resolveCheckoutPaymentType(
+  planType: string | undefined,
+  paymentType?: string | null,
+): string | null {
+  if (!planType) {
+    return null
+  }
+
+  if (planType === "infinite") {
+    if (paymentType === "infinite" || paymentType === "decade") {
+      return paymentType
+    }
+
+    return "decade"
+  }
+
+  return resolveMembershipInterval(planType, paymentType ?? null)
 }
 
 function CompleteProfileContent() {
@@ -288,18 +308,28 @@ function CompleteProfileContent() {
 
             if (txnData && !txnError) {
               const meta = txnData.metadata as Record<string, unknown> | null
-              setCheckoutData({
-                id: txnData.redsys_order || sessionId,
-                status: "complete",
-                redsys_token: txnData.redsys_token,
-                redsys_token_expiry: txnData.redsys_token_expiry,
-                cof_txn_id: txnData.cof_txn_id,
-                payment_status: "paid",
-                subscription_status: "active",
-                plan_type: (meta?.planType as string) || "over25",
-                payment_type: (meta?.interval as string) || "monthly",
-                last_four: txnData.last_four,
-              })
+              const planType = typeof meta?.planType === "string" ? meta.planType : "over25"
+              const paymentType = resolveCheckoutPaymentType(
+                planType,
+                typeof meta?.interval === "string" ? meta.interval : null,
+              )
+
+              if (!paymentType) {
+                console.warn("Skipping legacy checkout data with invalid plan metadata:", meta)
+              } else {
+                setCheckoutData({
+                  id: txnData.redsys_order || sessionId,
+                  status: "complete",
+                  redsys_token: txnData.redsys_token,
+                  redsys_token_expiry: txnData.redsys_token_expiry,
+                  cof_txn_id: txnData.cof_txn_id,
+                  payment_status: "paid",
+                  subscription_status: "active",
+                  plan_type: planType,
+                  payment_type: paymentType,
+                  last_four: txnData.last_four,
+                })
+              }
             } else {
               console.warn("No authorized membership payment found for user:", currentUserId)
               // Continue without checkout data — profile can still be created
@@ -419,16 +449,31 @@ function CompleteProfileContent() {
 
       // If we have checkout data, create or update subscription record
       if (checkoutData && checkoutData.plan_type) {
+        const resolvedPaymentType = resolveCheckoutPaymentType(
+          checkoutData.plan_type,
+          checkoutData.payment_type,
+        )
+
+        if (!resolvedPaymentType) {
+          setError("No se pudo determinar el periodo de la suscripcion.")
+          setLoading(false)
+          return
+        }
+
         // Calculate end date based on payment type
         const startDate = new Date()
         const endDate = new Date()
+        let endDateValue: string | null = null
         
-        if (checkoutData.payment_type === 'annual') {
+        if (resolvedPaymentType === "annual") {
           endDate.setFullYear(endDate.getFullYear() + 1)
-        } else if (checkoutData.payment_type === 'decade') {
+          endDateValue = endDate.toISOString()
+        } else if (resolvedPaymentType === "decade") {
           endDate.setFullYear(endDate.getFullYear() + 10)
-        } else {
+          endDateValue = endDate.toISOString()
+        } else if (resolvedPaymentType === "monthly") {
           endDate.setMonth(endDate.getMonth() + 1)
+          endDateValue = endDate.toISOString()
         }
 
         const { error: subscriptionError } = await supabase
@@ -436,14 +481,14 @@ function CompleteProfileContent() {
           .upsert({
             member_id: userData.user.id,
             plan_type: checkoutData.plan_type,
-            payment_type: checkoutData.payment_type || "monthly",
+            payment_type: resolvedPaymentType,
             last_four: checkoutData.last_four ?? null,
             redsys_token: checkoutData.redsys_token ?? null,
             redsys_token_expiry: checkoutData.redsys_token_expiry ?? null,
             redsys_cof_txn_id: checkoutData.cof_txn_id ?? null,
             redsys_last_order: checkoutData.id,
             start_date: startDate.toISOString(),
-            end_date: endDate.toISOString(),
+            end_date: endDateValue,
             status: checkoutData.subscription_status || "active",
             updated_at: new Date().toISOString(),
           }, { onConflict: "member_id" })

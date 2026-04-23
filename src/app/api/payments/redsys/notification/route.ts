@@ -5,7 +5,9 @@ import {
   getMerchantCode,
   getSecretKey,
   getTerminal,
+  isMembershipPlanType,
   isAuthorizationSuccess,
+  resolveMembershipInterval,
   verifySignature,
 } from "@/lib/redsys"
 import type { RedsysResponseParams } from "@/lib/redsys"
@@ -195,8 +197,16 @@ async function handleAuthorizedMembershipPayment(
   }
 
   const metadata = parseContextMetadata(transaction.metadata)
-  const interval = metadata.interval === "annual" ? "annual" : "monthly"
-  const planType = metadata.planType ?? "over25"
+  if (!metadata.planType || !isMembershipPlanType(metadata.planType)) {
+    throw new Error("Membership transaction metadata is missing a valid plan type")
+  }
+
+  const interval = resolveMembershipInterval(metadata.planType, metadata.interval)
+  if (!interval) {
+    throw new Error(`Invalid membership interval for plan ${metadata.planType}`)
+  }
+
+  const planType = metadata.planType
 
   const startDate = new Date()
   const endDate = new Date(startDate)

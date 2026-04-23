@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
-import { CheckCircle, Calendar, CreditCard, Award, Gift, Loader2, AlertCircle, BadgeCheck, Info } from "lucide-react"
+import { CheckCircle, CreditCard, Award, Gift, Loader2, AlertCircle, BadgeCheck, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
@@ -14,13 +14,26 @@ import type { PaymentInterval, PlanType, RedsysSignedRequest } from "@/lib/redsy
 import { prepareMembershipRedirectPayment } from "@/app/actions/payment"
 import { RedsysRedirectAutoSubmitForm } from "@/components/payments/redsys-redirect-form"
 
-const membershipPlans = [
+type MembershipPaymentOption = {
+  id: PaymentInterval
+  name: string
+  price: string
+  period: string
+  discount?: string
+}
+
+const membershipPlans: Array<{
+  id: PlanType
+  name: string
+  paymentOptions: MembershipPaymentOption[]
+  features: string[]
+  popular?: boolean
+}> = [
   {
     id: "under25" as PlanType,
     name: "Suscripción Joven (Menores de 25)",
     paymentOptions: [
-      { id: "monthly" as PaymentInterval, name: "Mensual", price: "5 €", period: "/mes" },
-      { id: "annual" as PaymentInterval, name: "Anual", price: "50 €", period: "/año", discount: "¡Ahorra 2 meses!" },
+      { id: "annual" as PaymentInterval, name: "Anual", price: "30 €", period: "/año" },
     ],
     features: [
       "Acceso a eventos exclusivos organizados por la peña",
@@ -34,8 +47,7 @@ const membershipPlans = [
     id: "over25" as PlanType,
     name: "Suscripción Adulto (Mayores de 25)",
     paymentOptions: [
-      { id: "monthly" as PaymentInterval, name: "Mensual", price: "10 €", period: "/mes" },
-      { id: "annual" as PaymentInterval, name: "Anual", price: "100 €", period: "/año", discount: "¡Ahorra 2 meses!" },
+      { id: "annual" as PaymentInterval, name: "Anual", price: "60 €", period: "/año" },
     ],
     features: [
       "Acceso a eventos exclusivos organizados por la peña",
@@ -192,8 +204,9 @@ export default function MembershipPage() {
       setError("La suscripción Joven está disponible solo para menores de 25 años. Por favor, selecciona la suscripción Adulto.")
       return
     }
+    const plan = membershipPlans.find((item) => item.id === planId)
     setSelectedPlan(planId)
-    setSelectedPaymentOption(null)
+    setSelectedPaymentOption(plan?.paymentOptions[0]?.id ?? null)
     setError(null)
   }
 
@@ -387,23 +400,17 @@ export default function MembershipPage() {
                 </div>
                 <div className="p-6 flex-grow flex flex-col">
                   <div className="mb-6 border-b pb-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center">
-                        <Calendar className="h-4 w-4 text-primary mr-1" />
-                        <span className="text-sm">Mensual</span>
-                      </div>
-                      <span className="font-bold">{plan.paymentOptions.find((opt) => opt.id === "monthly")?.price}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center">
-                        <CreditCard className="h-4 w-4 text-primary mr-1" />
-                        <span className="text-sm">Anual</span>
+                    <div className="flex justify-between items-start gap-4">
+                      <div>
+                        <div className="flex items-center">
+                          <CreditCard className="h-4 w-4 text-primary mr-1" />
+                          <span className="text-sm">Pago anual</span>
+                        </div>
+                        <div className="text-xs text-gray-600 mt-1">Solo disponible en cuota anual</div>
                       </div>
                       <div className="text-right">
-                        <span className="font-bold">{plan.paymentOptions.find((opt) => opt.id === "annual")?.price}</span>
-                        {plan.paymentOptions.find((opt) => opt.id === "annual")?.discount && (
-                          <div className="text-xs text-green-600">{plan.paymentOptions.find((opt) => opt.id === "annual")?.discount}</div>
-                        )}
+                        <span className="font-bold">{plan.paymentOptions[0]?.price}</span>
+                        <div className="text-xs text-gray-600">{plan.paymentOptions[0]?.period}</div>
                       </div>
                     </div>
                   </div>
@@ -423,8 +430,9 @@ export default function MembershipPage() {
 
           {selectedPlanData && (
             <div className="mt-8 bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-xl font-bold text-primary mb-4">Elige tu opcion de pago</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <h3 className="text-xl font-bold text-primary mb-2">Pago de la suscripción</h3>
+              <p className="text-sm text-gray-600 mb-4">Las suscripciones Joven y Adulto se contratan exclusivamente con pago anual.</p>
+              <div className="grid grid-cols-1 gap-4">
                 {selectedPlanData.paymentOptions.map((option) => (
                   <button
                     key={option.id}
@@ -457,7 +465,7 @@ export default function MembershipPage() {
               disabled={!selectedPlan || !selectedPaymentOption}
               className="px-8 py-6 text-lg"
             >
-              {!user ? "Iniciar sesion para suscribirse" : "Continuar con el pago"}
+              {!user ? "Iniciar sesion para suscribirse" : "Continuar con el pago anual"}
             </Button>
           </div>
 

@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { PostgrestError } from "@supabase/supabase-js"
+import { isAnnualOnlyMembershipPlan, resolveMembershipInterval } from "@/lib/redsys/config"
 
 export type PlanType = 'under25' | 'over25' | 'family';
 export type PaymentType = 'monthly' | 'annual' | 'decade';
@@ -236,10 +237,23 @@ export const serverSubscriptionService = {
     try {
       const supabase = await createServerSupabaseClient()
       
-      // Ensure payment type is valid - normalize to one of the allowed values
-      const normalizedPaymentType: PaymentType = 
-        paymentType === 'annual' ? 'annual' : 
-        paymentType === 'decade' ? 'decade' : 'monthly'
+      // Keep legacy decade subscriptions intact, but reject new monthly
+      // creations for annual-only plans.
+      const normalizedPaymentType: PaymentType | null =
+        paymentType === 'decade'
+          ? 'decade'
+          : resolveMembershipInterval(planType, paymentType)
+
+      if (!normalizedPaymentType) {
+        return {
+          success: false,
+          error: {
+            message: isAnnualOnlyMembershipPlan(planType)
+              ? 'Las suscripciones Joven y Adulto solo permiten pago anual'
+              : 'Tipo de pago no valido para el plan seleccionado',
+          },
+        }
+      }
       
       // Calculate end date based on payment type
       const startDate = new Date()
