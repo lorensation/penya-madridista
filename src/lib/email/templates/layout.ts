@@ -48,7 +48,7 @@ export function renderEmailLayout(options: EmailLayoutOptions): string {
   const unsubscribeCta = includeUnsubscribe
     ? `
         <p style="margin-top:16px;">
-          <a href="${unsubscribeUrl}" style="color:#999999;text-decoration:underline;font-size:12px;">Cancelar suscripción</a>
+          <a href="${unsubscribeUrl}" style="color:#999999;text-decoration:underline;font-size:12px;">Cancelar suscripci&oacute;n</a>
           &nbsp;|&nbsp;
           <a href="${preferencesUrl}" style="color:#999999;text-decoration:underline;font-size:12px;">Gestionar preferencias</a>
         </p>`
@@ -62,7 +62,7 @@ export function renderEmailLayout(options: EmailLayoutOptions): string {
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Peña Lorenzo Sanz</title>
+    <title>Pe&ntilde;a Lorenzo Sanz</title>
     <style>
       body {
         margin: 0;
@@ -123,7 +123,7 @@ export function renderEmailLayout(options: EmailLayoutOptions): string {
     ${previewHtml}
     <div class="container">
       <div class="header">
-        <img src="https://www.lorenzosanz.com/Logo-Penya-LS-resized.jpg" alt="Peña Lorenzo Sanz" class="logo" />
+        <img src="https://www.lorenzosanz.com/Logo-Penya-LS-resized.jpg" alt="Pe&ntilde;a Lorenzo Sanz" class="logo" />
       </div>
 
       <div class="content">
@@ -131,14 +131,14 @@ export function renderEmailLayout(options: EmailLayoutOptions): string {
       </div>
 
       <div class="footer">
-        <p>Peña Lorenzo Sanz Siempre Presente</p>
-        <p>&copy; ${new Date().getFullYear()} Peña Lorenzo Sanz. Todos los derechos reservados.</p>
+        <p>Pe&ntilde;a Lorenzo Sanz Siempre Presente</p>
+        <p>&copy; ${new Date().getFullYear()} Pe&ntilde;a Lorenzo Sanz. Todos los derechos reservados.</p>
         <p style="margin-top:12px;">
-          <a href="${BASE_URL}/privacy-policy" style="color:#999999;text-decoration:underline;">Política de Privacidad</a>
+          <a href="${BASE_URL}/privacy-policy" style="color:#999999;text-decoration:underline;">Pol&iacute;tica de Privacidad</a>
           &nbsp;|&nbsp;
           <a href="${BASE_URL}/aviso-legal" style="color:#999999;text-decoration:underline;">Aviso Legal</a>
           &nbsp;|&nbsp;
-          <a href="${BASE_URL}/terms-and-conditions" style="color:#999999;text-decoration:underline;">Términos y Condiciones</a>
+          <a href="${BASE_URL}/terms-and-conditions" style="color:#999999;text-decoration:underline;">T&eacute;rminos y Condiciones</a>
         </p>
         <p style="margin-top:8px;">
           <a href="mailto:info@lorenzosanz.com" style="color:#999999;text-decoration:underline;">info@lorenzosanz.com</a>

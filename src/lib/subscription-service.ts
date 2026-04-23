@@ -5,7 +5,16 @@ import { isAnnualOnlyMembershipPlan, resolveMembershipInterval } from "@/lib/red
 
 export type PlanType = 'under25' | 'over25' | 'family';
 export type PaymentType = 'monthly' | 'annual' | 'decade';
-export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'unpaid' | 'incomplete';
+export type SubscriptionStatus =
+  | 'active'
+  | 'trialing'
+  | 'pending_profile'
+  | 'canceled'
+  | 'past_due'
+  | 'expired'
+  | 'inactive'
+  | 'unpaid'
+  | 'incomplete';
 
 export interface Subscription {
   id: string;
