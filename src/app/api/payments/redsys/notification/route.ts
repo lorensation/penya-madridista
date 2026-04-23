@@ -5,13 +5,12 @@ import {
   getMerchantCode,
   getSecretKey,
   getTerminal,
-  isMembershipPlanType,
   isAuthorizationSuccess,
-  resolveMembershipInterval,
   verifySignature,
 } from "@/lib/redsys"
 import type { RedsysResponseParams } from "@/lib/redsys"
 import type { Json } from "@/types/supabase"
+import { finalizeMembershipPayment } from "@/lib/membership/onboarding"
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -187,76 +186,6 @@ async function handleAuthorizedShopPayment(transaction: PaymentTransactionRow) {
     .eq("id", transaction.id)
 }
 
-async function handleAuthorizedMembershipPayment(
-  transaction: PaymentTransactionRow,
-  responseParams: RedsysResponseParams,
-) {
-  const memberId = transaction.member_id
-  if (!memberId) {
-    throw new Error("Membership transaction has no member_id")
-  }
-
-  const metadata = parseContextMetadata(transaction.metadata)
-  if (!metadata.planType || !isMembershipPlanType(metadata.planType)) {
-    throw new Error("Membership transaction metadata is missing a valid plan type")
-  }
-
-  const interval = resolveMembershipInterval(metadata.planType, metadata.interval)
-  if (!interval) {
-    throw new Error(`Invalid membership interval for plan ${metadata.planType}`)
-  }
-
-  const planType = metadata.planType
-
-  const startDate = new Date()
-  const endDate = new Date(startDate)
-
-  if (interval === "annual") {
-    endDate.setFullYear(endDate.getFullYear() + 1)
-  } else {
-    endDate.setMonth(endDate.getMonth() + 1)
-  }
-
-  const { data: subscription, error: subError } = await admin
-    .from("subscriptions")
-    .upsert(
-      {
-        member_id: memberId,
-        plan_type: planType,
-        payment_type: interval,
-        status: "active",
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString(),
-        last_four: responseParams.Ds_CardNumber ? responseParams.Ds_CardNumber.slice(-4) : null,
-        redsys_token: responseParams.Ds_Merchant_Identifier ?? null,
-        redsys_token_expiry: responseParams.Ds_ExpiryDate ?? null,
-        redsys_cof_txn_id: responseParams.Ds_Merchant_Cof_Txnid ?? null,
-        redsys_last_order: transaction.redsys_order,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "member_id" },
-    )
-    .select("id")
-    .single()
-
-  if (subError || !subscription) {
-    throw new Error(`Failed upserting subscription: ${subError?.message ?? "unknown"}`)
-  }
-
-  await admin
-    .from("payment_transactions")
-    .update({
-      subscription_id: subscription.id,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", transaction.id)
-
-  await admin
-    .from("users")
-    .update({ is_member: true })
-    .eq("id", memberId)
-}
-
 async function handleAuthorizedCardUpdate(
   transaction: PaymentTransactionRow,
   responseParams: RedsysResponseParams,
@@ -353,6 +282,7 @@ export async function POST(request: NextRequest) {
     const transactionMetadata = parseMetadataRecord(transaction.metadata)
     const transactionMetadataType =
       typeof transactionMetadata.type === "string" ? transactionMetadata.type : null
+    const isMembershipCheckout = transaction.context === "membership" && transactionMetadataType !== "card_update"
     const notifiedAmount = parseInteger(responseParams.Ds_Amount)
     const isCardUpdateZeroAmount = transactionMetadataType === "card_update" && transaction.amount_cents === 0
 
@@ -407,6 +337,38 @@ export async function POST(request: NextRequest) {
     const dsResponse = responseParams.Ds_Response ?? ""
     const nextStatus = isAuthorizationSuccess(dsResponse) ? "authorized" : "denied"
 
+    if (isMembershipCheckout) {
+      if (nextStatus !== "authorized") {
+        await admin
+          .from("payment_transactions")
+          .update({
+            status: "denied",
+            ds_response: dsResponse || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", transaction.id)
+          .eq("status", "pending")
+
+        return NextResponse.json({ ok: true }, { status: 200 })
+      }
+
+      const finalized = await finalizeMembershipPayment({
+        order,
+        expectedMemberId: transaction.member_id,
+        responseParams,
+        admin,
+      })
+
+      if (!finalized.success) {
+        console.error("[redsys/notification] Membership finalization failed", {
+          order,
+          error: finalized.error,
+        })
+      }
+
+      return NextResponse.json({ ok: true }, { status: 200 })
+    }
+
     const claimed = await admin
       .from("payment_transactions")
       .update({
@@ -446,8 +408,6 @@ export async function POST(request: NextRequest) {
 
         if (metadataType === "card_update") {
           await handleAuthorizedCardUpdate(claimed.data as PaymentTransactionRow, responseParams)
-        } else {
-          await handleAuthorizedMembershipPayment(claimed.data as PaymentTransactionRow, responseParams)
         }
       }
     } catch (fulfillmentError) {
@@ -457,13 +417,15 @@ export async function POST(request: NextRequest) {
         error: fulfillmentError,
       })
 
-      await admin
-        .from("payment_transactions")
-        .update({
-          status: "error",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", claimed.data.id)
+      if (claimed.data.context !== "membership") {
+        await admin
+          .from("payment_transactions")
+          .update({
+            status: "error",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", claimed.data.id)
+      }
 
       return NextResponse.json({ ok: true }, { status: 200 })
     }

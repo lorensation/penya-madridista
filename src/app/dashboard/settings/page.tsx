@@ -259,42 +259,8 @@ export default function SettingsPage() {
         // Step 3: Check if the user is a member
         setIsMiembro(publicUserData.is_member === true)
 
-        // If user is marked as member, try to get member data
         if (publicUserData.is_member) {
-          const memberDataFound = await loadMemberDataFromTable(userData.user.id)
-          
-          // If user is marked as member but no member data found in miembros table,
-          // create a basic member record
-          if (!memberDataFound) {
-            console.log("User marked as member but no member data found, creating basic member record")
-            const newMemberData = {
-              user_uuid: userData.user.id,
-              email: userData.user.email || "",
-              name: publicUserData.name || userData.user.user_metadata?.name || "",
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              es_socio_realmadrid: false,
-              fecha_nacimiento: "1990-01-01",
-              socio_carnet_madridista: false,
-              telefono: 0,
-            }
-            
-            try {
-              const { data: newMember, error: createError } = await supabase
-                .from("miembros")
-                .insert(newMemberData)
-                .select()
-                
-              if (createError) {
-                console.error("Error creating missing member record:", createError)
-              } else if (newMember?.[0]) {
-                setMemberData(newMember[0])
-                updateFormWithMemberData(newMember[0])
-              }
-            } catch (error) {
-              console.error("Error creating missing member record:", error)
-            }
-          }
+          await loadMemberDataFromTable(userData.user.id)
         }
       }
     } catch (error) {
@@ -303,7 +269,7 @@ export default function SettingsPage() {
     } finally {
       setLoading(false)
     }
-  }, [router, supabase, updateFormWithUserData, loadMemberDataFromTable, updateFormWithMemberData])
+  }, [router, supabase, updateFormWithUserData, loadMemberDataFromTable])
   
   // Check authentication status and redirect if not logged in
   useEffect(() => {
@@ -694,6 +660,8 @@ const handleSendPasswordReset = async () => {
       ? "Activa"
       : subscriptionStatus === "trialing"
         ? "Prueba"
+        : subscriptionStatus === "pending_profile"
+          ? "Pendiente de perfil"
         : subscriptionStatus === "canceled"
           ? "Cancelada"
           : subscriptionStatus === "past_due"
@@ -706,6 +674,7 @@ const handleSendPasswordReset = async () => {
       })
     : null
   const hasActiveMembership = subscriptionStatus === "active" || subscriptionStatus === "trialing"
+  const hasPendingMembership = subscriptionStatus === "pending_profile"
 
   // Main settings page UI for authenticated users
   return (
@@ -762,13 +731,13 @@ const handleSendPasswordReset = async () => {
           </CardContent>
         </Card>
         
-        <Card className={`flex-1 ${hasActiveMembership ? "border-green-200" : isMiembro ? "border-orange-200" : "border-yellow-200"}`}>
+        <Card className={`flex-1 ${hasActiveMembership ? "border-green-200" : hasPendingMembership ? "border-amber-200" : isMiembro ? "border-orange-200" : "border-yellow-200"}`}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Estado de Suscripción</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
-              <div className={`w-3 h-3 rounded-full mr-2 ${hasActiveMembership ? "bg-green-500" : isMiembro ? "bg-orange-500" : "bg-yellow-500"}`}></div>
+              <div className={`w-3 h-3 rounded-full mr-2 ${hasActiveMembership ? "bg-green-500" : hasPendingMembership ? "bg-amber-500" : isMiembro ? "bg-orange-500" : "bg-yellow-500"}`}></div>
               <span className="text-sm">
                 {isMiembro ? (
                   <>
@@ -781,9 +750,16 @@ const handleSendPasswordReset = async () => {
                       </Badge>
                     )}
                   </>
-                ) : "No es miembro"}
+                ) : hasPendingMembership ? "Pago confirmado. Falta completar el perfil." : "No es miembro"}
               </span>
             </div>
+            {hasPendingMembership && user && membershipSubscription?.plan_type && (
+              <div className="mt-2">
+                <Link href="/complete-profile" className="text-xs text-primary hover:underline">
+                  Completar perfil para activar la membresia →
+                </Link>
+              </div>
+            )}
             {!isMiembro && (
               <div className="mt-2">
                 <Link href="/membership" className="text-xs text-primary hover:underline">

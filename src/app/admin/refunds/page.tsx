@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { AlertCircle, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -14,19 +15,30 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AlertCircle, Loader2, RefreshCw } from "lucide-react"
 import { supabase } from "@/lib/supabase"
-import { getRefundRequests } from "@/app/actions/refunds"
-import type { RefundRequestRow } from "@/app/actions/refunds"
+import {
+  getIncompleteOnboardingReviews,
+  getRefundRequests,
+  type IncompleteOnboardingReviewRow,
+  type RefundRequestRow,
+} from "@/app/actions/refunds"
 import { RefundReviewDialog } from "@/components/admin/refund-review-dialog"
+import { IncompleteOnboardingReviewDialog } from "@/components/admin/incomplete-onboarding-review-dialog"
 
 export const dynamic = "force-dynamic"
 
 const REASON_LABELS: Record<string, string> = {
-  economic: "Económicos",
+  economic: "Economicos",
   not_satisfied: "No satisfecho",
   personal: "Personales",
   other: "Otro",
+}
+
+const ONBOARDING_STATUS_LABELS: Record<string, string> = {
+  pending_review: "Pendiente",
+  resolved_completed: "Resuelto",
+  refunded_manually: "Reembolsado manualmente",
+  dismissed: "Descartado",
 }
 
 export default function AdminRefundsPage() {
@@ -35,12 +47,20 @@ export default function AdminRefundsPage() {
   const [authChecking, setAuthChecking] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [requests, setRequests] = useState<RefundRequestRow[]>([])
-  const [statusFilter, setStatusFilter] = useState("pending")
-  const [selectedRequest, setSelectedRequest] = useState<RefundRequestRow | null>(null)
+
+  const [queue, setQueue] = useState<"refunds" | "onboarding">("refunds")
+
+  const [refundRequests, setRefundRequests] = useState<RefundRequestRow[]>([])
+  const [refundStatusFilter, setRefundStatusFilter] = useState("pending")
+  const [selectedRefundRequest, setSelectedRefundRequest] = useState<RefundRequestRow | null>(null)
+
+  const [onboardingReviews, setOnboardingReviews] = useState<IncompleteOnboardingReviewRow[]>([])
+  const [onboardingStatusFilter, setOnboardingStatusFilter] = useState("pending_review")
+  const [selectedOnboardingReview, setSelectedOnboardingReview] =
+    useState<IncompleteOnboardingReviewRow | null>(null)
+
   const [dialogOpen, setDialogOpen] = useState(false)
 
-  // Auth check
   useEffect(() => {
     async function checkAdmin() {
       try {
@@ -76,26 +96,35 @@ export default function AdminRefundsPage() {
     checkAdmin()
   }, [router])
 
-  const loadRequests = useCallback(async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     setError(null)
 
-    const result = await getRefundRequests(statusFilter)
+    const [refundsResult, onboardingResult] = await Promise.all([
+      getRefundRequests(refundStatusFilter),
+      getIncompleteOnboardingReviews(onboardingStatusFilter),
+    ])
 
-    if (result.success && result.data) {
-      setRequests(result.data)
+    if (refundsResult.success && refundsResult.data) {
+      setRefundRequests(refundsResult.data)
     } else {
-      setError(result.error || "Error al cargar las solicitudes")
+      setError(refundsResult.error || "Error al cargar las solicitudes de reembolso")
+    }
+
+    if (onboardingResult.success && onboardingResult.data) {
+      setOnboardingReviews(onboardingResult.data)
+    } else {
+      setError((previous) => previous || onboardingResult.error || "Error al cargar la cola de onboarding")
     }
 
     setLoading(false)
-  }, [statusFilter])
+  }, [onboardingStatusFilter, refundStatusFilter])
 
   useEffect(() => {
     if (isAdmin) {
-      loadRequests()
+      loadData()
     }
-  }, [isAdmin, loadRequests])
+  }, [isAdmin, loadData])
 
   if (authChecking) {
     return (
@@ -105,21 +134,26 @@ export default function AdminRefundsPage() {
     )
   }
 
-  if (!isAdmin) return null
+  if (!isAdmin) {
+    return null
+  }
 
-  const pendingCount = requests.filter((r) => r.status === "pending").length
+  const pendingRefundCount = refundRequests.filter((request) => request.status === "pending").length
+  const pendingOnboardingCount = onboardingReviews.filter(
+    (review) => review.refund_review_status === "pending_review",
+  ).length
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-3xl font-bold">Reembolsos</h1>
-          <p className="text-gray-500 mt-1">
-            Gestiona las solicitudes de reembolso de los socios
+          <h1 className="text-3xl font-bold">Reembolsos y onboarding</h1>
+          <p className="mt-1 text-gray-500">
+            Gestiona solicitudes de reembolso y pagos confirmados con perfil incompleto.
           </p>
         </div>
-        <Button variant="outline" onClick={loadRequests} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+        <Button variant="outline" onClick={loadData} disabled={loading}>
+          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           Actualizar
         </Button>
       </div>
@@ -131,127 +165,248 @@ export default function AdminRefundsPage() {
         </Alert>
       )}
 
-      <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+      <Tabs value={queue} onValueChange={(value) => setQueue(value as "refunds" | "onboarding")}>
         <TabsList>
-          <TabsTrigger value="pending" className="relative">
-            Pendientes
-            {pendingCount > 0 && (
-              <Badge className="ml-2 bg-red-500 text-white text-xs px-1.5 py-0.5 min-w-[20px] h-5">
-                {pendingCount}
+          <TabsTrigger value="refunds" className="relative">
+            Reembolsos
+            {pendingRefundCount > 0 && (
+              <Badge className="ml-2 min-w-[20px] bg-red-500 px-1.5 py-0.5 text-xs text-white">
+                {pendingRefundCount}
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="approved">Aprobadas</TabsTrigger>
-          <TabsTrigger value="declined">Rechazadas</TabsTrigger>
-          <TabsTrigger value="all">Todas</TabsTrigger>
+          <TabsTrigger value="onboarding" className="relative">
+            Onboarding incompleto
+            {pendingOnboardingCount > 0 && (
+              <Badge className="ml-2 min-w-[20px] bg-amber-500 px-1.5 py-0.5 text-xs text-white">
+                {pendingOnboardingCount}
+              </Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      ) : requests.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          <p className="text-lg">No hay solicitudes de reembolso</p>
-          <p className="text-sm mt-1">
-            {statusFilter === "pending"
-              ? "No hay solicitudes pendientes de revisión"
-              : "No se encontraron solicitudes con este filtro"}
-          </p>
-        </div>
-      ) : (
-        <div className="rounded-md border bg-white">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Socio</TableHead>
-                <TableHead>Plan</TableHead>
-                <TableHead className="text-right">Importe</TableHead>
-                <TableHead>Motivo</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acción</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {requests.map((req) => {
-                const date = new Date(req.created_at).toLocaleDateString("es-ES", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                })
-                const amount = (req.amount_cents / 100).toFixed(2)
+      {queue === "refunds" && (
+        <>
+          <Tabs value={refundStatusFilter} onValueChange={setRefundStatusFilter}>
+            <TabsList>
+              <TabsTrigger value="pending">Pendientes</TabsTrigger>
+              <TabsTrigger value="approved">Aprobadas</TabsTrigger>
+              <TabsTrigger value="declined">Rechazadas</TabsTrigger>
+              <TabsTrigger value="all">Todas</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-                return (
-                  <TableRow
-                    key={req.id}
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => {
-                      setSelectedRequest(req)
-                      setDialogOpen(true)
-                    }}
-                  >
-                    <TableCell className="text-sm">{date}</TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium text-sm">{req.member_name || "—"}</p>
-                        <p className="text-xs text-gray-500">{req.member_email || ""}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {req.plan_type || "—"}
-                      {req.payment_type && (
-                        <span className="text-gray-400 ml-1">({req.payment_type})</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-sm">
-                      {amount} €
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {REASON_LABELS[req.reason] || req.reason}
-                    </TableCell>
-                    <TableCell>
-                      {req.status === "pending" && (
-                        <Badge className="bg-amber-500">Pendiente</Badge>
-                      )}
-                      {req.status === "approved" && (
-                        <Badge className="bg-green-500">Aprobada</Badge>
-                      )}
-                      {req.status === "declined" && (
-                        <Badge variant="outline" className="text-red-500 border-red-300">
-                          Rechazada
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setSelectedRequest(req)
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : refundRequests.length === 0 ? (
+            <div className="py-12 text-center text-gray-500">
+              <p className="text-lg">No hay solicitudes de reembolso</p>
+            </div>
+          ) : (
+            <div className="rounded-md border bg-white">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Socio</TableHead>
+                    <TableHead>Plan</TableHead>
+                    <TableHead className="text-right">Importe</TableHead>
+                    <TableHead>Motivo</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Accion</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {refundRequests.map((request) => {
+                    const date = new Date(request.created_at).toLocaleDateString("es-ES", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    })
+
+                    return (
+                      <TableRow
+                        key={request.id}
+                        className="cursor-pointer hover:bg-gray-50"
+                        onClick={() => {
+                          setSelectedRefundRequest(request)
                           setDialogOpen(true)
                         }}
                       >
-                        {req.status === "pending" ? "Revisar" : "Ver"}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                        <TableCell className="text-sm">{date}</TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="text-sm font-medium">{request.member_name || "—"}</p>
+                            <p className="text-xs text-gray-500">{request.member_email || ""}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {request.plan_type || "—"}
+                          {request.payment_type && (
+                            <span className="ml-1 text-gray-400">({request.payment_type})</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-medium">
+                          {(request.amount_cents / 100).toFixed(2)} €
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {REASON_LABELS[request.reason] || request.reason}
+                        </TableCell>
+                        <TableCell>
+                          {request.status === "pending" && <Badge className="bg-amber-500">Pendiente</Badge>}
+                          {request.status === "approved" && <Badge className="bg-green-500">Aprobada</Badge>}
+                          {request.status === "declined" && (
+                            <Badge variant="outline" className="border-red-300 text-red-500">
+                              Rechazada
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setSelectedRefundRequest(request)
+                              setDialogOpen(true)
+                            }}
+                          >
+                            {request.status === "pending" ? "Revisar" : "Ver"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Review dialog */}
-      {selectedRequest && (
+      {queue === "onboarding" && (
+        <>
+          <Tabs value={onboardingStatusFilter} onValueChange={setOnboardingStatusFilter}>
+            <TabsList>
+              <TabsTrigger value="pending_review">Pendientes</TabsTrigger>
+              <TabsTrigger value="resolved_completed">Completados</TabsTrigger>
+              <TabsTrigger value="refunded_manually">Reembolsados</TabsTrigger>
+              <TabsTrigger value="dismissed">Descartados</TabsTrigger>
+              <TabsTrigger value="all">Todos</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : onboardingReviews.length === 0 ? (
+            <div className="py-12 text-center text-gray-500">
+              <p className="text-lg">No hay casos de onboarding incompleto</p>
+            </div>
+          ) : (
+            <div className="rounded-md border bg-white">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Autorizado</TableHead>
+                    <TableHead>Socio</TableHead>
+                    <TableHead>Plan</TableHead>
+                    <TableHead className="text-right">Importe</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Limite</TableHead>
+                    <TableHead className="text-right">Accion</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {onboardingReviews.map((review) => (
+                    <TableRow
+                      key={review.id}
+                      className="cursor-pointer hover:bg-gray-50"
+                      onClick={() => {
+                        setSelectedOnboardingReview(review)
+                        setDialogOpen(true)
+                      }}
+                    >
+                      <TableCell className="text-sm">
+                        {review.authorized_at
+                          ? new Date(review.authorized_at).toLocaleDateString("es-ES")
+                          : "—"}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="text-sm font-medium">{review.member_name || "—"}</p>
+                          <p className="text-xs text-gray-500">{review.member_email || ""}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {review.plan_type || "—"}
+                        {review.payment_type && (
+                          <span className="ml-1 text-gray-400">({review.payment_type})</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-medium">
+                        {(review.amount_cents / 100).toFixed(2)} €
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={
+                            review.refund_review_status === "pending_review"
+                              ? "bg-amber-500"
+                              : review.refund_review_status === "resolved_completed"
+                                ? "bg-green-600"
+                                : "bg-slate-700"
+                          }
+                        >
+                          {ONBOARDING_STATUS_LABELS[review.refund_review_status] ||
+                            review.refund_review_status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {review.grace_expires_at
+                          ? new Date(review.grace_expires_at).toLocaleDateString("es-ES")
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setSelectedOnboardingReview(review)
+                            setDialogOpen(true)
+                          }}
+                        >
+                          {review.refund_review_status === "pending_review" ? "Revisar" : "Ver"}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </>
+      )}
+
+      {selectedRefundRequest && queue === "refunds" && (
         <RefundReviewDialog
-          request={selectedRequest}
+          request={selectedRefundRequest}
           open={dialogOpen}
           onOpenChange={setDialogOpen}
-          onActionComplete={loadRequests}
+          onActionComplete={loadData}
+        />
+      )}
+
+      {selectedOnboardingReview && queue === "onboarding" && (
+        <IncompleteOnboardingReviewDialog
+          review={selectedOnboardingReview}
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onActionComplete={loadData}
         />
       )}
     </div>

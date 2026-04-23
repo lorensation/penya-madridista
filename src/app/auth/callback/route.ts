@@ -47,42 +47,40 @@ export async function GET(request: NextRequest) {
   // Post-auth profile creation (runs for both flows)
   if (authUser) {
     try {
-      // Check if user profile exists
-      const { data: profile, error: profileError } = await supabase
-        .from("miembros")
+      const communicationsConsent = authUser.user_metadata?.subscribeToNewsletter !== false
+
+      // Ensure the public users row exists, but do not create a synthetic miembros profile here.
+      const { data: publicUser, error: publicUserError } = await supabase
+        .from("users")
         .select("id")
-        .eq("user_uuid", authUser.id)
+        .eq("id", authUser.id)
         .maybeSingle()
 
-      // If profile doesn't exist, create it
-      if ((profileError || !profile) && authUser.email) {
-        const { error: insertError } = await supabase.from("miembros").insert({
+      if ((publicUserError || !publicUser) && authUser.email) {
+        const { error: insertError } = await supabase.from("users").insert({
           id: authUser.id,
-          user_uuid: authUser.id,
-          email: authUser.email!,
-          name: authUser.user_metadata?.name || authUser.email!.split("@")[0] || "",
-          role: "user",
-          created_at: new Date().toISOString(),
-          es_socio_realmadrid: false,
-          fecha_nacimiento: "1990-01-01",
-          socio_carnet_madridista: false,
-          telefono: 0,
+          email: authUser.email,
+          name: authUser.user_metadata?.name || authUser.email.split("@")[0] || "",
+          is_member: false,
+          email_notifications: communicationsConsent,
+          marketing_emails: communicationsConsent,
+          updated_at: new Date().toISOString(),
         })
 
         if (insertError) {
-          console.error("Error creating profile in callback:", insertError)
+          console.error("Error creating user row in callback:", insertError)
         }
-        
+
         // Check if the user opted in for newsletter (stored in user metadata)
         const subscribeNewsletter = authUser.user_metadata?.subscribeToNewsletter === true
-        
+
         if (subscribeNewsletter && authUser.email) {
           try {
             const subscribed = await addUserToNewsletter(
-              authUser.email, 
+              authUser.email,
               authUser.user_metadata?.name || ""
             )
-            
+
             if (!subscribed) {
               console.log("User wanted to subscribe to newsletter but couldn't be subscribed")
             }
