@@ -73,6 +73,7 @@ export default function EventsPage() {
         const { data: eventsData, error: eventsError } = await supabase
           .from("events")
           .select("*")
+          .eq("is_hidden", false)
           .order('date', { ascending: true })
         
         if (eventsError) {

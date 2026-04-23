@@ -307,6 +307,7 @@ export type Database = {
           description: string | null
           id: string
           image_url: string | null
+          is_hidden: boolean
           location: string | null
           time: string | null
           title: string
@@ -320,6 +321,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_hidden?: boolean
           location?: string | null
           time?: string | null
           title: string
@@ -333,6 +335,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_hidden?: boolean
           location?: string | null
           time?: string | null
           title?: string

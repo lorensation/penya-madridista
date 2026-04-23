@@ -148,6 +148,7 @@ export default function DashboardPage() {
           .from("events")
           .select("id, title, description, date, time, location, created_at")
           .gte('date', today) // Only get events that are today or in the future
+          .eq("is_hidden", false)
           .order('date', { ascending: true })
           .limit(3) // Limit to 3 upcoming events
         
@@ -195,6 +196,7 @@ export default function DashboardPage() {
         const { data: recentEvents, error: eventsError } = await supabase
           .from("events")
           .select("id, title, description, date, time, location, created_at")
+          .eq("is_hidden", false)
           .order('date', { ascending: true })
           .limit(5)
         
