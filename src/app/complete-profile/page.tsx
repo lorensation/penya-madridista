@@ -411,6 +411,21 @@ function CompleteProfileContent() {
         }
       }
 
+      const { data: persistedMember, error: persistedMemberError } = await supabase
+        .from("miembros")
+        .select("user_uuid")
+        .eq("user_uuid", userData.user.id)
+        .maybeSingle()
+
+      if (persistedMemberError || !persistedMember) {
+        console.error("Member profile persistence check failed:", persistedMemberError)
+        setError(
+          "No hemos podido guardar tu ficha de socio. Si ya realizaste el pago, escribe a info@lorenzosanz.com para revisarlo contigo.",
+        )
+        setLoading(false)
+        return
+      }
+
       const { error: userUpdateError } = await supabase
         .from("users")
         .update({
@@ -461,7 +476,11 @@ function CompleteProfileContent() {
       const completionResult = await completeMembershipOnboarding(membershipOrder)
       if (!completionResult.success) {
         console.error("Error finalizing membership onboarding:", completionResult.error)
-        setError("Tu perfil se ha guardado, pero no se pudo activar la membresia. Contacta con soporte.")
+        setError(
+          completionResult.error === "MEMBER_PROFILE_INCOMPLETE"
+            ? "No hemos podido confirmar tu ficha de socio. Revisa el formulario o contacta con soporte."
+            : "Tu perfil se ha guardado, pero no se pudo activar la membresia. Contacta con soporte.",
+        )
         setLoading(false)
         return
       }
