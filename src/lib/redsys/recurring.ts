@@ -18,6 +18,35 @@ import { getMembershipPlan } from "./config"
 import type { PlanType, PaymentInterval } from "./config"
 import type { ExecutePaymentResult } from "./types"
 
+const GRANDFATHERED_MONTHLY_PLANS = {
+  under25: { amountCents: 500, name: "Joven Mensual" },
+  over25: { amountCents: 1000, name: "Adulto Mensual" },
+} as const
+
+function getRenewalPlan(
+  planType: string | null | undefined,
+  interval: string | null | undefined,
+): { amountCents: number; name: string } | undefined {
+  if (!planType || !interval) {
+    return undefined
+  }
+
+  const activePlan = getMembershipPlan(
+    planType as PlanType,
+    interval as PaymentInterval,
+  )
+
+  if (activePlan) {
+    return activePlan
+  }
+
+  if (interval === "monthly" && (planType === "under25" || planType === "over25")) {
+    return GRANDFATHERED_MONTHLY_PLANS[planType]
+  }
+
+  return undefined
+}
+
 // Admin client (bypasses RLS)
 function getAdminClient() {
   return createClient(
@@ -121,9 +150,9 @@ export async function processRenewals(options?: {
       }
 
       // Look up plan amount
-      const plan = getMembershipPlan(
-        sub.plan_type as PlanType,
-        sub.payment_type as PaymentInterval,
+      const plan = getRenewalPlan(
+        sub.plan_type as string | null | undefined,
+        sub.payment_type as string | null | undefined,
       )
 
       if (!plan) {

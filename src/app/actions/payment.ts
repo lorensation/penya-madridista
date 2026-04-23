@@ -12,7 +12,9 @@ import {
   getMembershipPlan,
   getRealizarPagoUrl,
   getSecretKey,
+  isAnnualOnlyMembershipPlan,
   isAuthorizationSuccess,
+  resolveMembershipInterval,
   verifySignature,
 } from "@/lib/redsys"
 import type {
@@ -147,7 +149,11 @@ function mapMembershipCheckoutData(
     payment_status: "paid",
     subscription_status: "active",
     plan_type: typeof metadata?.planType === "string" ? metadata.planType : "over25",
-    payment_type: typeof metadata?.interval === "string" ? metadata.interval : "monthly",
+    payment_type:
+      resolveMembershipInterval(
+        typeof metadata?.planType === "string" ? metadata.planType : "over25",
+        typeof metadata?.interval === "string" ? metadata.interval : null,
+      ) ?? "annual",
     last_four: transaction.last_four,
   }
 }
@@ -351,7 +357,19 @@ export async function prepareMembershipRedirectPayment(
       }
     }
 
-    const plan = getMembershipPlan(planType, interval)
+    if (isAnnualOnlyMembershipPlan(planType) && interval !== "annual") {
+      return {
+        success: false,
+        error: "Las suscripciones Joven y Adulto solo permiten pago anual.",
+      }
+    }
+
+    const resolvedInterval = resolveMembershipInterval(planType, interval)
+    if (!resolvedInterval) {
+      return { success: false, error: "Plan de suscripción no valido" }
+    }
+
+    const plan = getMembershipPlan(planType, resolvedInterval)
     if (!plan) {
       return { success: false, error: "Plan de suscripción no valido" }
     }
@@ -371,7 +389,7 @@ export async function prepareMembershipRedirectPayment(
         is_mit: false,
         metadata: {
           planType,
-          interval,
+          interval: resolvedInterval,
           planName: plan.name,
         },
       })

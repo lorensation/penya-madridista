@@ -19,7 +19,7 @@ The Peña Lorenzo Sanz website serves as a digital hub for members and supporter
 
 ### Membership System
 - **Tiered Membership Plans**: Various membership options (Under 25, Over 25, Family plans)
-- **Subscription Management**: Monthly and annual subscription options
+- **Subscription Management**: Annual-only Under 25 and Over 25 memberships, plus existing Family plan billing options
 - **Payment Processing**: Secure payment processing via RedSys / Getnet
 - **Digital Membership Cards**: For verified members
 

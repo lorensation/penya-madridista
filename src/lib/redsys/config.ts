@@ -15,7 +15,7 @@
 
 import type { SignatureVersion } from "./types"
 
-// ── Endpoint URLs ────────────────────────────────────────────────────────────
+// —— Endpoint URLs ————————————————————————————————————————————————————————————
 
 export const REDSYS_ENDPOINTS = {
   test: {
@@ -34,7 +34,7 @@ export const REDSYS_ENDPOINTS = {
   },
 } as const
 
-// ── Constants ────────────────────────────────────────────────────────────────
+// —— Constants ————————————————————————————————————————————————————————————————
 
 /** ISO-4217 numeric code for Euro */
 export const CURRENCY_EUR = "978"
@@ -59,7 +59,7 @@ export const RESPONSE_CODES = {
   REDIRECT_3DS_V22: 8220,
 } as const
 
-// ── Test Credentials (sandbox) ───────────────────────────────────────────────
+// —— Test Credentials (sandbox) —————————————————————————————————————————————
 
 export const TEST_CREDENTIALS = {
   merchantCode: "999008881",
@@ -81,7 +81,7 @@ export const TEST_CREDENTIALS = {
   },
 } as const
 
-// ── Membership Plans ─────────────────────────────────────────────────────────
+// —— Membership Plans ————————————————————————————————————————————————————————
 
 export type PlanType = "under25" | "over25" | "family"
 export type PaymentInterval = "monthly" | "annual"
@@ -96,11 +96,9 @@ export interface MembershipPlan {
 
 export const MEMBERSHIP_PLANS: MembershipPlan[] = [
   // Under 25
-  { planType: "under25", interval: "monthly", amountCents: 500,   name: "Joven Mensual",    description: "Suscripción Joven — Menores de 25" },
-  { planType: "under25", interval: "annual",  amountCents: 5000,  name: "Joven Anual",      description: "Suscripción Joven — Menores de 25" },
+  { planType: "under25", interval: "annual",  amountCents: 3000,  name: "Joven Anual",      description: "Suscripción Joven — Menores de 25" },
   // Over 25
-  { planType: "over25",  interval: "monthly", amountCents: 1000,  name: "Adulto Mensual",   description: "Suscripción Adulto — Mayores de 25" },
-  { planType: "over25",  interval: "annual",  amountCents: 10000, name: "Adulto Anual",     description: "Suscripción Adulto — Mayores de 25" },
+  { planType: "over25",  interval: "annual",  amountCents: 6000,  name: "Adulto Anual",     description: "Suscripción Adulto — Mayores de 25" },
   // Family
   { planType: "family",  interval: "monthly", amountCents: 1500,  name: "Familiar Mensual", description: "Suscripción Familiar — Un adulto y un menor" },
   { planType: "family",  interval: "annual",  amountCents: 15000, name: "Familiar Anual",   description: "Suscripción Familiar — Un adulto y un menor" },
@@ -110,7 +108,42 @@ export function getMembershipPlan(planType: PlanType, interval: PaymentInterval)
   return MEMBERSHIP_PLANS.find((p) => p.planType === planType && p.interval === interval)
 }
 
-// ── Environment Helpers (server-side) ────────────────────────────────────────
+export function isMembershipPlanType(value: string): value is PlanType {
+  return value === "under25" || value === "over25" || value === "family"
+}
+
+export function isPaymentInterval(value: string): value is PaymentInterval {
+  return value === "monthly" || value === "annual"
+}
+
+export function isAnnualOnlyMembershipPlan(planType: string): planType is "under25" | "over25" {
+  return planType === "under25" || planType === "over25"
+}
+
+export function resolveMembershipInterval(
+  planType: string | null | undefined,
+  interval: string | null | undefined,
+): PaymentInterval | null {
+  if (!planType || !isMembershipPlanType(planType)) {
+    return null
+  }
+
+  if (typeof interval !== "string") {
+    return isAnnualOnlyMembershipPlan(planType) ? "annual" : null
+  }
+
+  if (!isPaymentInterval(interval)) {
+    return null
+  }
+
+  if (isAnnualOnlyMembershipPlan(planType) && interval !== "annual") {
+    return null
+  }
+
+  return interval
+}
+
+// —— Environment Helpers (server-side) ——————————————————————————————————————
 
 export function getRedsysEnv(): "test" | "production" {
   return process.env.REDSYS_ENV === "production" || process.env.REDSYS_ENV === "prod"
