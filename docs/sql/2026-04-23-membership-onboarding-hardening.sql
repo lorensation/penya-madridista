@@ -1,6 +1,44 @@
 alter table public.users
 add column if not exists profile_completed_at timestamptz null;
 
+do $$
+begin
+  if exists (
+    select 1
+    from pg_constraint
+    where conname = 'subscriptions_status_check'
+      and conrelid = 'public.subscriptions'::regclass
+  ) then
+    alter table public.subscriptions
+      drop constraint subscriptions_status_check;
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'subscriptions_status_check'
+      and conrelid = 'public.subscriptions'::regclass
+  ) then
+    alter table public.subscriptions
+      add constraint subscriptions_status_check
+      check (
+        status = any (
+          array[
+            'active'::text,
+            'trialing'::text,
+            'pending_profile'::text,
+            'canceled'::text,
+            'past_due'::text,
+            'expired'::text,
+            'inactive'::text,
+            'unpaid'::text,
+            'incomplete'::text
+          ]
+        )
+      );
+  end if;
+end $$;
+
 alter table public.payment_transactions
 add column if not exists authorized_at timestamptz null,
 add column if not exists onboarding_status text not null default 'not_applicable',
