@@ -220,7 +220,7 @@ export type PaymentStatus =
   | "refunded"
   | "cancelled"
 
-export type PaymentContext = "shop" | "membership"
+export type PaymentContext = "shop" | "membership" | "event"
 
 // ── Action Results ───────────────────────────────────────────────────────────
 

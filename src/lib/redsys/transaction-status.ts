@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js"
 
 export interface PaymentTransactionStatusRow {
+  event_id: string | null
+  member_id: string | null
   redsys_order: string
   status: string
   context: string
@@ -22,7 +24,7 @@ export async function getPaymentTransactionStatusByOrder(order: string): Promise
 
   const { data, error } = await admin
     .from("payment_transactions")
-    .select("redsys_order, status, context, amount_cents, ds_response, updated_at")
+    .select("event_id, member_id, redsys_order, status, context, amount_cents, ds_response, updated_at")
     .eq("redsys_order", order)
     .maybeSingle()
 

@@ -13,12 +13,13 @@
  *   M = Membership first payment (with tokenization)
  *   R = Recurring MIT charge
  *   D = Refund (devolución)
+ *   E = Event one-time payment
  *   X = Other / generic
  */
 
 const ALPHANUMERIC = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
-export type OrderPrefix = "S" | "M" | "R" | "D" | "X"
+export type OrderPrefix = "S" | "M" | "R" | "D" | "E" | "X"
 
 /**
  * Generate a unique order number.
@@ -59,7 +60,7 @@ export function generateOrderNumber(prefix: OrderPrefix = "X"): string {
 export function getOrderPrefix(orderNumber: string): OrderPrefix | null {
   if (orderNumber.length < 5) return null
   const ch = orderNumber[4]
-  if ("SMRDX".includes(ch)) return ch as OrderPrefix
+  if ("SMRDEX".includes(ch)) return ch as OrderPrefix
   return null
 }
 

@@ -181,6 +181,67 @@ export type Database = {
           },
         ]
       }
+      event_external_assists: {
+        Row: {
+          created_at: string
+          email: string
+          event_id: string
+          id: string
+          name: string
+          payment_transaction_id: string
+          phone: string
+          redsys_order: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          event_id: string
+          id?: string
+          name: string
+          payment_transaction_id: string
+          phone: string
+          redsys_order: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          event_id?: string
+          id?: string
+          name?: string
+          payment_transaction_id?: string
+          phone?: string
+          redsys_order?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_external_assists_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_external_assists_payment_transaction_id_fkey"
+            columns: ["payment_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "payment_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_external_assists_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blocked_users: {
         Row: {
           blocked_by: string
@@ -309,6 +370,7 @@ export type Database = {
           image_url: string | null
           is_hidden: boolean
           location: string | null
+          one_time_price_cents: number | null
           time: string | null
           title: string
           updated_at: string | null
@@ -323,6 +385,7 @@ export type Database = {
           image_url?: string | null
           is_hidden?: boolean
           location?: string | null
+          one_time_price_cents?: number | null
           time?: string | null
           title: string
           updated_at?: string | null
@@ -337,6 +400,7 @@ export type Database = {
           image_url?: string | null
           is_hidden?: boolean
           location?: string | null
+          one_time_price_cents?: number | null
           time?: string | null
           title?: string
           updated_at?: string | null
@@ -665,6 +729,7 @@ export type Database = {
           ds_card_brand: string | null
           ds_card_country: string | null
           ds_response: string | null
+          event_id: string | null
           id: string
           is_mit: boolean
           last_four: string | null
@@ -697,6 +762,7 @@ export type Database = {
           ds_card_brand?: string | null
           ds_card_country?: string | null
           ds_response?: string | null
+          event_id?: string | null
           id?: string
           is_mit?: boolean
           last_four?: string | null
@@ -729,6 +795,7 @@ export type Database = {
           ds_card_brand?: string | null
           ds_card_country?: string | null
           ds_response?: string | null
+          event_id?: string | null
           id?: string
           is_mit?: boolean
           last_four?: string | null
@@ -750,7 +817,36 @@ export type Database = {
           transaction_type?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "payment_transactions_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transactions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transactions_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       refund_requests: {
         Row: {

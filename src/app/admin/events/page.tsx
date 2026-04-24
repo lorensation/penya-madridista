@@ -42,7 +42,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
+import { formatShopPrice, cn } from "@/lib/utils"
+import { formatCentsToEuroInput, parseEuroPriceInputToCents } from "@/lib/events"
 import { createEventCampaign, sendCampaign, sendTestCampaign, getEventCampaignStatus } from "@/app/actions/admin-email-campaigns"
 
 // Add route segment config to mark this route as dynamic
@@ -60,6 +61,7 @@ interface Event {
   available: number | null
   image_url: string | null
   is_hidden: boolean
+  one_time_price_cents: number | null
   created_at: string | null
   updated_at: string | null
 }
@@ -75,6 +77,7 @@ const emptyEvent: Omit<Event, "id" | "created_at" | "updated_at"> = {
   available: 0,
   image_url: null,
   is_hidden: false,
+  one_time_price_cents: null,
 }
 
 export default function AdminEventsPage() {
@@ -96,6 +99,8 @@ export default function AdminEventsPage() {
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null)
   const [imageUploading, setImageUploading] = useState(false)
   const [visibilityUpdatingId, setVisibilityUpdatingId] = useState<string | null>(null)
+  const [priceInput, setPriceInput] = useState("")
+  const [priceInputError, setPriceInputError] = useState<string | null>(null)
 
   // Email notification state
   const [emailDialogOpen, setEmailDialogOpen] = useState(false)
@@ -223,6 +228,8 @@ export default function AdminEventsPage() {
     setFormData({...emptyEvent})
     setSelectedDate(new Date())
     setCurrentEventId(null)
+    setPriceInput("")
+    setPriceInputError(null)
     setIsOpen(true)
   }
 
@@ -239,9 +246,12 @@ export default function AdminEventsPage() {
       available: event.available || 0,
       image_url: event.image_url,
       is_hidden: event.is_hidden,
+      one_time_price_cents: event.one_time_price_cents,
     })
     setSelectedDate(new Date(event.date))
     setCurrentEventId(event.id)
+    setPriceInput(formatCentsToEuroInput(event.one_time_price_cents))
+    setPriceInputError(null)
     setIsOpen(true)
   }
 
@@ -350,11 +360,31 @@ export default function AdminEventsPage() {
     }
   }
 
+  const handlePriceInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target
+    setPriceInput(value)
+
+    const parsed = parseEuroPriceInputToCents(value)
+    setPriceInputError(parsed.error)
+
+    if (!parsed.error) {
+      setFormData((prev) => ({
+        ...prev,
+        one_time_price_cents: parsed.cents,
+      }))
+    }
+  }
+
   // Submit the form to create or update an event
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     try {
+      if (priceInputError) {
+        setError(priceInputError)
+        return
+      }
+
       setSubmitLoading(true)
       
       if (isEditing && currentEventId) {
@@ -394,6 +424,8 @@ export default function AdminEventsPage() {
       
       // Reset and close the form
       setFormData({...emptyEvent})
+      setPriceInput("")
+      setPriceInputError(null)
       setIsOpen(false)
     } catch (error) {
       console.error("Error in handleSubmit:", error)
@@ -634,6 +666,14 @@ export default function AdminEventsPage() {
                     </span>
                   </div>
                 )}
+                {typeof event.one_time_price_cents === "number" && event.one_time_price_cents >= 0 && (
+                  <div className="flex items-center">
+                    <span className="mr-2 text-primary">€</span>
+                    <span className="text-sm">
+                      Entrada puntual: {formatShopPrice(event.one_time_price_cents)}
+                    </span>
+                  </div>
+                )}
               </CardContent>
               <CardFooter className="pt-0 mt-auto grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Button
@@ -774,6 +814,23 @@ export default function AdminEventsPage() {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="one_time_price_cents">Precio entrada puntual (EUR)</Label>
+              <Input
+                id="one_time_price_cents"
+                name="one_time_price_cents"
+                type="text"
+                inputMode="decimal"
+                value={priceInput}
+                onChange={handlePriceInputChange}
+                placeholder="Ej: 12,50"
+              />
+              <p className="text-sm text-gray-500">
+                Déjalo vacío para que el evento siga siendo solo visible y no comprable por no socios.
+              </p>
+              {priceInputError && <p className="text-sm text-red-600">{priceInputError}</p>}
+            </div>
+
             <div className="flex items-center justify-between rounded-lg border p-4">
               <div className="space-y-1">
                 <Label htmlFor="event-visibility">Mostrar en la web y dashboard</Label>
@@ -848,7 +905,7 @@ export default function AdminEventsPage() {
               </Button>
               <Button 
                 type="submit"
-                disabled={submitLoading || !formData.title || !formData.date}
+                disabled={submitLoading || !formData.title || !formData.date || Boolean(priceInputError)}
                 className="ml-2"
               >
                 {submitLoading ? (

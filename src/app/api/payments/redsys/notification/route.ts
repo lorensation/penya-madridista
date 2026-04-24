@@ -41,6 +41,7 @@ interface PaymentTransactionRow {
   status: string
   context: string
   amount_cents: number
+  event_id: string | null
   redsys_order: string
   member_id: string | null
   metadata: Json | null
@@ -266,7 +267,7 @@ export async function POST(request: NextRequest) {
 
     const { data: transaction, error: txnError } = await admin
       .from("payment_transactions")
-      .select("id, status, context, amount_cents, redsys_order, member_id, metadata")
+      .select("id, status, context, amount_cents, event_id, redsys_order, member_id, metadata")
       .eq("redsys_order", order)
       .maybeSingle()
 
@@ -385,7 +386,7 @@ export async function POST(request: NextRequest) {
       })
       .eq("id", transaction.id)
       .eq("status", "pending")
-      .select("id, status, context, amount_cents, redsys_order, member_id, metadata")
+      .select("id, status, context, amount_cents, event_id, redsys_order, member_id, metadata")
       .maybeSingle()
 
     if (claimed.error || !claimed.data) {
