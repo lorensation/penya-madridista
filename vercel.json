@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/payments/redsys/monitor",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 8 * * *"
     },
     {
       "path": "/api/payments/membership-follow-up",
