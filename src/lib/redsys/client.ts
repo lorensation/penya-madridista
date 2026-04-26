@@ -21,6 +21,7 @@ import {
   decodeMerchantParams,
   verifySignature,
 } from "./signature"
+import { extractCardLastFour } from "./card"
 
 import type {
   RedsysMerchantParams,
@@ -186,14 +187,12 @@ export async function authorizeWithIdOper(options: {
     const dsResponse = responseParams.Ds_Response ?? ""
 
     if (isAuthorizationSuccess(dsResponse)) {
-      const cardNumber = responseParams.Ds_CardNumber ?? ""
-
       return {
         success: true,
         dsResponse,
         authorizationCode: responseParams.Ds_AuthorisationCode ?? undefined,
         cardBrand: responseParams.Ds_Card_Brand ?? undefined,
-        lastFour: cardNumber.slice(-4) || undefined,
+        lastFour: extractCardLastFour(responseParams as unknown as Record<string, unknown>) ?? undefined,
         redsysToken: responseParams.Ds_Merchant_Identifier ?? undefined,
         redsysTokenExpiry: responseParams.Ds_ExpiryDate ?? undefined,
         cofTxnId: responseParams.Ds_Merchant_Cof_Txnid ?? undefined,

@@ -262,7 +262,9 @@ function CompleteProfileContent() {
               continue
             }
 
-            setError("El pago aun se esta procesando. Recarga la pagina en unos segundos.")
+            setError(
+              "El pago aun se esta procesando. Recarga la pagina en unos segundos; si el cargo aparece en tu banco, escribe a info@lorenzosanz.com para revisarlo.",
+            )
             setLoading(false)
             return
           }

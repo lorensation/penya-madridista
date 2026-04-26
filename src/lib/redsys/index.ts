@@ -56,7 +56,11 @@ export {
   verifySignature,
   encodeMerchantParams,
   decodeMerchantParams,
+  normalizeRedsysBase64,
 } from "./signature"
+
+export type { CardLastFourExtraction, CardLastFourExtractionReason } from "./card"
+export { extractCardLastFour, getCardLastFourExtraction } from "./card"
 
 // Client (server-only REST calls)
 export {
