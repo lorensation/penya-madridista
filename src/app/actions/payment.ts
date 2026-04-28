@@ -17,6 +17,7 @@ import {
   getSecretKey,
   isAnnualOnlyMembershipPlan,
   isAuthorizationSuccess,
+  normalizeRedsysBase64,
   resolveMembershipInterval,
   verifySignature,
 } from "@/lib/redsys"
@@ -165,10 +166,6 @@ function getCardUpdateAmountCents(): number {
   return Math.trunc(parsed)
 }
 
-function normalizeBase64Payload(value: string): string {
-  return value.replace(/ /g, "+").replace(/-/g, "+").replace(/_/g, "/")
-}
-
 export async function resolveMembershipRedirectPayment(
   order: string,
   dsMerchantParameters?: string | null,
@@ -188,8 +185,8 @@ export async function resolveMembershipRedirectPayment(
     let decoded: RedsysResponseParams | null = null
 
     if (dsMerchantParameters && dsSignature) {
-      const normalizedParams = normalizeBase64Payload(dsMerchantParameters)
-      const normalizedSignature = normalizeBase64Payload(dsSignature)
+      const normalizedParams = normalizeRedsysBase64(dsMerchantParameters)
+      const normalizedSignature = normalizeRedsysBase64(dsSignature)
       const hasValidSignature = verifySignature(getSecretKey(), normalizedParams, normalizedSignature)
 
       if (hasValidSignature) {
@@ -909,7 +906,7 @@ export async function executeCardUpdate(
         status: result.success ? "authorized" : "denied",
         ds_response: result.dsResponse ?? null,
         ds_authorization_code: result.authorizationCode ?? null,
-        last_four: result.lastFour ?? null,
+        last_four: result.lastFour ?? transaction.last_four,
         redsys_token: result.redsysToken ?? null,
         cof_txn_id: result.cofTxnId ?? null,
         updated_at: new Date().toISOString(),
@@ -938,16 +935,26 @@ export async function executeCardUpdate(
 
     if (result.redsysToken) {
       const memberId = transaction.member_id as string
+      const subscriptionUpdates: {
+        redsys_token: string
+        redsys_token_expiry: string | null
+        redsys_cof_txn_id: string | null
+        updated_at: string
+        last_four?: string
+      } = {
+        redsys_token: result.redsysToken,
+        redsys_token_expiry: result.redsysTokenExpiry ?? null,
+        redsys_cof_txn_id: result.cofTxnId ?? null,
+        updated_at: new Date().toISOString(),
+      }
+
+      if (result.lastFour) {
+        subscriptionUpdates.last_four = result.lastFour
+      }
 
       await admin
         .from("subscriptions")
-        .update({
-          last_four: result.lastFour ?? null,
-          redsys_token: result.redsysToken,
-          redsys_token_expiry: result.redsysTokenExpiry ?? null,
-          redsys_cof_txn_id: result.cofTxnId ?? null,
-          updated_at: new Date().toISOString(),
-        })
+        .update(subscriptionUpdates)
         .eq("member_id", memberId)
         .eq("status", "active")
 

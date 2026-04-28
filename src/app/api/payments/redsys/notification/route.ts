@@ -6,17 +6,24 @@ import {
   getSecretKey,
   getTerminal,
   isAuthorizationSuccess,
+  getCardLastFourExtraction,
+  normalizeRedsysBase64,
+  SIGNATURE_VERSION,
   verifySignature,
 } from "@/lib/redsys"
 import type { RedsysResponseParams } from "@/lib/redsys"
 import type { Json } from "@/types/supabase"
 import { finalizeMembershipPayment } from "@/lib/membership/onboarding"
 
-const admin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } },
-)
+function getAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  )
+}
+
+type AdminClient = ReturnType<typeof getAdminClient>
 
 interface ShopTxnItem {
   variantId: string
@@ -44,7 +51,142 @@ interface PaymentTransactionRow {
   event_id: string | null
   redsys_order: string
   member_id: string | null
+  last_four: string | null
+  created_at: string
   metadata: Json | null
+}
+
+type NotificationEvent =
+  | "redsys.notification.received"
+  | "redsys.notification.ignored"
+  | "redsys.notification.failed"
+  | "redsys.notification.completed"
+
+type NotificationReason =
+  | "missing_fields"
+  | "invalid_signature"
+  | "unknown_order"
+  | "amount_mismatch"
+  | "merchant_mismatch"
+  | "terminal_mismatch"
+  | "status_transition_failed"
+  | "membership_finalization_failed"
+  | "success"
+  | "already_processed"
+  | "unsupported_signature_version"
+  | "decode_failed"
+  | "missing_order"
+  | "denied"
+  | "fulfillment_failed"
+  | "unhandled_error"
+
+interface NotificationLogFields {
+  event: NotificationEvent
+  reason: NotificationReason
+  redsys_order?: string | null
+  transaction_id?: string | null
+  member_id?: string | null
+  context?: string | null
+  status_before?: string | null
+  status_after?: string | null
+  ds_response?: string | null
+  authorization_code?: string | null
+  amount?: number | string | null
+  created_at?: string | null
+  content_type?: string | null
+  signature_version?: string | null
+  transaction_type?: string | null
+  expected_amount?: number | null
+  received_amount?: string | null
+  expected_merchant_code?: string | null
+  received_merchant_code?: string | null
+  expected_terminal?: string | null
+  received_terminal?: string | null
+  has_merchant_parameters?: boolean
+  has_signature?: boolean
+  error_message?: string | null
+}
+
+function logNotificationLastFour(options: {
+  event: "redsys.last_four.found" | "redsys.last_four.missing" | "redsys.last_four.invalid" | "redsys.last_four.preserved"
+  redsysOrder: string
+  transactionId: string
+  context: string
+  signatureVerified: boolean
+  lastFour?: string | null
+}) {
+  console.info("[redsys.last_four]", {
+    event: options.event,
+    redsys_order: options.redsysOrder,
+    transaction_id: options.transactionId,
+    context: options.context,
+    signature_verified: options.signatureVerified,
+    last_four: options.lastFour ?? null,
+  })
+}
+
+function logLastFourExtraction(options: {
+  responseParams: RedsysResponseParams
+  transaction: PaymentTransactionRow
+}) {
+  const extraction = getCardLastFourExtraction(options.responseParams as unknown as Record<string, unknown>)
+
+  if (extraction.reason === "found") {
+    logNotificationLastFour({
+      event: "redsys.last_four.found",
+      redsysOrder: options.transaction.redsys_order,
+      transactionId: options.transaction.id,
+      context: options.transaction.context,
+      signatureVerified: true,
+      lastFour: extraction.lastFour,
+    })
+  } else if (options.transaction.last_four) {
+    logNotificationLastFour({
+      event: "redsys.last_four.preserved",
+      redsysOrder: options.transaction.redsys_order,
+      transactionId: options.transaction.id,
+      context: options.transaction.context,
+      signatureVerified: true,
+      lastFour: options.transaction.last_four,
+    })
+  } else {
+    logNotificationLastFour({
+      event:
+        extraction.reason === "invalid"
+          ? "redsys.last_four.invalid"
+          : "redsys.last_four.missing",
+      redsysOrder: options.transaction.redsys_order,
+      transactionId: options.transaction.id,
+      context: options.transaction.context,
+      signatureVerified: true,
+    })
+  }
+}
+
+function logNotification(fields: NotificationLogFields) {
+  const level = fields.event === "redsys.notification.failed" ? "error" : "info"
+  console[level]("[redsys.notification]", fields)
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function getStringField(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key]
+  return typeof value === "string" ? value : undefined
+}
+
+function tryDecodeMerchantParams(value: string | undefined): RedsysResponseParams | null {
+  if (!value) {
+    return null
+  }
+
+  try {
+    return decodeMerchantParams<RedsysResponseParams>(value)
+  } catch {
+    return null
+  }
 }
 
 function parseMetadataRecord(metadata: Json | null): Record<string, unknown> {
@@ -108,7 +250,7 @@ function parseContextMetadata(metadata: Json | null): {
   }
 }
 
-async function handleAuthorizedShopPayment(transaction: PaymentTransactionRow) {
+async function handleAuthorizedShopPayment(admin: AdminClient, transaction: PaymentTransactionRow) {
   const { items, shipping } = parseContextMetadata(transaction.metadata)
 
   if (items.length === 0) {
@@ -188,6 +330,7 @@ async function handleAuthorizedShopPayment(transaction: PaymentTransactionRow) {
 }
 
 async function handleAuthorizedCardUpdate(
+  admin: AdminClient,
   transaction: PaymentTransactionRow,
   responseParams: RedsysResponseParams,
 ) {
@@ -198,7 +341,7 @@ async function handleAuthorizedCardUpdate(
 
   const { data: latestSubscription, error: latestSubscriptionError } = await admin
     .from("subscriptions")
-    .select("id")
+    .select("id, last_four")
     .eq("member_id", memberId)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -209,10 +352,44 @@ async function handleAuthorizedCardUpdate(
   }
 
   if (latestSubscription) {
+    const extractedLastFour = getCardLastFourExtraction(responseParams as unknown as Record<string, unknown>)
+    const nextLastFour = extractedLastFour.lastFour ?? latestSubscription.last_four
+
+    if (extractedLastFour.reason === "found") {
+      logNotificationLastFour({
+        event: "redsys.last_four.found",
+        redsysOrder: transaction.redsys_order,
+        transactionId: transaction.id,
+        context: transaction.context,
+        signatureVerified: true,
+        lastFour: extractedLastFour.lastFour,
+      })
+    } else if (latestSubscription.last_four) {
+      logNotificationLastFour({
+        event: "redsys.last_four.preserved",
+        redsysOrder: transaction.redsys_order,
+        transactionId: transaction.id,
+        context: transaction.context,
+        signatureVerified: true,
+        lastFour: latestSubscription.last_four,
+      })
+    } else {
+      logNotificationLastFour({
+        event:
+          extractedLastFour.reason === "invalid"
+            ? "redsys.last_four.invalid"
+            : "redsys.last_four.missing",
+        redsysOrder: transaction.redsys_order,
+        transactionId: transaction.id,
+        context: transaction.context,
+        signatureVerified: true,
+      })
+    }
+
     const { error: updateSubscriptionError } = await admin
       .from("subscriptions")
       .update({
-        last_four: responseParams.Ds_CardNumber ? responseParams.Ds_CardNumber.slice(-4) : null,
+        last_four: nextLastFour,
         redsys_token: responseParams.Ds_Merchant_Identifier ?? null,
         redsys_token_expiry: responseParams.Ds_ExpiryDate ?? null,
         redsys_cof_txn_id: responseParams.Ds_Merchant_Cof_Txnid ?? null,
@@ -227,56 +404,166 @@ async function handleAuthorizedCardUpdate(
 }
 
 export async function POST(request: NextRequest) {
+  const contentType = request.headers.get("content-type") || ""
+  let decodedForLogs: RedsysResponseParams | null = null
+
   try {
     let dsMerchantParameters: string | undefined
     let dsSignature: string | undefined
+    let dsSignatureVersion: string | undefined
 
-    const contentType = request.headers.get("content-type") || ""
-
-    if (contentType.includes("application/x-www-form-urlencoded")) {
+    if (
+      contentType.includes("application/x-www-form-urlencoded") ||
+      contentType.includes("multipart/form-data")
+    ) {
       const formData = await request.formData()
       dsMerchantParameters = formData.get("Ds_MerchantParameters")?.toString()
       dsSignature = formData.get("Ds_Signature")?.toString()
+      dsSignatureVersion = formData.get("Ds_SignatureVersion")?.toString()
     } else {
       const body = await request.json().catch(() => null)
       if (body && typeof body === "object") {
-        dsMerchantParameters = body.Ds_MerchantParameters
-        dsSignature = body.Ds_Signature
+        const record = body as Record<string, unknown>
+        dsMerchantParameters = getStringField(record, "Ds_MerchantParameters")
+        dsSignature = getStringField(record, "Ds_Signature")
+        dsSignatureVersion = getStringField(record, "Ds_SignatureVersion")
       }
     }
 
-    if (!dsMerchantParameters || !dsSignature) {
-      console.error("[redsys/notification] Missing required fields")
+    logNotification({
+      event: "redsys.notification.received",
+      reason: "success",
+      content_type: contentType,
+      signature_version: dsSignatureVersion ?? null,
+      has_merchant_parameters: Boolean(dsMerchantParameters),
+      has_signature: Boolean(dsSignature),
+    })
+
+    if (!dsMerchantParameters || !dsSignature || !dsSignatureVersion) {
+      logNotification({
+        event: "redsys.notification.failed",
+        reason: "missing_fields",
+        content_type: contentType,
+        signature_version: dsSignatureVersion ?? null,
+        has_merchant_parameters: Boolean(dsMerchantParameters),
+        has_signature: Boolean(dsSignature),
+      })
       return NextResponse.json({ ok: true }, { status: 200 })
     }
 
-    const isValidSignature = verifySignature(getSecretKey(), dsMerchantParameters, dsSignature)
+    const normalizedParams = normalizeRedsysBase64(dsMerchantParameters)
+    const normalizedSignature = normalizeRedsysBase64(dsSignature)
+    decodedForLogs = tryDecodeMerchantParams(normalizedParams)
+
+    if (dsSignatureVersion !== SIGNATURE_VERSION) {
+      logNotification({
+        event: "redsys.notification.failed",
+        reason: "unsupported_signature_version",
+        redsys_order: decodedForLogs?.Ds_Order ?? null,
+        ds_response: decodedForLogs?.Ds_Response ?? null,
+        authorization_code: decodedForLogs?.Ds_AuthorisationCode ?? null,
+        amount: decodedForLogs?.Ds_Amount ?? null,
+        content_type: contentType,
+        signature_version: dsSignatureVersion,
+        transaction_type: decodedForLogs?.Ds_TransactionType ?? null,
+        has_merchant_parameters: true,
+        has_signature: true,
+      })
+      return NextResponse.json({ ok: true }, { status: 200 })
+    }
+
+    const isValidSignature = verifySignature(getSecretKey(), normalizedParams, normalizedSignature)
 
     if (!isValidSignature) {
-      console.error("[redsys/notification] Invalid signature")
+      logNotification({
+        event: "redsys.notification.failed",
+        reason: "invalid_signature",
+        redsys_order: decodedForLogs?.Ds_Order ?? null,
+        ds_response: decodedForLogs?.Ds_Response ?? null,
+        authorization_code: decodedForLogs?.Ds_AuthorisationCode ?? null,
+        amount: decodedForLogs?.Ds_Amount ?? null,
+        content_type: contentType,
+        signature_version: dsSignatureVersion,
+        transaction_type: decodedForLogs?.Ds_TransactionType ?? null,
+        has_merchant_parameters: true,
+        has_signature: true,
+      })
       return NextResponse.json({ ok: true }, { status: 200 })
     }
 
-    const responseParams = decodeMerchantParams<RedsysResponseParams>(dsMerchantParameters)
+    let responseParams: RedsysResponseParams
+    try {
+      responseParams = decodeMerchantParams<RedsysResponseParams>(normalizedParams)
+    } catch (error) {
+      logNotification({
+        event: "redsys.notification.failed",
+        reason: "decode_failed",
+        redsys_order: decodedForLogs?.Ds_Order ?? null,
+        content_type: contentType,
+        signature_version: dsSignatureVersion,
+        error_message: getErrorMessage(error),
+      })
+      return NextResponse.json({ ok: true }, { status: 200 })
+    }
+
     const order = responseParams.Ds_Order
 
     if (!order) {
-      console.error("[redsys/notification] Missing Ds_Order")
+      logNotification({
+        event: "redsys.notification.failed",
+        reason: "missing_order",
+        ds_response: responseParams.Ds_Response ?? null,
+        authorization_code: responseParams.Ds_AuthorisationCode ?? null,
+        amount: responseParams.Ds_Amount ?? null,
+        content_type: contentType,
+        signature_version: dsSignatureVersion,
+        transaction_type: responseParams.Ds_TransactionType ?? null,
+      })
       return NextResponse.json({ ok: true }, { status: 200 })
     }
 
+    const admin = getAdminClient()
+
     const { data: transaction, error: txnError } = await admin
       .from("payment_transactions")
-      .select("id, status, context, amount_cents, event_id, redsys_order, member_id, metadata")
+      .select("id, status, context, amount_cents, redsys_order, member_id, last_four, created_at, metadata")
       .eq("redsys_order", order)
       .maybeSingle()
 
     if (txnError || !transaction) {
-      console.warn("[redsys/notification] Unknown order", { order, error: txnError })
+      logNotification({
+        event: "redsys.notification.failed",
+        reason: "unknown_order",
+        redsys_order: order,
+        ds_response: responseParams.Ds_Response ?? null,
+        authorization_code: responseParams.Ds_AuthorisationCode ?? null,
+        amount: responseParams.Ds_Amount ?? null,
+        content_type: contentType,
+        signature_version: dsSignatureVersion,
+        transaction_type: responseParams.Ds_TransactionType ?? null,
+        error_message: txnError?.message ?? null,
+      })
       return NextResponse.json({ ok: true }, { status: 200 })
     }
 
     if (transaction.status !== "pending") {
+      logNotification({
+        event: "redsys.notification.ignored",
+        reason: "already_processed",
+        redsys_order: order,
+        transaction_id: transaction.id,
+        member_id: transaction.member_id,
+        context: transaction.context,
+        status_before: transaction.status,
+        status_after: transaction.status,
+        ds_response: responseParams.Ds_Response ?? null,
+        authorization_code: responseParams.Ds_AuthorisationCode ?? null,
+        amount: transaction.amount_cents,
+        created_at: transaction.created_at,
+        content_type: contentType,
+        signature_version: dsSignatureVersion,
+        transaction_type: responseParams.Ds_TransactionType ?? null,
+      })
       return NextResponse.json({ ok: true }, { status: 200 })
     }
 
@@ -288,12 +575,6 @@ export async function POST(request: NextRequest) {
     const isCardUpdateZeroAmount = transactionMetadataType === "card_update" && transaction.amount_cents === 0
 
     if ((notifiedAmount === null && !isCardUpdateZeroAmount) || (notifiedAmount !== null && notifiedAmount !== transaction.amount_cents)) {
-      console.error("[redsys/notification] Amount mismatch", {
-        order,
-        expected: transaction.amount_cents,
-        received: responseParams.Ds_Amount,
-      })
-
       await admin
         .from("payment_transactions")
         .update({
@@ -303,6 +584,26 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", transaction.id)
         .eq("status", "pending")
+
+      logNotification({
+        event: "redsys.notification.failed",
+        reason: "amount_mismatch",
+        redsys_order: order,
+        transaction_id: transaction.id,
+        member_id: transaction.member_id,
+        context: transaction.context,
+        status_before: transaction.status,
+        status_after: "error",
+        ds_response: responseParams.Ds_Response ?? null,
+        authorization_code: responseParams.Ds_AuthorisationCode ?? null,
+        amount: transaction.amount_cents,
+        created_at: transaction.created_at,
+        content_type: contentType,
+        signature_version: dsSignatureVersion,
+        transaction_type: responseParams.Ds_TransactionType ?? null,
+        expected_amount: transaction.amount_cents,
+        received_amount: responseParams.Ds_Amount ?? null,
+      })
 
       return NextResponse.json({ ok: true }, { status: 200 })
     }
@@ -314,14 +615,6 @@ export async function POST(request: NextRequest) {
       (responseParams.Ds_MerchantCode && responseParams.Ds_MerchantCode !== expectedMerchantCode) ||
       (responseParams.Ds_Terminal && responseParams.Ds_Terminal !== expectedTerminal)
     ) {
-      console.error("[redsys/notification] Merchant/terminal mismatch", {
-        order,
-        expectedMerchantCode,
-        receivedMerchantCode: responseParams.Ds_MerchantCode,
-        expectedTerminal,
-        receivedTerminal: responseParams.Ds_Terminal,
-      })
-
       await admin
         .from("payment_transactions")
         .update({
@@ -331,6 +624,31 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", transaction.id)
         .eq("status", "pending")
+
+      logNotification({
+        event: "redsys.notification.failed",
+        reason:
+          responseParams.Ds_MerchantCode && responseParams.Ds_MerchantCode !== expectedMerchantCode
+            ? "merchant_mismatch"
+            : "terminal_mismatch",
+        redsys_order: order,
+        transaction_id: transaction.id,
+        member_id: transaction.member_id,
+        context: transaction.context,
+        status_before: transaction.status,
+        status_after: "error",
+        ds_response: responseParams.Ds_Response ?? null,
+        authorization_code: responseParams.Ds_AuthorisationCode ?? null,
+        amount: transaction.amount_cents,
+        created_at: transaction.created_at,
+        content_type: contentType,
+        signature_version: dsSignatureVersion,
+        transaction_type: responseParams.Ds_TransactionType ?? null,
+        expected_merchant_code: expectedMerchantCode,
+        received_merchant_code: responseParams.Ds_MerchantCode ?? null,
+        expected_terminal: expectedTerminal,
+        received_terminal: responseParams.Ds_Terminal ?? null,
+      })
 
       return NextResponse.json({ ok: true }, { status: 200 })
     }
@@ -350,6 +668,24 @@ export async function POST(request: NextRequest) {
           .eq("id", transaction.id)
           .eq("status", "pending")
 
+        logNotification({
+          event: "redsys.notification.completed",
+          reason: "denied",
+          redsys_order: order,
+          transaction_id: transaction.id,
+          member_id: transaction.member_id,
+          context: transaction.context,
+          status_before: transaction.status,
+          status_after: "denied",
+          ds_response: dsResponse || null,
+          authorization_code: responseParams.Ds_AuthorisationCode ?? null,
+          amount: transaction.amount_cents,
+          created_at: transaction.created_at,
+          content_type: contentType,
+          signature_version: dsSignatureVersion,
+          transaction_type: responseParams.Ds_TransactionType ?? null,
+        })
+
         return NextResponse.json({ ok: true }, { status: 200 })
       }
 
@@ -361,13 +697,55 @@ export async function POST(request: NextRequest) {
       })
 
       if (!finalized.success) {
-        console.error("[redsys/notification] Membership finalization failed", {
-          order,
-          error: finalized.error,
+        logNotification({
+          event: "redsys.notification.failed",
+          reason: "membership_finalization_failed",
+          redsys_order: order,
+          transaction_id: transaction.id,
+          member_id: transaction.member_id,
+          context: transaction.context,
+          status_before: transaction.status,
+          status_after: finalized.status ?? "error",
+          ds_response: dsResponse || null,
+          authorization_code: responseParams.Ds_AuthorisationCode ?? null,
+          amount: transaction.amount_cents,
+          created_at: transaction.created_at,
+          content_type: contentType,
+          signature_version: dsSignatureVersion,
+          transaction_type: responseParams.Ds_TransactionType ?? null,
+          error_message: finalized.error ?? null,
+        })
+      } else {
+        logNotification({
+          event: "redsys.notification.completed",
+          reason: "success",
+          redsys_order: order,
+          transaction_id: finalized.transactionId ?? transaction.id,
+          member_id: transaction.member_id,
+          context: transaction.context,
+          status_before: transaction.status,
+          status_after: finalized.status ?? "authorized",
+          ds_response: dsResponse || null,
+          authorization_code: responseParams.Ds_AuthorisationCode ?? null,
+          amount: transaction.amount_cents,
+          created_at: transaction.created_at,
+          content_type: contentType,
+          signature_version: dsSignatureVersion,
+          transaction_type: responseParams.Ds_TransactionType ?? null,
         })
       }
 
       return NextResponse.json({ ok: true }, { status: 200 })
+    }
+
+    const extractedLastFour = getCardLastFourExtraction(responseParams as unknown as Record<string, unknown>)
+    const nextLastFour = extractedLastFour.lastFour ?? transaction.last_four
+
+    if (nextStatus === "authorized") {
+      logLastFourExtraction({
+        responseParams,
+        transaction: transaction as PaymentTransactionRow,
+      })
     }
 
     const claimed = await admin
@@ -378,7 +756,7 @@ export async function POST(request: NextRequest) {
         ds_authorization_code: responseParams.Ds_AuthorisationCode ?? null,
         ds_card_brand: responseParams.Ds_Card_Brand ?? null,
         ds_card_country: responseParams.Ds_Card_Country ?? null,
-        last_four: responseParams.Ds_CardNumber ? responseParams.Ds_CardNumber.slice(-4) : null,
+        last_four: nextStatus === "authorized" ? nextLastFour : transaction.last_four,
         redsys_token: responseParams.Ds_Merchant_Identifier ?? null,
         redsys_token_expiry: responseParams.Ds_ExpiryDate ?? null,
         cof_txn_id: responseParams.Ds_Merchant_Cof_Txnid ?? null,
@@ -386,38 +764,64 @@ export async function POST(request: NextRequest) {
       })
       .eq("id", transaction.id)
       .eq("status", "pending")
-      .select("id, status, context, amount_cents, event_id, redsys_order, member_id, metadata")
+      .select("id, status, context, amount_cents, redsys_order, member_id, last_four, created_at, metadata")
       .maybeSingle()
 
     if (claimed.error || !claimed.data) {
-      if (claimed.error) {
-        console.error("[redsys/notification] Failed claiming transaction", { order, error: claimed.error })
-      }
+      logNotification({
+        event: "redsys.notification.failed",
+        reason: "status_transition_failed",
+        redsys_order: order,
+        transaction_id: transaction.id,
+        member_id: transaction.member_id,
+        context: transaction.context,
+        status_before: transaction.status,
+        status_after: nextStatus,
+        ds_response: dsResponse || null,
+        authorization_code: responseParams.Ds_AuthorisationCode ?? null,
+        amount: transaction.amount_cents,
+        created_at: transaction.created_at,
+        content_type: contentType,
+        signature_version: dsSignatureVersion,
+        transaction_type: responseParams.Ds_TransactionType ?? null,
+        error_message: claimed.error?.message ?? null,
+      })
       return NextResponse.json({ ok: true }, { status: 200 })
     }
 
     if (nextStatus !== "authorized") {
+      logNotification({
+        event: "redsys.notification.completed",
+        reason: "denied",
+        redsys_order: order,
+        transaction_id: claimed.data.id,
+        member_id: claimed.data.member_id,
+        context: claimed.data.context,
+        status_before: transaction.status,
+        status_after: claimed.data.status,
+        ds_response: dsResponse || null,
+        authorization_code: responseParams.Ds_AuthorisationCode ?? null,
+        amount: claimed.data.amount_cents,
+        created_at: claimed.data.created_at,
+        content_type: contentType,
+        signature_version: dsSignatureVersion,
+        transaction_type: responseParams.Ds_TransactionType ?? null,
+      })
       return NextResponse.json({ ok: true }, { status: 200 })
     }
 
     try {
       if (claimed.data.context === "shop") {
-        await handleAuthorizedShopPayment(claimed.data as PaymentTransactionRow)
+        await handleAuthorizedShopPayment(admin, claimed.data as PaymentTransactionRow)
       } else if (claimed.data.context === "membership") {
         const metadata = parseMetadataRecord(claimed.data.metadata)
         const metadataType = typeof metadata.type === "string" ? metadata.type : null
 
         if (metadataType === "card_update") {
-          await handleAuthorizedCardUpdate(claimed.data as PaymentTransactionRow, responseParams)
+          await handleAuthorizedCardUpdate(admin, claimed.data as PaymentTransactionRow, responseParams)
         }
       }
     } catch (fulfillmentError) {
-      console.error("[redsys/notification] Fulfillment failed", {
-        order,
-        context: claimed.data.context,
-        error: fulfillmentError,
-      })
-
       if (claimed.data.context !== "membership") {
         await admin
           .from("payment_transactions")
@@ -428,12 +832,59 @@ export async function POST(request: NextRequest) {
           .eq("id", claimed.data.id)
       }
 
+      logNotification({
+        event: "redsys.notification.failed",
+        reason: "fulfillment_failed",
+        redsys_order: order,
+        transaction_id: claimed.data.id,
+        member_id: claimed.data.member_id,
+        context: claimed.data.context,
+        status_before: transaction.status,
+        status_after: claimed.data.context === "membership" ? claimed.data.status : "error",
+        ds_response: dsResponse || null,
+        authorization_code: responseParams.Ds_AuthorisationCode ?? null,
+        amount: claimed.data.amount_cents,
+        created_at: claimed.data.created_at,
+        content_type: contentType,
+        signature_version: dsSignatureVersion,
+        transaction_type: responseParams.Ds_TransactionType ?? null,
+        error_message: getErrorMessage(fulfillmentError),
+      })
+
       return NextResponse.json({ ok: true }, { status: 200 })
     }
 
+    logNotification({
+      event: "redsys.notification.completed",
+      reason: "success",
+      redsys_order: order,
+      transaction_id: claimed.data.id,
+      member_id: claimed.data.member_id,
+      context: claimed.data.context,
+      status_before: transaction.status,
+      status_after: claimed.data.status,
+      ds_response: dsResponse || null,
+      authorization_code: responseParams.Ds_AuthorisationCode ?? null,
+      amount: claimed.data.amount_cents,
+      created_at: claimed.data.created_at,
+      content_type: contentType,
+      signature_version: dsSignatureVersion,
+      transaction_type: responseParams.Ds_TransactionType ?? null,
+    })
+
     return NextResponse.json({ ok: true }, { status: 200 })
   } catch (error) {
-    console.error("[redsys/notification] Unhandled error", { error })
+    logNotification({
+      event: "redsys.notification.failed",
+      reason: "unhandled_error",
+      redsys_order: decodedForLogs?.Ds_Order ?? null,
+      ds_response: decodedForLogs?.Ds_Response ?? null,
+      authorization_code: decodedForLogs?.Ds_AuthorisationCode ?? null,
+      amount: decodedForLogs?.Ds_Amount ?? null,
+      content_type: contentType,
+      transaction_type: decodedForLogs?.Ds_TransactionType ?? null,
+      error_message: getErrorMessage(error),
+    })
     return NextResponse.json({ ok: true }, { status: 200 })
   }
 }

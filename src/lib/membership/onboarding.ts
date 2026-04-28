@@ -4,6 +4,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase"
 import { sendEmail } from "@/lib/email"
 import { renderPaymentOnboardingReminderEmail } from "@/lib/email/templates/payment-onboarding-reminder"
 import { resolveMembershipInterval } from "@/lib/redsys/config"
+import { getCardLastFourExtraction } from "@/lib/redsys/card"
 import type { RedsysResponseParams } from "@/lib/redsys"
 
 type AdminClient = SupabaseClient<Database>
@@ -273,6 +274,24 @@ function buildMembershipCheckoutSnapshot(
   }
 }
 
+function logMembershipLastFour(options: {
+  event: "redsys.last_four.found" | "redsys.last_four.missing" | "redsys.last_four.invalid" | "redsys.last_four.preserved"
+  order: string
+  transactionId: string
+  context: string
+  signatureVerified: boolean
+  lastFour?: string | null
+}) {
+  console.info("[redsys.last_four]", {
+    event: options.event,
+    redsys_order: options.order,
+    transaction_id: options.transactionId,
+    context: options.context,
+    signature_verified: options.signatureVerified,
+    last_four: options.lastFour ?? null,
+  })
+}
+
 async function loadMembershipTransaction(
   admin: AdminClient,
   order: string,
@@ -314,13 +333,47 @@ async function markTransactionAuthorized(
     throw new Error("Payment amount mismatch while finalizing membership payment")
   }
 
+  const extractedLastFour = getCardLastFourExtraction(responseParams as unknown as Record<string, unknown>)
+  const nextLastFour = extractedLastFour.lastFour ?? transaction.last_four
+
+  if (extractedLastFour.reason === "found") {
+    logMembershipLastFour({
+      event: "redsys.last_four.found",
+      order: transaction.redsys_order,
+      transactionId: transaction.id,
+      context: transaction.context,
+      signatureVerified: true,
+      lastFour: extractedLastFour.lastFour,
+    })
+  } else if (transaction.last_four) {
+    logMembershipLastFour({
+      event: "redsys.last_four.preserved",
+      order: transaction.redsys_order,
+      transactionId: transaction.id,
+      context: transaction.context,
+      signatureVerified: true,
+      lastFour: transaction.last_four,
+    })
+  } else {
+    logMembershipLastFour({
+      event:
+        extractedLastFour.reason === "invalid"
+          ? "redsys.last_four.invalid"
+          : "redsys.last_four.missing",
+      order: transaction.redsys_order,
+      transactionId: transaction.id,
+      context: transaction.context,
+      signatureVerified: true,
+    })
+  }
+
   const authFields = {
     status: "authorized",
     ds_response: dsResponse || null,
     ds_authorization_code: responseParams.Ds_AuthorisationCode ?? null,
     ds_card_brand: responseParams.Ds_Card_Brand ?? null,
     ds_card_country: responseParams.Ds_Card_Country ?? null,
-    last_four: responseParams.Ds_CardNumber ? responseParams.Ds_CardNumber.slice(-4) : transaction.last_four,
+    last_four: nextLastFour,
     redsys_token: responseParams.Ds_Merchant_Identifier ?? transaction.redsys_token,
     redsys_token_expiry: responseParams.Ds_ExpiryDate ?? transaction.redsys_token_expiry,
     cof_txn_id: responseParams.Ds_Merchant_Cof_Txnid ?? transaction.cof_txn_id,
