@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
+    "test": "node --import tsx --test \"tests/**/*.test.ts\"",
     "start": "next start",
     "lint": "next lint",
     "send:profile-reminders": "tsx scripts/send-redsys-profile-reminders.ts"

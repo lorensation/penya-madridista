@@ -848,6 +848,93 @@ export type Database = {
           },
         ]
       }
+      redsys_notification_events: {
+        Row: {
+          amount: string | null
+          content_type: string | null
+          context: string | null
+          created_at: string
+          ds_authorization_code: string | null
+          ds_response: string | null
+          error_message: string | null
+          event: string
+          expected_amount: number | null
+          expected_merchant_code: string | null
+          expected_terminal: string | null
+          has_merchant_parameters: boolean | null
+          has_signature: boolean | null
+          id: string
+          member_id: string | null
+          raw: Json | null
+          reason: string
+          received_amount: string | null
+          received_merchant_code: string | null
+          received_terminal: string | null
+          redsys_order: string | null
+          signature_version: string | null
+          status_after: string | null
+          status_before: string | null
+          transaction_id: string | null
+          transaction_type: string | null
+        }
+        Insert: {
+          amount?: string | null
+          content_type?: string | null
+          context?: string | null
+          created_at?: string
+          ds_authorization_code?: string | null
+          ds_response?: string | null
+          error_message?: string | null
+          event: string
+          expected_amount?: number | null
+          expected_merchant_code?: string | null
+          expected_terminal?: string | null
+          has_merchant_parameters?: boolean | null
+          has_signature?: boolean | null
+          id?: string
+          member_id?: string | null
+          raw?: Json | null
+          reason: string
+          received_amount?: string | null
+          received_merchant_code?: string | null
+          received_terminal?: string | null
+          redsys_order?: string | null
+          signature_version?: string | null
+          status_after?: string | null
+          status_before?: string | null
+          transaction_id?: string | null
+          transaction_type?: string | null
+        }
+        Update: {
+          amount?: string | null
+          content_type?: string | null
+          context?: string | null
+          created_at?: string
+          ds_authorization_code?: string | null
+          ds_response?: string | null
+          error_message?: string | null
+          event?: string
+          expected_amount?: number | null
+          expected_merchant_code?: string | null
+          expected_terminal?: string | null
+          has_merchant_parameters?: boolean | null
+          has_signature?: boolean | null
+          id?: string
+          member_id?: string | null
+          raw?: Json | null
+          reason?: string
+          received_amount?: string | null
+          received_merchant_code?: string | null
+          received_terminal?: string | null
+          redsys_order?: string | null
+          signature_version?: string | null
+          status_after?: string | null
+          status_before?: string | null
+          transaction_id?: string | null
+          transaction_type?: string | null
+        }
+        Relationships: []
+      }
       refund_requests: {
         Row: {
           id: string

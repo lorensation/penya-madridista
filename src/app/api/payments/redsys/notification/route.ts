@@ -14,6 +14,7 @@ import {
 import type { RedsysResponseParams } from "@/lib/redsys"
 import type { Json } from "@/types/supabase"
 import { finalizeMembershipPayment } from "@/lib/membership/onboarding"
+import { recordRedsysNotificationEvent } from "@/lib/redsys/notification-events"
 
 function getAdminClient() {
   return createClient(
@@ -406,8 +407,15 @@ async function handleAuthorizedCardUpdate(
 export async function POST(request: NextRequest) {
   const contentType = request.headers.get("content-type") || ""
   let decodedForLogs: RedsysResponseParams | null = null
+  let admin: AdminClient | null = null
+
+  const recordAndLog = async (fields: NotificationLogFields) => {
+    logNotification(fields)
+    await recordRedsysNotificationEvent(admin, fields)
+  }
 
   try {
+    admin = getAdminClient()
     let dsMerchantParameters: string | undefined
     let dsSignature: string | undefined
     let dsSignatureVersion: string | undefined
@@ -430,7 +438,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    logNotification({
+    await recordAndLog({
       event: "redsys.notification.received",
       reason: "success",
       content_type: contentType,
@@ -440,7 +448,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!dsMerchantParameters || !dsSignature || !dsSignatureVersion) {
-      logNotification({
+      await recordAndLog({
         event: "redsys.notification.failed",
         reason: "missing_fields",
         content_type: contentType,
@@ -456,7 +464,7 @@ export async function POST(request: NextRequest) {
     decodedForLogs = tryDecodeMerchantParams(normalizedParams)
 
     if (dsSignatureVersion !== SIGNATURE_VERSION) {
-      logNotification({
+      await recordAndLog({
         event: "redsys.notification.failed",
         reason: "unsupported_signature_version",
         redsys_order: decodedForLogs?.Ds_Order ?? null,
@@ -475,7 +483,7 @@ export async function POST(request: NextRequest) {
     const isValidSignature = verifySignature(getSecretKey(), normalizedParams, normalizedSignature)
 
     if (!isValidSignature) {
-      logNotification({
+      await recordAndLog({
         event: "redsys.notification.failed",
         reason: "invalid_signature",
         redsys_order: decodedForLogs?.Ds_Order ?? null,
@@ -495,7 +503,7 @@ export async function POST(request: NextRequest) {
     try {
       responseParams = decodeMerchantParams<RedsysResponseParams>(normalizedParams)
     } catch (error) {
-      logNotification({
+      await recordAndLog({
         event: "redsys.notification.failed",
         reason: "decode_failed",
         redsys_order: decodedForLogs?.Ds_Order ?? null,
@@ -509,7 +517,7 @@ export async function POST(request: NextRequest) {
     const order = responseParams.Ds_Order
 
     if (!order) {
-      logNotification({
+      await recordAndLog({
         event: "redsys.notification.failed",
         reason: "missing_order",
         ds_response: responseParams.Ds_Response ?? null,
@@ -522,8 +530,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true }, { status: 200 })
     }
 
-    const admin = getAdminClient()
-
     const { data: transaction, error: txnError } = await admin
       .from("payment_transactions")
       .select("id, status, context, amount_cents, redsys_order, member_id, last_four, created_at, metadata")
@@ -531,7 +537,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     if (txnError || !transaction) {
-      logNotification({
+      await recordAndLog({
         event: "redsys.notification.failed",
         reason: "unknown_order",
         redsys_order: order,
@@ -547,7 +553,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (transaction.status !== "pending") {
-      logNotification({
+      await recordAndLog({
         event: "redsys.notification.ignored",
         reason: "already_processed",
         redsys_order: order,
@@ -585,7 +591,7 @@ export async function POST(request: NextRequest) {
         .eq("id", transaction.id)
         .eq("status", "pending")
 
-      logNotification({
+      await recordAndLog({
         event: "redsys.notification.failed",
         reason: "amount_mismatch",
         redsys_order: order,
@@ -625,7 +631,7 @@ export async function POST(request: NextRequest) {
         .eq("id", transaction.id)
         .eq("status", "pending")
 
-      logNotification({
+      await recordAndLog({
         event: "redsys.notification.failed",
         reason:
           responseParams.Ds_MerchantCode && responseParams.Ds_MerchantCode !== expectedMerchantCode
@@ -668,7 +674,7 @@ export async function POST(request: NextRequest) {
           .eq("id", transaction.id)
           .eq("status", "pending")
 
-        logNotification({
+        await recordAndLog({
           event: "redsys.notification.completed",
           reason: "denied",
           redsys_order: order,
@@ -697,7 +703,7 @@ export async function POST(request: NextRequest) {
       })
 
       if (!finalized.success) {
-        logNotification({
+        await recordAndLog({
           event: "redsys.notification.failed",
           reason: "membership_finalization_failed",
           redsys_order: order,
@@ -716,7 +722,7 @@ export async function POST(request: NextRequest) {
           error_message: finalized.error ?? null,
         })
       } else {
-        logNotification({
+        await recordAndLog({
           event: "redsys.notification.completed",
           reason: "success",
           redsys_order: order,
@@ -768,7 +774,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     if (claimed.error || !claimed.data) {
-      logNotification({
+      await recordAndLog({
         event: "redsys.notification.failed",
         reason: "status_transition_failed",
         redsys_order: order,
@@ -790,7 +796,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (nextStatus !== "authorized") {
-      logNotification({
+      await recordAndLog({
         event: "redsys.notification.completed",
         reason: "denied",
         redsys_order: order,
@@ -832,7 +838,7 @@ export async function POST(request: NextRequest) {
           .eq("id", claimed.data.id)
       }
 
-      logNotification({
+      await recordAndLog({
         event: "redsys.notification.failed",
         reason: "fulfillment_failed",
         redsys_order: order,
@@ -854,7 +860,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true }, { status: 200 })
     }
 
-    logNotification({
+    await recordAndLog({
       event: "redsys.notification.completed",
       reason: "success",
       redsys_order: order,
@@ -874,7 +880,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true }, { status: 200 })
   } catch (error) {
-    logNotification({
+    await recordAndLog({
       event: "redsys.notification.failed",
       reason: "unhandled_error",
       redsys_order: decodedForLogs?.Ds_Order ?? null,

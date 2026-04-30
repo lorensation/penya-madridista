@@ -33,6 +33,7 @@ import {
   completeMembershipOnboarding as completeMembershipOnboardingState,
   finalizeMembershipPayment,
 } from "@/lib/membership/onboarding"
+import { createReturnPendingReviewAlert } from "@/lib/payments/return-review-alerts"
 
 interface PrepareRedirectPaymentResult {
   success: boolean
@@ -170,6 +171,7 @@ export async function resolveMembershipRedirectPayment(
   order: string,
   dsMerchantParameters?: string | null,
   dsSignature?: string | null,
+  createReviewAlertOnPending = false,
 ): Promise<ResolveMembershipRedirectPaymentResult> {
   try {
     const supabase = await createServerSupabaseClient()
@@ -183,6 +185,7 @@ export async function resolveMembershipRedirectPayment(
     }
 
     let decoded: RedsysResponseParams | null = null
+    const hasSignedReturnParams = Boolean(dsMerchantParameters && dsSignature)
 
     if (dsMerchantParameters && dsSignature) {
       const normalizedParams = normalizeRedsysBase64(dsMerchantParameters)
@@ -197,11 +200,27 @@ export async function resolveMembershipRedirectPayment(
       }
     }
 
+    const admin = getAdminClient()
     const finalized = await finalizeMembershipPayment({
       order,
       expectedMemberId: user.id,
       responseParams: decoded,
+      admin,
     })
+
+    if (
+      finalized.success &&
+      finalized.status === "pending" &&
+      createReviewAlertOnPending &&
+      !hasSignedReturnParams
+    ) {
+      await createReturnPendingReviewAlert(admin, {
+        order,
+        memberId: user.id,
+        status: "pending",
+        hasSignedReturnParams,
+      })
+    }
 
     return {
       success: finalized.success,
