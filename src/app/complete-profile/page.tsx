@@ -215,6 +215,7 @@ function CompleteProfileContent() {
               redsysOrder,
               dsMerchantParameters,
               dsSignature,
+              attempt === maxAttempts,
             )
 
             if (!resolution.success) {
@@ -263,7 +264,7 @@ function CompleteProfileContent() {
             }
 
             setError(
-              "El pago aun se esta procesando. Recarga la pagina en unos segundos; si el cargo aparece en tu banco, escribe a info@lorenzosanz.com para revisarlo.",
+              "Estamos verificando tu pago. Si el cargo aparece en tu banco, no vuelvas a pagar: revisaremos la operacion y te avisaremos.",
             )
             setLoading(false)
             return

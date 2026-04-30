@@ -6,6 +6,10 @@
       "headers": {
         "Authorization": "Bearer ${input:supabase_access_token}"
       }
+    },
+    "vercel": {
+      "type": "http",
+      "url": "https://mcp.vercel.com"
     }
   },
   "inputs": [

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin"
+import { sendEmail } from "@/lib/email"
+import { recordRedsysNotificationEvent } from "@/lib/redsys/notification-events"
+import type { Json } from "@/types/supabase"
 
-const DEFAULT_PENDING_MINUTES = 30
+const DEFAULT_PENDING_MINUTES = 15
 const DEFAULT_PENDING_PROFILE_HOURS = 24
 const DEFAULT_LIMIT = 50
 
@@ -20,6 +23,37 @@ function subtractMs(ms: number): string {
 
 function compactUnique(values: Array<string | null>): string[] {
   return [...new Set(values.filter((value): value is string => Boolean(value)))]
+}
+
+async function sendMonitorAlertEmail(options: {
+  to: string | undefined
+  counts: Record<string, number>
+  checkedAt: string
+}) {
+  if (!options.to) {
+    return
+  }
+
+  try {
+    const summary = Object.entries(options.counts)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join("\n")
+
+    await sendEmail({
+      to: options.to,
+      subject: "[Redsys] Payment monitor alert",
+      text: `Redsys payment monitor found high-priority issues at ${options.checkedAt}.\n\n${summary}`,
+      html: `
+        <p>Redsys payment monitor found high-priority issues at ${options.checkedAt}.</p>
+        <pre>${summary}</pre>
+      `,
+    })
+  } catch (error) {
+    console.error("[redsys.monitor]", {
+      event: "redsys.monitor.alert_email_failed",
+      error_message: error instanceof Error ? error.message : String(error),
+    })
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -51,7 +85,7 @@ async function handleMonitor(request: NextRequest) {
 
     const pendingMinutes = parsePositiveInteger(
       request.nextUrl.searchParams.get("pending_minutes"),
-      DEFAULT_PENDING_MINUTES,
+      parsePositiveInteger(process.env.PAYMENTS_MONITOR_MINUTES ?? null, DEFAULT_PENDING_MINUTES),
     )
     const pendingProfileHours = parsePositiveInteger(
       request.nextUrl.searchParams.get("pending_profile_hours"),
@@ -203,6 +237,24 @@ async function handleMonitor(request: NextRequest) {
       event: hasHighPriorityAlert ? "redsys.monitor.alert" : "redsys.monitor.ok",
       ...alertCounts,
     })
+
+    if (hasHighPriorityAlert) {
+      await recordRedsysNotificationEvent(admin, {
+        event: "redsys.monitor.alert",
+        reason: "monitor_detected_issue",
+        raw: {
+          counts: alertCounts,
+          checked_at: result.checked_at,
+          thresholds: result.thresholds,
+        } as Json,
+      })
+
+      await sendMonitorAlertEmail({
+        to: process.env.PAYMENTS_ALERT_EMAIL,
+        counts: alertCounts,
+        checkedAt: result.checked_at,
+      })
+    }
 
     return NextResponse.json({
       ok: true,
