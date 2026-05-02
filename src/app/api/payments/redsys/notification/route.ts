@@ -15,6 +15,7 @@ import type { RedsysResponseParams } from "@/lib/redsys"
 import type { Json } from "@/types/supabase"
 import { finalizeMembershipPayment } from "@/lib/membership/onboarding"
 import { recordRedsysNotificationEvent } from "@/lib/redsys/notification-events"
+import { upsertEventAssistForAuthorizedPayment } from "@/lib/event-assists"
 
 function getAdminClient() {
   return createClient(
@@ -49,8 +50,12 @@ interface PaymentTransactionRow {
   status: string
   context: string
   amount_cents: number
+  currency: string
+  event_id: string | null
   redsys_order: string
   member_id: string | null
+  authorized_at: string | null
+  ds_authorization_code: string | null
   last_four: string | null
   created_at: string
   metadata: Json | null
@@ -531,7 +536,7 @@ export async function POST(request: NextRequest) {
 
     const { data: transaction, error: txnError } = await admin
       .from("payment_transactions")
-      .select("id, status, context, amount_cents, redsys_order, member_id, last_four, created_at, metadata")
+      .select("id, status, context, amount_cents, currency, event_id, redsys_order, member_id, authorized_at, ds_authorization_code, last_four, created_at, metadata")
       .eq("redsys_order", order)
       .maybeSingle()
 
@@ -552,6 +557,31 @@ export async function POST(request: NextRequest) {
     }
 
     if (transaction.status !== "pending") {
+      if (transaction.context === "event" && transaction.status === "authorized") {
+        try {
+          await upsertEventAssistForAuthorizedPayment(admin, transaction as PaymentTransactionRow)
+        } catch (fulfillmentError) {
+          await recordAndLog({
+            event: "redsys.notification.failed",
+            reason: "fulfillment_failed",
+            redsys_order: order,
+            transaction_id: transaction.id,
+            member_id: transaction.member_id,
+            context: transaction.context,
+            status_before: transaction.status,
+            status_after: transaction.status,
+            ds_response: responseParams.Ds_Response ?? null,
+            authorization_code: responseParams.Ds_AuthorisationCode ?? null,
+            amount: transaction.amount_cents,
+            created_at: transaction.created_at,
+            content_type: contentType,
+            signature_version: dsSignatureVersion,
+            transaction_type: responseParams.Ds_TransactionType ?? null,
+            error_message: getErrorMessage(fulfillmentError),
+          })
+        }
+      }
+
       await recordAndLog({
         event: "redsys.notification.ignored",
         reason: "already_processed",
@@ -660,6 +690,7 @@ export async function POST(request: NextRequest) {
 
     const dsResponse = responseParams.Ds_Response ?? ""
     const nextStatus = isAuthorizationSuccess(dsResponse) ? "authorized" : "denied"
+    const authorizedAt = nextStatus === "authorized" ? new Date().toISOString() : null
 
     if (isMembershipCheckout) {
       if (nextStatus !== "authorized") {
@@ -765,11 +796,12 @@ export async function POST(request: NextRequest) {
         redsys_token: responseParams.Ds_Merchant_Identifier ?? null,
         redsys_token_expiry: responseParams.Ds_ExpiryDate ?? null,
         cof_txn_id: responseParams.Ds_Merchant_Cof_Txnid ?? null,
+        authorized_at: authorizedAt,
         updated_at: new Date().toISOString(),
       })
       .eq("id", transaction.id)
       .eq("status", "pending")
-      .select("id, status, context, amount_cents, redsys_order, member_id, last_four, created_at, metadata")
+      .select("id, status, context, amount_cents, currency, event_id, redsys_order, member_id, authorized_at, ds_authorization_code, last_four, created_at, metadata")
       .maybeSingle()
 
     if (claimed.error || !claimed.data) {
@@ -818,6 +850,8 @@ export async function POST(request: NextRequest) {
     try {
       if (claimed.data.context === "shop") {
         await handleAuthorizedShopPayment(admin, claimed.data as PaymentTransactionRow)
+      } else if (claimed.data.context === "event") {
+        await upsertEventAssistForAuthorizedPayment(admin, claimed.data as PaymentTransactionRow)
       } else if (claimed.data.context === "membership") {
         const metadata = parseMetadataRecord(claimed.data.metadata)
         const metadataType = typeof metadata.type === "string" ? metadata.type : null
@@ -827,7 +861,7 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch (fulfillmentError) {
-      if (claimed.data.context !== "membership") {
+      if (claimed.data.context === "shop") {
         await admin
           .from("payment_transactions")
           .update({
@@ -845,7 +879,7 @@ export async function POST(request: NextRequest) {
         member_id: claimed.data.member_id,
         context: claimed.data.context,
         status_before: transaction.status,
-        status_after: claimed.data.context === "membership" ? claimed.data.status : "error",
+        status_after: claimed.data.context === "shop" ? "error" : claimed.data.status,
         ds_response: dsResponse || null,
         authorization_code: responseParams.Ds_AuthorisationCode ?? null,
         amount: claimed.data.amount_cents,

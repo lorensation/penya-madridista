@@ -2,7 +2,10 @@
 
 import { createClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
+import { z } from "zod"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { isUpcomingEventDate } from "@/lib/events"
+import { hasMembershipAccess } from "@/lib/membership-access"
 import {
   authorizeWithIdOper,
   buildSignedRequest,
@@ -77,6 +80,31 @@ interface ResolveMembershipRedirectPaymentResult {
   error?: string
 }
 
+interface ConfirmEventAssistInput {
+  eventId: string
+  order: string
+  name: string
+  email: string
+  apellido1?: string | null
+  apellido2?: string | null
+  phone?: string | null
+}
+
+interface ConfirmEventAssistResult {
+  success: boolean
+  error?: string
+}
+
+const eventAssistSchema = z.object({
+  eventId: z.string().uuid("Evento no valido"),
+  order: z.string().min(1, "Pedido no valido"),
+  name: z.string().trim().min(1, "El nombre es obligatorio"),
+  email: z.string().trim().email("Introduce un email valido"),
+  apellido1: z.string().trim().optional().nullable(),
+  apellido2: z.string().trim().optional().nullable(),
+  phone: z.string().trim().optional().nullable(),
+})
+
 function getAdminClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -101,9 +129,24 @@ function getRedirectReturnUrls(context: PaymentContext, order: string, userId?: 
     }
   }
 
+  if (context === "event") {
+    throw new Error("Event redirect URLs require an explicit eventId")
+  }
+
   return {
     ok: `${base}/tienda/checkout/redsys/ok?order=${encodeURIComponent(order)}`,
     ko: `${base}/tienda/checkout/redsys/ko?order=${encodeURIComponent(order)}`,
+  }
+}
+
+function getEventRedirectReturnUrls(eventId: string, order: string) {
+  const base = getBaseUrl().replace(/\/+$/, "")
+  const encodedEventId = encodeURIComponent(eventId)
+  const encodedOrder = encodeURIComponent(order)
+
+  return {
+    ok: `${base}/blog/events/${encodedEventId}/redsys/ok?order=${encodedOrder}`,
+    ko: `${base}/blog/events/${encodedEventId}/redsys/ko?order=${encodedOrder}`,
   }
 }
 
@@ -506,6 +549,217 @@ export async function prepareShopRedirectPayment(
     return { success: false, error: "Error interno al preparar el pago" }
   }
 }
+
+export async function prepareEventRedirectPayment(
+  eventId: string,
+): Promise<PrepareRedirectPaymentResult> {
+  try {
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError) {
+      console.error("[payment] Failed loading auth user for event payment", { error: authError })
+      return { success: false, error: "No se pudo validar la sesion" }
+    }
+
+    if (!user) {
+      return { success: false, error: "Debes iniciar sesion para comprar una entrada" }
+    }
+
+    const admin = getAdminClient()
+
+    const { data: event, error: eventError } = await admin
+      .from("events")
+      .select("id, title, date, is_hidden, one_time_price_cents")
+      .eq("id", eventId)
+      .maybeSingle()
+
+    if (eventError || !event) {
+      console.error("[payment] Failed loading event for payment", {
+        eventId,
+        error: eventError,
+      })
+      return { success: false, error: "Evento no encontrado" }
+    }
+
+    if (event.is_hidden || !isUpcomingEventDate(event.date)) {
+      return { success: false, error: "Este evento ya no esta disponible para compra" }
+    }
+
+    const priceCents = event.one_time_price_cents
+    if (!Number.isInteger(priceCents) || priceCents <= 0) {
+      return { success: false, error: "Este evento no tiene una entrada de pago disponible" }
+    }
+
+    const { data: subscription } = await admin
+      .from("subscriptions")
+      .select("status, end_date")
+      .eq("member_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const hasCurrentMembership = hasMembershipAccess({
+      status: subscription?.status ?? null,
+      endDate: subscription?.end_date ?? null,
+    })
+
+    if (hasCurrentMembership) {
+      return { success: false, error: "Los socios deben reservar este evento por WhatsApp" }
+    }
+
+    const order = generateOrderNumber("E")
+
+    const { data: transaction, error: insertError } = await admin
+      .from("payment_transactions")
+      .insert({
+        redsys_order: order,
+        transaction_type: "0",
+        amount_cents: priceCents,
+        currency: "978",
+        status: "pending",
+        authorized_at: null,
+        context: "event",
+        member_id: user.id,
+        event_id: event.id,
+        is_mit: false,
+        metadata: {
+          eventTitle: event.title,
+          priceCents,
+        },
+      })
+      .select("id")
+      .single()
+
+    if (insertError || !transaction) {
+      console.error("[payment] Failed creating event transaction", {
+        eventId,
+        order,
+        error: insertError,
+      })
+      return { success: false, error: "Error al preparar el pago del evento" }
+    }
+
+    const returnUrls = getEventRedirectReturnUrls(event.id, order)
+    const signed = buildSignedRequest({
+      DS_MERCHANT_TRANSACTIONTYPE: "0",
+      DS_MERCHANT_ORDER: order,
+      DS_MERCHANT_AMOUNT: String(priceCents),
+      DS_MERCHANT_URLOK: returnUrls.ok,
+      DS_MERCHANT_URLKO: returnUrls.ko,
+      DS_MERCHANT_PRODUCTDESCRIPTION: `Evento Pena Lorenzo Sanz - ${event.title}`,
+    })
+
+    return {
+      success: true,
+      order,
+      amountCents: priceCents,
+      transactionId: transaction.id,
+      actionUrl: getRealizarPagoUrl(),
+      signed,
+    }
+  } catch (error) {
+    console.error("[payment] prepareEventRedirectPayment failed", { eventId, error })
+    return { success: false, error: "Error interno al preparar el pago" }
+  }
+}
+
+export async function confirmEventAssist(
+  input: ConfirmEventAssistInput,
+): Promise<ConfirmEventAssistResult> {
+  try {
+    const parsed = eventAssistSchema.safeParse(input)
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message ?? "Datos no validos",
+      }
+    }
+
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: "Debes iniciar sesion para confirmar la asistencia" }
+    }
+
+    const admin = getAdminClient()
+    const { data: transaction, error: transactionError } = await admin
+      .from("payment_transactions")
+      .select("id, redsys_order, status, context, event_id, member_id, amount_cents, currency, authorized_at, ds_authorization_code, last_four")
+      .eq("redsys_order", parsed.data.order)
+      .maybeSingle()
+
+    if (transactionError || !transaction) {
+      return { success: false, error: "No encontramos el pago del evento" }
+    }
+
+    if (transaction.context !== "event" || transaction.event_id !== parsed.data.eventId) {
+      return { success: false, error: "El pago no corresponde con este evento" }
+    }
+
+    if (transaction.member_id !== user.id) {
+      return { success: false, error: "No tienes permiso para confirmar este pago" }
+    }
+
+    if (transaction.status !== "authorized") {
+      return { success: false, error: "El pago aun no esta confirmado" }
+    }
+
+    const nowIso = new Date().toISOString()
+    const { error: assistError } = await admin
+      .from("event_assists")
+      .upsert(
+        {
+          event_id: parsed.data.eventId,
+          payment_transaction_id: transaction.id,
+          redsys_order: transaction.redsys_order,
+          user_id: transaction.member_id,
+          name: parsed.data.name,
+          email: parsed.data.email,
+          apellido1: parsed.data.apellido1 || null,
+          apellido2: parsed.data.apellido2 || null,
+          phone: parsed.data.phone || null,
+          amount_cents: transaction.amount_cents,
+          currency: transaction.currency,
+          payment_status: transaction.status,
+          payment_authorized_at: transaction.authorized_at,
+          ds_authorization_code: transaction.ds_authorization_code,
+          last_four: transaction.last_four,
+          data_confirmed_at: nowIso,
+          updated_at: nowIso,
+        },
+        { onConflict: "payment_transaction_id" },
+      )
+
+    if (assistError) {
+      console.error("[payment] Failed confirming event assist", {
+        order: parsed.data.order,
+        eventId: parsed.data.eventId,
+        error: assistError,
+      })
+      return { success: false, error: "No se pudo guardar la asistencia" }
+    }
+
+    revalidatePath(`/blog/events/${parsed.data.eventId}/redsys/ok`)
+
+    return { success: true }
+  } catch (error) {
+    console.error("[payment] confirmEventAssist failed", { input, error })
+    return { success: false, error: "Error interno al guardar la asistencia" }
+  }
+}
+
+/**
+ * @deprecated Use confirmEventAssist. Kept during the event-refactor transition.
+ */
+export const saveEventExternalAssist = confirmEventAssist
 
 export async function cancelMembershipSubscription(): Promise<{
   success: boolean
