@@ -1,6 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import {
+  buildAuthorizedEventReturnUpdate,
   buildEventAssistPayload,
   upsertEventAssistForAuthorizedPayment,
 } from "../src/lib/event-assists"
@@ -67,6 +68,51 @@ test("builds event assist payload from users without splitting full name", () =>
   assert.equal(payload.apellido1, null)
   assert.equal(payload.apellido2, null)
   assert.equal(payload.phone, null)
+})
+
+test("builds an authorized update from matching Redsys event return params", () => {
+  const update = buildAuthorizedEventReturnUpdate({
+    transaction: {
+      ...authorizedTransaction,
+      status: "pending",
+    },
+    responseParams: {
+      Ds_Order: "2605Eabc1234",
+      Ds_Amount: "2000",
+      Ds_Response: "0000",
+      Ds_AuthorisationCode: "253641",
+      Ds_Card_Brand: "1",
+      Ds_Card_Country: "724",
+    },
+    lastFour: null,
+    nowIso: "2026-05-02T10:33:00.000Z",
+  })
+
+  assert.deepEqual(update, {
+    status: "authorized",
+    ds_response: "0000",
+    ds_authorization_code: "253641",
+    ds_card_brand: "1",
+    ds_card_country: "724",
+    last_four: "1234",
+    authorized_at: "2026-05-02T10:33:00.000Z",
+    updated_at: "2026-05-02T10:33:00.000Z",
+  })
+})
+
+test("does not build event return update when amount does not match", () => {
+  const update = buildAuthorizedEventReturnUpdate({
+    transaction: authorizedTransaction,
+    responseParams: {
+      Ds_Order: "2605Eabc1234",
+      Ds_Amount: "1000",
+      Ds_Response: "0000",
+    },
+    lastFour: null,
+    nowIso: "2026-05-02T10:33:00.000Z",
+  })
+
+  assert.equal(update, null)
 })
 
 test("upserts authorized event assists by payment transaction id", async () => {

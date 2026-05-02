@@ -1,3 +1,6 @@
+import { isAuthorizationSuccess } from "@/lib/redsys"
+import type { RedsysResponseParams } from "@/lib/redsys"
+
 interface DbErrorLike {
   message?: string
 }
@@ -80,6 +83,17 @@ export interface EventAssistPayload {
   updated_at: string
 }
 
+export interface AuthorizedEventReturnUpdate {
+  status: "authorized"
+  ds_response: string | null
+  ds_authorization_code: string | null
+  ds_card_brand: string | null
+  ds_card_country: string | null
+  last_four: string | null
+  authorized_at: string
+  updated_at: string
+}
+
 function trimOrNull(value: string | number | null | undefined): string | null {
   if (value === null || value === undefined) {
     return null
@@ -91,6 +105,50 @@ function trimOrNull(value: string | number | null | undefined): string | null {
 
 function errorMessage(error: DbErrorLike | null): string {
   return error?.message ?? "unknown"
+}
+
+export function buildAuthorizedEventReturnUpdate(input: {
+  transaction: EventAssistTransaction
+  responseParams: Partial<RedsysResponseParams>
+  lastFour?: string | null
+  nowIso?: string
+}): AuthorizedEventReturnUpdate | null {
+  const { transaction, responseParams } = input
+  const dsResponse = responseParams.Ds_Response ?? ""
+  const dsAmount = Number.parseInt(responseParams.Ds_Amount ?? "", 10)
+
+  if (responseParams.Ds_Order !== transaction.redsys_order) {
+    return null
+  }
+
+  if (!Number.isFinite(dsAmount) || dsAmount !== transaction.amount_cents) {
+    return null
+  }
+
+  if (
+    responseParams.Ds_Currency &&
+    transaction.currency &&
+    responseParams.Ds_Currency !== transaction.currency
+  ) {
+    return null
+  }
+
+  if (!isAuthorizationSuccess(dsResponse)) {
+    return null
+  }
+
+  const nowIso = input.nowIso ?? new Date().toISOString()
+
+  return {
+    status: "authorized",
+    ds_response: dsResponse || null,
+    ds_authorization_code: responseParams.Ds_AuthorisationCode ?? null,
+    ds_card_brand: responseParams.Ds_Card_Brand ?? null,
+    ds_card_country: responseParams.Ds_Card_Country ?? null,
+    last_four: input.lastFour ?? transaction.last_four,
+    authorized_at: nowIso,
+    updated_at: nowIso,
+  }
 }
 
 export function buildEventAssistPayload(input: {

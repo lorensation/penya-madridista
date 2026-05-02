@@ -10,6 +10,7 @@ import {
   authorizeWithIdOper,
   buildSignedRequest,
   decodeMerchantParams,
+  getCardLastFourExtraction,
   getBaseUrl,
   generateOrderNumber,
   getMembershipPlan,
@@ -21,6 +22,10 @@ import {
   resolveMembershipInterval,
   verifySignature,
 } from "@/lib/redsys"
+import {
+  buildAuthorizedEventReturnUpdate,
+  upsertEventAssistForAuthorizedPayment,
+} from "@/lib/event-assists"
 import type {
   ExecutePaymentResult,
   PaymentContext,
@@ -80,6 +85,19 @@ interface ResolveMembershipRedirectPaymentResult {
   error?: string
 }
 
+interface ResolveEventRedirectPaymentInput {
+  eventId: string
+  order: string
+  dsMerchantParameters?: string | null
+  dsSignature?: string | null
+}
+
+interface ResolveEventRedirectPaymentResult {
+  success: boolean
+  status?: "authorized" | "pending" | "denied" | "error" | "not_found"
+  error?: string
+}
+
 interface ConfirmEventAssistInput {
   eventId: string
   order: string
@@ -103,6 +121,13 @@ const eventAssistSchema = z.object({
   apellido1: z.string().trim().optional().nullable(),
   apellido2: z.string().trim().optional().nullable(),
   phone: z.string().trim().optional().nullable(),
+})
+
+const eventRedirectResolutionSchema = z.object({
+  eventId: z.string().uuid("Evento no valido"),
+  order: z.string().min(1, "Pedido no valido"),
+  dsMerchantParameters: z.string().optional().nullable(),
+  dsSignature: z.string().optional().nullable(),
 })
 
 function getAdminClient() {
@@ -234,6 +259,135 @@ export async function resolveMembershipRedirectPayment(
     }
   } catch (error) {
     console.error("[payment] resolveMembershipRedirectPayment unexpected error", { order, error })
+    return { success: false, status: "error", error: "UNEXPECTED_ERROR" }
+  }
+}
+
+function normalizePaymentStatus(status: string | null | undefined): ResolveEventRedirectPaymentResult["status"] {
+  if (status === "authorized" || status === "pending" || status === "denied" || status === "error") {
+    return status
+  }
+
+  return "not_found"
+}
+
+export async function resolveEventRedirectPayment(
+  input: ResolveEventRedirectPaymentInput,
+): Promise<ResolveEventRedirectPaymentResult> {
+  try {
+    const parsed = eventRedirectResolutionSchema.safeParse(input)
+    if (!parsed.success) {
+      return { success: false, status: "error", error: "INVALID_INPUT" }
+    }
+
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, status: "error", error: "AUTH_REQUIRED" }
+    }
+
+    const admin = getAdminClient()
+    const { data: transaction, error: transactionError } = await admin
+      .from("payment_transactions")
+      .select("id, redsys_order, status, context, event_id, member_id, amount_cents, currency, authorized_at, ds_authorization_code, last_four")
+      .eq("redsys_order", parsed.data.order)
+      .maybeSingle()
+
+    if (transactionError || !transaction) {
+      return { success: false, status: "not_found", error: "PAYMENT_NOT_FOUND" }
+    }
+
+    if (
+      transaction.context !== "event" ||
+      transaction.event_id !== parsed.data.eventId ||
+      transaction.member_id !== user.id
+    ) {
+      return { success: false, status: "not_found", error: "PAYMENT_NOT_FOUND" }
+    }
+
+    if (transaction.status === "authorized") {
+      await upsertEventAssistForAuthorizedPayment(admin, transaction)
+      return { success: true, status: "authorized" }
+    }
+
+    if (transaction.status !== "pending") {
+      return { success: true, status: normalizePaymentStatus(transaction.status) }
+    }
+
+    const { dsMerchantParameters, dsSignature } = parsed.data
+    if (!dsMerchantParameters || !dsSignature) {
+      return { success: true, status: "pending" }
+    }
+
+    const normalizedParams = normalizeRedsysBase64(dsMerchantParameters)
+    const normalizedSignature = normalizeRedsysBase64(dsSignature)
+    const hasValidSignature = verifySignature(getSecretKey(), normalizedParams, normalizedSignature)
+
+    if (!hasValidSignature) {
+      return { success: true, status: "pending" }
+    }
+
+    const responseParams = decodeMerchantParams<RedsysResponseParams>(normalizedParams)
+    const lastFourResult = getCardLastFourExtraction(responseParams as unknown as Record<string, unknown>)
+    const update = buildAuthorizedEventReturnUpdate({
+      transaction,
+      responseParams,
+      lastFour: lastFourResult.lastFour,
+    })
+
+    if (!update) {
+      return { success: true, status: "pending" }
+    }
+
+    const { data: updatedTransaction, error: updateError } = await admin
+      .from("payment_transactions")
+      .update(update)
+      .eq("id", transaction.id)
+      .eq("status", "pending")
+      .select("id, redsys_order, status, context, event_id, member_id, amount_cents, currency, authorized_at, ds_authorization_code, last_four")
+      .maybeSingle()
+
+    if (updateError) {
+      console.error("[payment] Failed resolving event payment return", {
+        order: parsed.data.order,
+        eventId: parsed.data.eventId,
+        error: updateError,
+      })
+      return { success: false, status: "error", error: "PAYMENT_UPDATE_FAILED" }
+    }
+
+    if (!updatedTransaction) {
+      const { data: latestTransaction } = await admin
+        .from("payment_transactions")
+        .select("id, redsys_order, status, context, event_id, member_id, amount_cents, currency, authorized_at, ds_authorization_code, last_four")
+        .eq("id", transaction.id)
+        .maybeSingle()
+
+      if (latestTransaction?.status === "authorized") {
+        await upsertEventAssistForAuthorizedPayment(admin, latestTransaction)
+        return { success: true, status: "authorized" }
+      }
+
+      return {
+        success: true,
+        status: normalizePaymentStatus(latestTransaction?.status ?? transaction.status),
+      }
+    }
+
+    await upsertEventAssistForAuthorizedPayment(admin, updatedTransaction)
+    revalidatePath(`/blog/events/${parsed.data.eventId}/redsys/ok`)
+
+    return { success: true, status: "authorized" }
+  } catch (error) {
+    console.error("[payment] resolveEventRedirectPayment unexpected error", {
+      eventId: input.eventId,
+      order: input.order,
+      error,
+    })
     return { success: false, status: "error", error: "UNEXPECTED_ERROR" }
   }
 }
