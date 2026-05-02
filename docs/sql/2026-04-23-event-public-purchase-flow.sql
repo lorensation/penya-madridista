@@ -23,32 +23,107 @@ alter table public.payment_transactions
 create index if not exists idx_payment_transactions_event_id
   on public.payment_transactions (event_id);
 
-create table if not exists public.event_external_assists (
+do $$
+begin
+  if to_regclass('public.event_assists') is null
+     and to_regclass('public.event_external_assists') is not null then
+    alter table public.event_external_assists rename to event_assists;
+  end if;
+end $$;
+
+create table if not exists public.event_assists (
   id uuid primary key default gen_random_uuid(),
   event_id uuid not null references public.events(id),
-  payment_transaction_id uuid not null references public.payment_transactions(id),
-  redsys_order text not null,
   user_id uuid null references public.users(id),
-  name text not null,
+  payment_transaction_id uuid null references public.payment_transactions(id),
   email text not null,
-  phone text not null,
+  name text not null,
+  apellido1 text null,
+  apellido2 text null,
+  phone text null,
+  amount_cents integer null,
+  currency text not null default '978',
+  redsys_order text null,
+  payment_status text not null default 'pending',
+  payment_authorized_at timestamptz null,
+  ds_authorization_code text null,
+  last_four text null,
+  data_confirmed_at timestamptz null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
-create unique index if not exists idx_event_external_assists_payment_transaction_id
-  on public.event_external_assists (payment_transaction_id);
+alter table public.event_assists
+  alter column phone drop not null;
 
-create unique index if not exists idx_event_external_assists_redsys_order
-  on public.event_external_assists (redsys_order);
+alter table public.event_assists
+  add column if not exists apellido1 text null,
+  add column if not exists apellido2 text null,
+  add column if not exists amount_cents integer null,
+  add column if not exists currency text not null default '978',
+  add column if not exists payment_status text not null default 'pending',
+  add column if not exists payment_authorized_at timestamptz null,
+  add column if not exists ds_authorization_code text null,
+  add column if not exists last_four text null,
+  add column if not exists data_confirmed_at timestamptz null;
 
-create index if not exists idx_event_external_assists_event_id
-  on public.event_external_assists (event_id);
+drop index if exists public.idx_event_assists_payment_transaction_id;
+create unique index idx_event_assists_payment_transaction_id
+  on public.event_assists (payment_transaction_id);
 
-create index if not exists idx_event_external_assists_user_id
-  on public.event_external_assists (user_id);
+drop index if exists public.idx_event_assists_redsys_order;
+create unique index idx_event_assists_redsys_order
+  on public.event_assists (redsys_order);
 
-alter table public.event_external_assists enable row level security;
+create unique index if not exists idx_event_assists_event_user
+  on public.event_assists (event_id, user_id)
+  where user_id is not null;
 
-comment on table public.event_external_assists is
-  'External attendee records captured after successful one-time event payments.';
+create index if not exists idx_event_assists_event_id
+  on public.event_assists (event_id);
+
+create index if not exists idx_event_assists_user_id
+  on public.event_assists (user_id);
+
+alter table public.event_assists enable row level security;
+
+comment on table public.event_assists is
+  'Attendance records for event registrations, including paid one-time tickets.';
+
+comment on column public.event_assists.data_confirmed_at is
+  'Set when the attendee has confirmed or completed their displayed registration data.';
+
+-- Remove the superseded table name if both tables exist in a partially applied environment.
+do $$
+begin
+  if to_regclass('public.event_assists') is not null
+     and to_regclass('public.event_external_assists') is not null then
+    execute $sql$
+      insert into public.event_assists (
+        event_id,
+        user_id,
+        payment_transaction_id,
+        email,
+        name,
+        phone,
+        redsys_order,
+        created_at,
+        updated_at
+      )
+      select
+        event_id,
+        user_id,
+        payment_transaction_id,
+        email,
+        name,
+        phone,
+        redsys_order,
+        created_at,
+        updated_at
+      from public.event_external_assists
+      on conflict (payment_transaction_id) do nothing
+    $sql$;
+
+    drop table public.event_external_assists;
+  end if;
+end $$;

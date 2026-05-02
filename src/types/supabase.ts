@@ -181,60 +181,87 @@ export type Database = {
           },
         ]
       }
-      event_external_assists: {
+      event_assists: {
         Row: {
+          amount_cents: number | null
+          apellido1: string | null
+          apellido2: string | null
           created_at: string
+          currency: string
+          data_confirmed_at: string | null
+          ds_authorization_code: string | null
           email: string
           event_id: string
           id: string
+          last_four: string | null
           name: string
-          payment_transaction_id: string
-          phone: string
-          redsys_order: string
+          payment_authorized_at: string | null
+          payment_status: string
+          payment_transaction_id: string | null
+          phone: string | null
+          redsys_order: string | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
+          amount_cents?: number | null
+          apellido1?: string | null
+          apellido2?: string | null
           created_at?: string
+          currency?: string
+          data_confirmed_at?: string | null
+          ds_authorization_code?: string | null
           email: string
           event_id: string
           id?: string
+          last_four?: string | null
           name: string
-          payment_transaction_id: string
-          phone: string
-          redsys_order: string
+          payment_authorized_at?: string | null
+          payment_status?: string
+          payment_transaction_id?: string | null
+          phone?: string | null
+          redsys_order?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
+          amount_cents?: number | null
+          apellido1?: string | null
+          apellido2?: string | null
           created_at?: string
+          currency?: string
+          data_confirmed_at?: string | null
+          ds_authorization_code?: string | null
           email?: string
           event_id?: string
           id?: string
+          last_four?: string | null
           name?: string
-          payment_transaction_id?: string
-          phone?: string
-          redsys_order?: string
+          payment_authorized_at?: string | null
+          payment_status?: string
+          payment_transaction_id?: string | null
+          phone?: string | null
+          redsys_order?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "event_external_assists_event_id_fkey"
+            foreignKeyName: "event_assists_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "event_external_assists_payment_transaction_id_fkey"
+            foreignKeyName: "event_assists_payment_transaction_id_fkey"
             columns: ["payment_transaction_id"]
             isOneToOne: false
             referencedRelation: "payment_transactions"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "event_external_assists_user_id_fkey"
+            foreignKeyName: "event_assists_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"

@@ -281,6 +281,7 @@ export interface PaymentTransaction {
   ds_card_country: string | null
   last_four: string | null
   member_id: string | null
+  event_id: string | null
   subscription_id: string | null
   order_id: string | null
   redsys_token: string | null

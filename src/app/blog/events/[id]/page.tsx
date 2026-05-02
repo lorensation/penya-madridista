@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PublicEventDetailClient } from "@/components/events/public-event-detail-client"
 import { createUpcomingVisibleEventsQuery, getEventWhatsappBookingLink, getViewerEventAccess } from "@/lib/events"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createAdminSupabaseClient } from "@/lib/supabase/admin"
 import type { Database } from "@/types/supabase"
 import { formatShopPrice } from "@/lib/utils"
 
@@ -61,6 +62,45 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
     endDate: subscription?.end_date ?? null,
   })
   const whatsappLink = getEventWhatsappBookingLink(eventData.title)
+  const eventPath = `/blog/events/${eventData.id}`
+  let ticketStatus: { order: string; confirmed: boolean } | null = null
+
+  if (user && viewerAccess === "authenticated_non_member") {
+    const admin = createAdminSupabaseClient()
+    const { data: assist } = await admin
+      .from("event_assists")
+      .select("redsys_order, data_confirmed_at")
+      .eq("event_id", eventData.id)
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (assist?.redsys_order) {
+      ticketStatus = {
+        order: assist.redsys_order,
+        confirmed: Boolean(assist.data_confirmed_at),
+      }
+    } else {
+      const { data: transaction } = await admin
+        .from("payment_transactions")
+        .select("redsys_order")
+        .eq("context", "event")
+        .eq("event_id", eventData.id)
+        .eq("member_id", user.id)
+        .eq("status", "authorized")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (transaction?.redsys_order) {
+        ticketStatus = {
+          order: transaction.redsys_order,
+          confirmed: false,
+        }
+      }
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -165,6 +205,8 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                   oneTimePriceCents={eventData.one_time_price_cents}
                   viewerAccess={viewerAccess}
                   whatsappLink={whatsappLink}
+                  eventPath={eventPath}
+                  ticketStatus={ticketStatus}
                 />
               </CardContent>
             </Card>

@@ -16,6 +16,11 @@ interface PublicEventDetailClientProps {
   oneTimePriceCents: number | null
   viewerAccess: EventViewerAccess
   whatsappLink: string
+  eventPath: string
+  ticketStatus: {
+    order: string
+    confirmed: boolean
+  } | null
 }
 
 type EventCheckoutStep = "idle" | "processing" | "redirecting"
@@ -25,6 +30,8 @@ export function PublicEventDetailClient({
   oneTimePriceCents,
   viewerAccess,
   whatsappLink,
+  eventPath,
+  ticketStatus,
 }: PublicEventDetailClientProps) {
   const [step, setStep] = useState<EventCheckoutStep>("idle")
   const [error, setError] = useState<string | null>(null)
@@ -56,18 +63,37 @@ export function PublicEventDetailClient({
     }
   }
 
-  if (viewerAccess === "member") {
+  if (viewerAccess === "member" || ticketStatus?.confirmed) {
     return (
       <div className="space-y-4">
         <Alert className="border-green-200 bg-green-50">
           <AlertDescription className="text-green-900">
-            Tu suscripción está activa. Puedes reservar directamente tu plaza por WhatsApp.
+            {viewerAccess === "member"
+              ? "Tu suscripción está activa. Puedes reservar directamente tu plaza por WhatsApp."
+              : "Tu entrada está confirmada. Ya puedes completar la reserva del evento por WhatsApp."}
           </AlertDescription>
         </Alert>
         <Button asChild size="lg" className="w-full">
           <a href={whatsappLink} target="_blank" rel="noopener noreferrer">
             Reservar plaza por WhatsApp
           </a>
+        </Button>
+      </div>
+    )
+  }
+
+  if (ticketStatus && !ticketStatus.confirmed) {
+    return (
+      <div className="space-y-4">
+        <Alert className="border-amber-200 bg-amber-50">
+          <AlertDescription className="text-amber-900">
+            Tu pago está autorizado. Completa tus datos para desbloquear la reserva por WhatsApp.
+          </AlertDescription>
+        </Alert>
+        <Button asChild size="lg" className="w-full">
+          <Link href={`${eventPath}/redsys/ok?order=${encodeURIComponent(ticketStatus.order)}`}>
+            Completar datos de asistencia
+          </Link>
         </Button>
       </div>
     )
@@ -110,7 +136,7 @@ export function PublicEventDetailClient({
         </div>
         <p className="mt-3 text-sm text-gray-600">
           {viewerAccess === "anonymous"
-            ? "Puedes comprar tu entrada sin iniciar sesión. Tras el pago te pediremos tus datos para desbloquear la reserva por WhatsApp."
+            ? "Inicia sesión para comprar tu entrada. Los visitantes pueden consultar los detalles, pero la compra requiere una cuenta."
             : "Puedes comprar una entrada puntual para este evento. Tras el pago se desbloqueará la reserva por WhatsApp."}
         </p>
       </div>
@@ -121,25 +147,32 @@ export function PublicEventDetailClient({
         </Alert>
       )}
 
-      <Button onClick={handlePurchase} disabled={step === "processing"} size="lg" className="w-full">
-        {step === "processing" ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Preparando pago
-          </>
-        ) : (
-          "Comprar entrada"
-        )}
-      </Button>
-
-      {viewerAccess === "anonymous" && (
-        <p className="text-center text-sm text-gray-500">
-          ¿Ya eres socio?{" "}
-          <Link href="/login?redirect=/dashboard/events" className="font-medium text-primary hover:underline">
-            Inicia sesión
-          </Link>
-          .
-        </p>
+      {viewerAccess === "anonymous" ? (
+        <div className="space-y-3">
+          <Button disabled size="lg" className="w-full">
+            <Lock className="mr-2 h-4 w-4" />
+            Inicia sesión para comprar tu entrada
+          </Button>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Button variant="outline" asChild>
+              <Link href={`/login?redirect=${encodeURIComponent(eventPath)}`}>Iniciar sesión</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href={`/register?redirect=${encodeURIComponent(eventPath)}`}>Crear cuenta</Link>
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button onClick={handlePurchase} disabled={step === "processing"} size="lg" className="w-full">
+          {step === "processing" ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Preparando pago
+            </>
+          ) : (
+            "Comprar entrada"
+          )}
+        </Button>
       )}
     </div>
   )

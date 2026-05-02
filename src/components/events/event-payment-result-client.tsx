@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { saveEventExternalAssist } from "@/app/actions/payment"
+import { confirmEventAssist } from "@/app/actions/payment"
 
 interface EventPaymentResultClientProps {
   eventId: string
@@ -17,7 +17,10 @@ interface EventPaymentResultClientProps {
   initialAssist: {
     name: string
     email: string
+    apellido1: string
+    apellido2: string
     phone: string
+    confirmedAt: string | null
   } | null
 }
 
@@ -35,6 +38,8 @@ export function EventPaymentResultClient({
   const [formState, setFormState] = useState({
     name: initialAssist?.name ?? "",
     email: initialAssist?.email ?? "",
+    apellido1: initialAssist?.apellido1 ?? "",
+    apellido2: initialAssist?.apellido2 ?? "",
     phone: initialAssist?.phone ?? "",
   })
 
@@ -64,11 +69,13 @@ export function EventPaymentResultClient({
     setIsSaving(true)
 
     try {
-      const result = await saveEventExternalAssist({
+      const result = await confirmEventAssist({
         eventId,
         order,
         name: formState.name,
         email: formState.email,
+        apellido1: formState.apellido1,
+        apellido2: formState.apellido2,
         phone: formState.phone,
       })
 
@@ -80,7 +87,10 @@ export function EventPaymentResultClient({
       setAssist({
         name: formState.name,
         email: formState.email,
+        apellido1: formState.apellido1,
+        apellido2: formState.apellido2,
         phone: formState.phone,
+        confirmedAt: new Date().toISOString(),
       })
       router.refresh()
     } finally {
@@ -113,7 +123,7 @@ export function EventPaymentResultClient({
     )
   }
 
-  if (assist) {
+  if (assist?.confirmedAt) {
     return (
       <div className="space-y-4">
         <Alert className="border-green-200 bg-green-50">
@@ -136,7 +146,7 @@ export function EventPaymentResultClient({
     <div className="space-y-4">
       <Alert className="border-amber-200 bg-amber-50">
         <AlertDescription className="text-amber-900">
-          Tu pago ya está autorizado. Completa este formulario para desbloquear el botón de reserva por WhatsApp.
+          Tu pago ya está autorizado. Revisa tus datos para desbloquear el botón de reserva por WhatsApp.
         </AlertDescription>
       </Alert>
 
@@ -155,9 +165,19 @@ export function EventPaymentResultClient({
           <Label htmlFor="email">Email</Label>
           <Input id="email" name="email" type="email" value={formState.email} onChange={handleChange} required />
         </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="apellido1">Primer apellido</Label>
+            <Input id="apellido1" name="apellido1" value={formState.apellido1} onChange={handleChange} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="apellido2">Segundo apellido</Label>
+            <Input id="apellido2" name="apellido2" value={formState.apellido2} onChange={handleChange} />
+          </div>
+        </div>
         <div className="space-y-2">
           <Label htmlFor="phone">Teléfono</Label>
-          <Input id="phone" name="phone" type="tel" value={formState.phone} onChange={handleChange} required />
+          <Input id="phone" name="phone" type="tel" value={formState.phone} onChange={handleChange} />
         </div>
         <Button type="submit" disabled={isSaving} size="lg" className="w-full">
           {isSaving ? (

@@ -1,11 +1,12 @@
 import Link from "next/link"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { CheckCircle2 } from "lucide-react"
 import { EventPaymentResultClient } from "@/components/events/event-payment-result-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getEventWhatsappBookingLink } from "@/lib/events"
 import { createAdminSupabaseClient } from "@/lib/supabase/admin"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 export const dynamic = "force-dynamic"
 
@@ -29,6 +30,16 @@ export default async function EventPaymentOkPage({
     notFound()
   }
 
+  const eventPath = `/blog/events/${resolvedParams.id}`
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect(`/login?redirect=${encodeURIComponent(`${eventPath}/redsys/ok?order=${order}`)}`)
+  }
+
   const admin = createAdminSupabaseClient()
   const { data: event } = await admin
     .from("events")
@@ -42,11 +53,16 @@ export default async function EventPaymentOkPage({
 
   const { data: transaction } = await admin
     .from("payment_transactions")
-    .select("id, status, context, event_id, redsys_order")
+    .select("id, status, context, event_id, redsys_order, member_id")
     .eq("redsys_order", order)
     .maybeSingle()
 
-  if (!transaction || transaction.context !== "event" || transaction.event_id !== resolvedParams.id) {
+  if (
+    !transaction ||
+    transaction.context !== "event" ||
+    transaction.event_id !== resolvedParams.id ||
+    transaction.member_id !== user.id
+  ) {
     return (
       <div className="min-h-screen bg-gray-50 py-12 px-4">
         <div className="mx-auto max-w-2xl">
@@ -69,10 +85,43 @@ export default async function EventPaymentOkPage({
   }
 
   const { data: assist } = await admin
-    .from("event_external_assists")
-    .select("name, email, phone")
+    .from("event_assists")
+    .select("name, email, apellido1, apellido2, phone, data_confirmed_at")
     .eq("payment_transaction_id", transaction.id)
     .maybeSingle()
+
+  const [{ data: memberProfile }, { data: userProfile }] = assist
+    ? [{ data: null }, { data: null }]
+    : await Promise.all([
+        admin
+          .from("miembros")
+          .select("email, name, apellido1, apellido2, telefono")
+          .eq("user_uuid", user.id)
+          .maybeSingle(),
+        admin
+          .from("users")
+          .select("email, name")
+          .eq("id", user.id)
+          .maybeSingle(),
+      ])
+
+  const initialAssist = assist
+    ? {
+        name: assist.name,
+        email: assist.email,
+        apellido1: assist.apellido1 ?? "",
+        apellido2: assist.apellido2 ?? "",
+        phone: assist.phone ?? "",
+        confirmedAt: assist.data_confirmed_at,
+      }
+    : {
+        name: memberProfile?.name ?? userProfile?.name ?? "",
+        email: memberProfile?.email ?? userProfile?.email ?? user.email ?? "",
+        apellido1: memberProfile?.apellido1 ?? "",
+        apellido2: memberProfile?.apellido2 ?? "",
+        phone: memberProfile?.telefono ? String(memberProfile.telefono) : "",
+        confirmedAt: null,
+      }
 
   const status =
     transaction.status === "authorized" || transaction.status === "pending" || transaction.status === "denied"
@@ -110,7 +159,7 @@ export default async function EventPaymentOkPage({
               order={order}
               status={status}
               whatsappLink={getEventWhatsappBookingLink(event.title)}
-              initialAssist={assist}
+              initialAssist={initialAssist}
             />
           </CardContent>
         </Card>

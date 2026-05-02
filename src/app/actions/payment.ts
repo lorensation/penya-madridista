@@ -80,25 +80,29 @@ interface ResolveMembershipRedirectPaymentResult {
   error?: string
 }
 
-interface SaveEventExternalAssistInput {
+interface ConfirmEventAssistInput {
   eventId: string
   order: string
   name: string
   email: string
-  phone: string
+  apellido1?: string | null
+  apellido2?: string | null
+  phone?: string | null
 }
 
-interface SaveEventExternalAssistResult {
+interface ConfirmEventAssistResult {
   success: boolean
   error?: string
 }
 
-const eventExternalAssistSchema = z.object({
+const eventAssistSchema = z.object({
   eventId: z.string().uuid("Evento no valido"),
   order: z.string().min(1, "Pedido no valido"),
   name: z.string().trim().min(1, "El nombre es obligatorio"),
   email: z.string().trim().email("Introduce un email valido"),
-  phone: z.string().trim().min(1, "El telefono es obligatorio"),
+  apellido1: z.string().trim().optional().nullable(),
+  apellido2: z.string().trim().optional().nullable(),
+  phone: z.string().trim().optional().nullable(),
 })
 
 function getAdminClient() {
@@ -561,6 +565,10 @@ export async function prepareEventRedirectPayment(
       return { success: false, error: "No se pudo validar la sesion" }
     }
 
+    if (!user) {
+      return { success: false, error: "Debes iniciar sesion para comprar una entrada" }
+    }
+
     const admin = getAdminClient()
 
     const { data: event, error: eventError } = await admin
@@ -586,23 +594,21 @@ export async function prepareEventRedirectPayment(
       return { success: false, error: "Este evento no tiene una entrada de pago disponible" }
     }
 
-    if (user) {
-      const { data: subscription } = await admin
-        .from("subscriptions")
-        .select("status, end_date")
-        .eq("member_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
+    const { data: subscription } = await admin
+      .from("subscriptions")
+      .select("status, end_date")
+      .eq("member_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-      const hasCurrentMembership = hasMembershipAccess({
-        status: subscription?.status ?? null,
-        endDate: subscription?.end_date ?? null,
-      })
+    const hasCurrentMembership = hasMembershipAccess({
+      status: subscription?.status ?? null,
+      endDate: subscription?.end_date ?? null,
+    })
 
-      if (hasCurrentMembership) {
-        return { success: false, error: "Los socios deben reservar este evento por WhatsApp" }
-      }
+    if (hasCurrentMembership) {
+      return { success: false, error: "Los socios deben reservar este evento por WhatsApp" }
     }
 
     const order = generateOrderNumber("E")
@@ -617,7 +623,7 @@ export async function prepareEventRedirectPayment(
         status: "pending",
         authorized_at: null,
         context: "event",
-        member_id: user?.id ?? null,
+        member_id: user.id,
         event_id: event.id,
         is_mit: false,
         metadata: {
@@ -661,11 +667,11 @@ export async function prepareEventRedirectPayment(
   }
 }
 
-export async function saveEventExternalAssist(
-  input: SaveEventExternalAssistInput,
-): Promise<SaveEventExternalAssistResult> {
+export async function confirmEventAssist(
+  input: ConfirmEventAssistInput,
+): Promise<ConfirmEventAssistResult> {
   try {
-    const parsed = eventExternalAssistSchema.safeParse(input)
+    const parsed = eventAssistSchema.safeParse(input)
     if (!parsed.success) {
       return {
         success: false,
@@ -673,10 +679,20 @@ export async function saveEventExternalAssist(
       }
     }
 
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: "Debes iniciar sesion para confirmar la asistencia" }
+    }
+
     const admin = getAdminClient()
     const { data: transaction, error: transactionError } = await admin
       .from("payment_transactions")
-      .select("id, redsys_order, status, context, event_id, member_id")
+      .select("id, redsys_order, status, context, event_id, member_id, amount_cents, currency, authorized_at, ds_authorization_code, last_four")
       .eq("redsys_order", parsed.data.order)
       .maybeSingle()
 
@@ -688,12 +704,17 @@ export async function saveEventExternalAssist(
       return { success: false, error: "El pago no corresponde con este evento" }
     }
 
+    if (transaction.member_id !== user.id) {
+      return { success: false, error: "No tienes permiso para confirmar este pago" }
+    }
+
     if (transaction.status !== "authorized") {
       return { success: false, error: "El pago aun no esta confirmado" }
     }
 
+    const nowIso = new Date().toISOString()
     const { error: assistError } = await admin
-      .from("event_external_assists")
+      .from("event_assists")
       .upsert(
         {
           event_id: parsed.data.eventId,
@@ -702,14 +723,23 @@ export async function saveEventExternalAssist(
           user_id: transaction.member_id,
           name: parsed.data.name,
           email: parsed.data.email,
-          phone: parsed.data.phone,
-          updated_at: new Date().toISOString(),
+          apellido1: parsed.data.apellido1 || null,
+          apellido2: parsed.data.apellido2 || null,
+          phone: parsed.data.phone || null,
+          amount_cents: transaction.amount_cents,
+          currency: transaction.currency,
+          payment_status: transaction.status,
+          payment_authorized_at: transaction.authorized_at,
+          ds_authorization_code: transaction.ds_authorization_code,
+          last_four: transaction.last_four,
+          data_confirmed_at: nowIso,
+          updated_at: nowIso,
         },
         { onConflict: "payment_transaction_id" },
       )
 
     if (assistError) {
-      console.error("[payment] Failed saving event external assist", {
+      console.error("[payment] Failed confirming event assist", {
         order: parsed.data.order,
         eventId: parsed.data.eventId,
         error: assistError,
@@ -721,10 +751,15 @@ export async function saveEventExternalAssist(
 
     return { success: true }
   } catch (error) {
-    console.error("[payment] saveEventExternalAssist failed", { input, error })
+    console.error("[payment] confirmEventAssist failed", { input, error })
     return { success: false, error: "Error interno al guardar la asistencia" }
   }
 }
+
+/**
+ * @deprecated Use confirmEventAssist. Kept during the event-refactor transition.
+ */
+export const saveEventExternalAssist = confirmEventAssist
 
 export async function cancelMembershipSubscription(): Promise<{
   success: boolean
