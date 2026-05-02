@@ -3,7 +3,8 @@
 import { createClient } from "@supabase/supabase-js"
 import { revalidatePath } from "next/cache"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
-import { processRefund, generateOrderNumber } from "@/lib/redsys"
+import { processRefund } from "@/lib/redsys"
+import { buildRedsysRefundMetadata, hasRemainingActiveMembershipAfterRefund } from "@/lib/redsys/refund-recording"
 import { sendEmail } from "@/lib/email"
 import { generatePreferencesToken } from "@/lib/email/preferences-token"
 import { completeMembershipOnboarding as finalizeMembershipOnboarding } from "@/lib/membership/onboarding"
@@ -318,7 +319,7 @@ export async function approveRefund(input: {
     // Get the original transaction to get the Redsys order number
     const { data: originalTxn, error: txnError } = await admin
       .from("payment_transactions")
-      .select("redsys_order, amount_cents, last_four")
+      .select("id, redsys_order, amount_cents, last_four, metadata")
       .eq("id", request.original_transaction_id)
       .single()
 
@@ -345,70 +346,88 @@ export async function approveRefund(input: {
       }
     }
 
-    // Create refund transaction record
-    const refundOrder = generateOrderNumber("D")
-    const { data: refundTxn, error: refundTxnError } = await admin
+    const nowIso = new Date().toISOString()
+    const refundMetadata = buildRedsysRefundMetadata({
+      existingMetadata: originalTxn.metadata,
+      source: "admin_dashboard",
+      originalOrder: originalTxn.redsys_order,
+      originalTransactionId: originalTxn.id,
+      refundRequestId: requestId,
+      amountCents: request.amount_cents,
+      authorizationCode: refundResult.authorizationCode || null,
+      dsResponse: refundResult.dsResponse || null,
+      lastFour: originalTxn.last_four,
+      processedAt: nowIso,
+    })
+
+    // Redsys refunds reuse the original order, so the original payment row remains canonical.
+    const { error: originalTxnUpdateError } = await admin
       .from("payment_transactions")
-      .insert({
-        redsys_order: refundOrder,
-        transaction_type: "3",
-        amount_cents: request.amount_cents,
-        currency: "978",
+      .update({
         status: "refunded",
-        context: "membership",
-        member_id: request.member_id,
-        subscription_id: request.subscription_id,
-        ds_response: refundResult.dsResponse || null,
-        ds_authorization_code: refundResult.authorizationCode || null,
-        metadata: {
-          type: "refund",
-          original_order: originalTxn.redsys_order,
-          original_transaction_id: request.original_transaction_id,
-          refund_request_id: requestId,
-        },
+        metadata: refundMetadata,
+        updated_at: nowIso,
       })
-      .select("id")
-      .single()
-
-    if (refundTxnError) {
-      console.error("[refunds] refund txn insert failed", refundTxnError)
-      // The Redsys refund succeeded but we failed to record it — log but continue
-    }
-
-    // Update the original transaction status
-    await admin
-      .from("payment_transactions")
-      .update({ status: "refunded", updated_at: new Date().toISOString() })
       .eq("id", request.original_transaction_id)
 
+    if (originalTxnUpdateError) {
+      console.error("[refunds] original txn refund update failed", originalTxnUpdateError)
+      return { success: false, error: "El reembolso se proceso en Redsys, pero no se pudo registrar en la base de datos" }
+    }
+
     // Update the refund request
-    await admin
+    const { error: refundRequestUpdateError } = await admin
       .from("refund_requests")
       .update({
         status: "approved",
         admin_notes: adminNotes?.trim() || null,
         reviewed_by: user.id,
-        reviewed_at: new Date().toISOString(),
-        refund_transaction_id: refundTxn?.id || null,
-        updated_at: new Date().toISOString(),
+        reviewed_at: nowIso,
+        refund_transaction_id: request.original_transaction_id,
+        updated_at: nowIso,
       })
       .eq("id", requestId)
 
+    if (refundRequestUpdateError) {
+      console.error("[refunds] refund request update failed", refundRequestUpdateError)
+      return { success: false, error: "El reembolso se registro parcialmente; revisa la solicitud manualmente" }
+    }
+
     // Cancel the subscription
-    await admin
+    const { error: subscriptionUpdateError } = await admin
       .from("subscriptions")
       .update({
         status: "canceled",
-        canceled_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        canceled_at: nowIso,
+        updated_at: nowIso,
       })
       .eq("id", request.subscription_id)
 
-    // Revoke membership
-    await admin
+    if (subscriptionUpdateError) {
+      console.error("[refunds] subscription cancellation failed", subscriptionUpdateError)
+      return { success: false, error: "El reembolso se registro, pero no se pudo cancelar la suscripcion" }
+    }
+
+    const { data: remainingSubscriptions, error: remainingSubscriptionsError } = await admin
+      .from("subscriptions")
+      .select("id, status")
+      .eq("member_id", request.member_id)
+
+    if (remainingSubscriptionsError) {
+      console.error("[refunds] remaining subscriptions check failed", remainingSubscriptionsError)
+      return { success: false, error: "El reembolso se registro, pero no se pudo recalcular el estado de socio" }
+    }
+
+    const keepMembership = hasRemainingActiveMembershipAfterRefund(remainingSubscriptions ?? [])
+    const { error: userMembershipUpdateError } = await admin
       .from("users")
-      .update({ is_member: false, updated_at: new Date().toISOString() })
+      .update({ is_member: keepMembership, updated_at: nowIso })
       .eq("id", request.member_id)
+
+    if (userMembershipUpdateError) {
+      console.error("[refunds] user membership update failed", userMembershipUpdateError)
+      return { success: false, error: "El reembolso se registro, pero no se pudo actualizar el estado de socio" }
+    }
 
     // Send approval email to member
     const { data: memberData } = await admin
@@ -970,10 +989,15 @@ export async function resolveIncompleteOnboardingReview(input: {
       }
 
       if (transaction.member_id) {
+        const { data: remainingSubscriptions } = await admin
+          .from("subscriptions")
+          .select("id, status")
+          .eq("member_id", transaction.member_id)
+
         await admin
           .from("users")
           .update({
-            is_member: false,
+            is_member: hasRemainingActiveMembershipAfterRefund(remainingSubscriptions ?? []),
             updated_at: nowIso,
           })
           .eq("id", transaction.member_id)

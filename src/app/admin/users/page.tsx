@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { 
   Users, Search, UserCheck, UserX, MoreHorizontal, ChevronLeft, ChevronRight, 
-  AlertCircle, UserCog, Mail, User, Shield, Ban
+  AlertCircle, UserCog, Mail, User, Shield, Ban, Upload, Download
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -56,6 +56,17 @@ interface AuthUser {
   banned?: boolean;
 }
 
+interface RedsysExportResult {
+  ok: true
+  fileName: string
+  storagePath: string
+  signedUrl: string
+  rowCount: number
+  matchedCount: number
+  fallbackUserCount: number
+  unmatchedCount: number
+}
+
 export default function AdminUsersPage() {
   const router = useRouter()
   const [miembros, setMiembros] = useState<MiembroUser[]>([])
@@ -87,6 +98,11 @@ export default function AdminUsersPage() {
   const [notes, setNotes] = useState("")
   const [blockingUser, setBlockingUser] = useState(false)
   const [blockedUsers, setBlockedUsers] = useState<Record<string, BlockedUser>>({})
+  const [redsysDialogOpen, setRedsysDialogOpen] = useState(false)
+  const [redsysFile, setRedsysFile] = useState<File | null>(null)
+  const [redsysUploading, setRedsysUploading] = useState(false)
+  const [redsysError, setRedsysError] = useState<string | null>(null)
+  const [redsysResult, setRedsysResult] = useState<RedsysExportResult | null>(null)
   const { toast } = useToast()
 
   // Check if user is admin on client side
@@ -502,6 +518,51 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleRedsysExport = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!redsysFile) {
+      setRedsysError("Selecciona un archivo CSV exportado desde Redsys.")
+      return
+    }
+
+    try {
+      setRedsysUploading(true)
+      setRedsysError(null)
+      setRedsysResult(null)
+
+      const formData = new FormData()
+      formData.append("file", redsysFile)
+
+      const response = await fetch("/api/admin/redsys-operations/export", {
+        method: "POST",
+        body: formData,
+      })
+      const payload = await response.json()
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || "No se pudo generar el Excel.")
+      }
+
+      setRedsysResult(payload as RedsysExportResult)
+      toast({
+        title: "Excel generado",
+        description: `${payload.rowCount} operaciones autorizadas exportadas.`,
+        variant: "default",
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo generar el Excel."
+      setRedsysError(message)
+      toast({
+        title: "Error al importar Redsys",
+        description: message,
+        variant: "destructive",
+      })
+    } finally {
+      setRedsysUploading(false)
+    }
+  };
+
   // Show loading state while checking authentication
   if (authChecking) {
     return (
@@ -528,11 +589,23 @@ export default function AdminUsersPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-primary mb-2">Gestión de Usuarios</h1>
           <p className="text-gray-600">Administra los usuarios de la Peña Lorenzo Sanz</p>
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="flex items-center gap-2"
+          onClick={() => {
+            setRedsysDialogOpen(true)
+            setRedsysError(null)
+          }}
+        >
+          <Upload className="h-4 w-4" />
+          Importar operaciones Redsys
+        </Button>
       </div>
 
       <Tabs defaultValue="miembros" className="w-full" onValueChange={setActiveTab}>
@@ -937,6 +1010,69 @@ export default function AdminUsersPage() {
               {blockingUser ? "Bloqueando..." : "Bloquear Usuario"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Redsys Operations Export Dialog */}
+      <Dialog open={redsysDialogOpen} onOpenChange={setRedsysDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Importar operaciones Redsys</DialogTitle>
+            <DialogDescription>
+              Sube el CSV exportado desde Redsys para generar el Excel limpio de operaciones autorizadas.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleRedsysExport} className="space-y-4">
+            {redsysError && (
+              <Alert variant="destructive">
+                <AlertDescription>{redsysError}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="redsysCsv">Archivo CSV</Label>
+              <Input
+                id="redsysCsv"
+                type="file"
+                accept=".csv,text/csv"
+                disabled={redsysUploading}
+                onChange={(event) => {
+                  setRedsysFile(event.target.files?.[0] ?? null)
+                  setRedsysResult(null)
+                  setRedsysError(null)
+                }}
+              />
+              <p className="text-xs text-gray-500">
+                Se incluirán solo operaciones autorizadas y se guardará el XLSX en el bucket privado.
+              </p>
+            </div>
+
+            {redsysResult && (
+              <div className="rounded-md border bg-green-50 p-4 text-sm text-green-900">
+                <div className="font-medium">{redsysResult.fileName}</div>
+                <div className="mt-1 text-green-800">
+                  {redsysResult.rowCount} filas exportadas, {redsysResult.matchedCount} con usuario encontrado
+                  {redsysResult.fallbackUserCount > 0 ? ` (${redsysResult.fallbackUserCount} desde users)` : ""}.
+                  {redsysResult.unmatchedCount > 0 ? ` ${redsysResult.unmatchedCount} sin usuario.` : ""}
+                </div>
+                <Button asChild variant="outline" size="sm" className="mt-3 bg-white">
+                  <a href={redsysResult.signedUrl} target="_blank" rel="noopener noreferrer">
+                    <Download className="h-4 w-4 mr-2" />
+                    Descargar Excel
+                  </a>
+                </Button>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setRedsysDialogOpen(false)}>
+                Cerrar
+              </Button>
+              <Button type="submit" disabled={redsysUploading || !redsysFile}>
+                {redsysUploading ? "Generando..." : "Generar Excel"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
