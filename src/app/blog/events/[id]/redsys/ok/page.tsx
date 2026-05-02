@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { CheckCircle2 } from "lucide-react"
+import { resolveEventRedirectPayment } from "@/app/actions/payment"
 import { EventPaymentResultClient } from "@/components/events/event-payment-result-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,14 +18,19 @@ type EventPaymentOkPageProps = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
+function firstSearchParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value
+}
+
 export default async function EventPaymentOkPage({
   params,
   searchParams,
 }: EventPaymentOkPageProps) {
   const resolvedParams = await params
   const resolvedSearchParams = await searchParams
-  const orderParam = resolvedSearchParams.order
-  const order = Array.isArray(orderParam) ? orderParam[0] : orderParam
+  const order = firstSearchParam(resolvedSearchParams.order)
+  const dsMerchantParameters = firstSearchParam(resolvedSearchParams.Ds_MerchantParameters)
+  const dsSignature = firstSearchParam(resolvedSearchParams.Ds_Signature)
 
   if (!order) {
     notFound()
@@ -37,7 +43,15 @@ export default async function EventPaymentOkPage({
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect(`/login?redirect=${encodeURIComponent(`${eventPath}/redsys/ok?order=${order}`)}`)
+    const returnParams = new URLSearchParams()
+    for (const [key, value] of Object.entries(resolvedSearchParams)) {
+      const firstValue = firstSearchParam(value)
+      if (firstValue) {
+        returnParams.set(key, firstValue)
+      }
+    }
+    const returnUrl = `${eventPath}/redsys/ok?${returnParams.toString()}`
+    redirect(`/login?redirect=${encodeURIComponent(returnUrl)}`)
   }
 
   const admin = createAdminSupabaseClient()
@@ -50,6 +64,13 @@ export default async function EventPaymentOkPage({
   if (!event) {
     notFound()
   }
+
+  await resolveEventRedirectPayment({
+    eventId: resolvedParams.id,
+    order,
+    dsMerchantParameters,
+    dsSignature,
+  })
 
   const { data: transaction } = await admin
     .from("payment_transactions")
