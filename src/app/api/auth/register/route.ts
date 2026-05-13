@@ -1,13 +1,19 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { getTermsAcceptanceError } from "@/lib/legal/terms"
 
 export async function POST(request: Request) {
   try {
-    const { email, password, name, subscribeToNewsletter } = await request.json()
+    const { email, password, name, subscribeToNewsletter, termsAccepted } = await request.json()
     const communicationsConsent = subscribeToNewsletter !== false
+    const termsError = getTermsAcceptanceError(termsAccepted)
 
     if (!email || !password) {
       return NextResponse.json({ error: "Email and password are required" }, { status: 400 })
+    }
+
+    if (termsError) {
+      return NextResponse.json({ error: termsError }, { status: 400 })
     }
 
     // Use standard sign-up method instead of admin API
@@ -19,6 +25,7 @@ export async function POST(request: Request) {
         data: {
           name,
           subscribeToNewsletter: communicationsConsent,
+          termsAccepted: true,
         },
         emailRedirectTo: `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/auth/callback`,
       },
@@ -48,6 +55,7 @@ export async function POST(request: Request) {
           is_member: false,
           email_notifications: communicationsConsent,
           marketing_emails: communicationsConsent,
+          terms_accepted: true,
         })
 
         if (insertError) {
@@ -64,6 +72,11 @@ export async function POST(request: Request) {
 
             if (rpcError) {
               console.error("RPC error:", rpcError)
+            } else {
+              await supabase
+                .from("users")
+                .update({ terms_accepted: true })
+                .eq("id", data.user.id)
             }
           } catch (rpcErr) {
             console.error("RPC exception:", rpcErr)

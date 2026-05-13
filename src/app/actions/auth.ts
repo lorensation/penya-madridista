@@ -4,16 +4,26 @@ import { redirect } from "next/navigation"
 import { createServerSupabaseClient } from "@/lib/supabase"
 import type { ApiResponse } from "@/types/common"
 import type { User } from "@supabase/supabase-js"
+import { getTermsAcceptanceError } from "@/lib/legal/terms"
 
 export async function signUp(formData: FormData) {
   const supabase = await createServerSupabaseClient()
   const email = formData.get("email") as string
   const password = formData.get("password") as string
   const name = formData.get("name") as string
+  const termsAcceptedValue = formData.get("termsAccepted")
+  const termsAccepted = termsAcceptedValue === "true" || termsAcceptedValue === "on"
 
   if (!email || !password || !name) {
     return {
       error: "Missing required fields",
+    }
+  }
+
+  const termsError = getTermsAcceptanceError(termsAccepted)
+  if (termsError) {
+    return {
+      error: termsError,
     }
   }
 
@@ -24,6 +34,7 @@ export async function signUp(formData: FormData) {
       emailRedirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
       data: {
         name,
+        termsAccepted: true,
       },
     },
   })

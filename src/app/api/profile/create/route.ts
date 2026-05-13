@@ -1,14 +1,20 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { getTermsAcceptanceError } from "@/lib/legal/terms"
 
 export async function POST(request: Request) {
   try {
-    const { userId, email, name, emailNotifications, marketingEmails } = await request.json()
+    const { userId, email, name, emailNotifications, marketingEmails, termsAccepted } = await request.json()
     const safeEmailNotifications = emailNotifications !== false
     const safeMarketingEmails = marketingEmails !== false
+    const termsError = getTermsAcceptanceError(termsAccepted)
 
     if (!userId || !email) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    }
+
+    if (termsError) {
+      return NextResponse.json({ error: termsError }, { status: 400 })
     }
 
     // Create user entry
@@ -21,6 +27,7 @@ export async function POST(request: Request) {
         is_member: false,
         email_notifications: safeEmailNotifications,
         marketing_emails: safeMarketingEmails,
+        terms_accepted: true,
         created_at: new Date().toISOString(),
       })
 

@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
   if (authUser) {
     try {
       const communicationsConsent = authUser.user_metadata?.subscribeToNewsletter !== false
+      const termsAccepted = authUser.user_metadata?.termsAccepted === true
 
       // Ensure the public users row exists, but do not create a synthetic miembros profile here.
       const { data: publicUser, error: publicUserError } = await supabase
@@ -57,6 +58,11 @@ export async function GET(request: NextRequest) {
         .maybeSingle()
 
       if ((publicUserError || !publicUser) && authUser.email) {
+        if (!termsAccepted) {
+          console.warn("Skipping public user creation without explicit terms acceptance:", authUser.id)
+          return NextResponse.redirect(new URL("/register", requestUrl.origin))
+        }
+
         const { error: insertError } = await supabase.from("users").insert({
           id: authUser.id,
           email: authUser.email,
@@ -64,6 +70,7 @@ export async function GET(request: NextRequest) {
           is_member: false,
           email_notifications: communicationsConsent,
           marketing_emails: communicationsConsent,
+          terms_accepted: true,
           updated_at: new Date().toISOString(),
         })
 

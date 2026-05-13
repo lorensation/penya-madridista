@@ -38,6 +38,12 @@ export async function POST(request: Request) {
       // User was created in Auth
       const user = payload.record
       const communicationsConsent = user.user_metadata?.subscribeToNewsletter !== false
+      const termsAccepted = user.user_metadata?.termsAccepted === true
+
+      if (!termsAccepted) {
+        console.warn("Skipping webhook public user creation without explicit terms acceptance:", user.id)
+        return NextResponse.json({ success: true })
+      }
 
       try {
         // Use a separate supabase client for this operation to avoid transaction issues
@@ -49,6 +55,7 @@ export async function POST(request: Request) {
           is_member: false,
           email_notifications: communicationsConsent,
           marketing_emails: communicationsConsent,
+          terms_accepted: true,
         })
 
         if (insertError) {
@@ -64,6 +71,11 @@ export async function POST(request: Request) {
 
             if (rpcError) {
               console.error("RPC error in webhook:", rpcError)
+            } else {
+              await supabase
+                .from("users")
+                .update({ terms_accepted: true })
+                .eq("id", user.id)
             }
           } catch (rpcErr) {
             console.error("RPC exception in webhook:", rpcErr)

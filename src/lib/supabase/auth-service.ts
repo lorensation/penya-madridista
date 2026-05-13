@@ -1,6 +1,7 @@
 import { createBrowserSupabaseClient } from "./client"
 import { createServerSupabaseClient } from "./server"
 import { baseUrl } from "./config"
+import { getTermsAcceptanceError } from "@/lib/legal/terms"
 
 /**
  * Get the appropriate Supabase client based on the environment
@@ -14,7 +15,15 @@ async function getClient() {
 /**
  * Register a new user with email and password
  */
-export async function signUp(email: string, password: string, name: string) {
+export async function signUp(email: string, password: string, name: string, termsAccepted: boolean) {
+  const termsError = getTermsAcceptanceError(termsAccepted)
+  if (termsError) {
+    return {
+      data: { user: null, session: null },
+      error: new Error(termsError),
+    }
+  }
+
   const client = await getClient()
   
   return await client.auth.signUp({
@@ -23,6 +32,7 @@ export async function signUp(email: string, password: string, name: string) {
     options: {
       data: {
         full_name: name,
+        termsAccepted: true,
       },
       emailRedirectTo: `${baseUrl}/auth/callback`,
     },

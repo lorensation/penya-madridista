@@ -39,6 +39,7 @@ import {
   finalizeMembershipPayment,
 } from "@/lib/membership/onboarding"
 import { createReturnPendingReviewAlert } from "@/lib/payments/return-review-alerts"
+import { getPaymentTermsAcceptanceError } from "@/lib/legal/terms"
 
 interface PrepareRedirectPaymentResult {
   success: boolean
@@ -395,8 +396,14 @@ export async function resolveEventRedirectPayment(
 export async function prepareMembershipRedirectPayment(
   planType: PlanType,
   interval: PaymentInterval,
+  termsAccepted: boolean,
 ): Promise<PrepareRedirectPaymentResult> {
   try {
+    const termsError = getPaymentTermsAcceptanceError(termsAccepted)
+    if (termsError) {
+      return { success: false, error: termsError }
+    }
+
     const supabase = await createServerSupabaseClient()
     const {
       data: { user },
@@ -533,7 +540,13 @@ export async function prepareMembershipRedirectPayment(
 export async function prepareShopRedirectPayment(
   items: ShopRedirectItemInput[],
   shipping: ShopRedirectShippingInput,
+  termsAccepted: boolean,
 ): Promise<PrepareRedirectPaymentResult> {
+  const termsError = getPaymentTermsAcceptanceError(termsAccepted)
+  if (termsError) {
+    return { success: false, error: termsError }
+  }
+
   if (!items.length) {
     return { success: false, error: "El carrito esta vacio" }
   }
@@ -706,8 +719,14 @@ export async function prepareShopRedirectPayment(
 
 export async function prepareEventRedirectPayment(
   eventId: string,
+  termsAccepted: boolean,
 ): Promise<PrepareRedirectPaymentResult> {
   try {
+    const termsError = getPaymentTermsAcceptanceError(termsAccepted)
+    if (termsError) {
+      return { success: false, error: termsError }
+    }
+
     const supabase = await createServerSupabaseClient()
     const {
       data: { user },

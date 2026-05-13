@@ -5,11 +5,14 @@ import Link from "next/link"
 import { Loader2, Lock, Ticket } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import { RedsysRedirectAutoSubmitForm } from "@/components/payments/redsys-redirect-form"
 import { prepareEventRedirectPayment } from "@/app/actions/payment"
 import type { EventViewerAccess } from "@/lib/events"
 import type { RedsysSignedRequest } from "@/lib/redsys"
 import { formatShopPrice } from "@/lib/utils"
+import { PAYMENT_TERMS_ACCEPTANCE_ERROR } from "@/lib/legal/terms"
 
 interface PublicEventDetailClientProps {
   eventId: string
@@ -37,15 +40,22 @@ export function PublicEventDetailClient({
   const [error, setError] = useState<string | null>(null)
   const [redirectActionUrl, setRedirectActionUrl] = useState<string | null>(null)
   const [redirectSigned, setRedirectSigned] = useState<RedsysSignedRequest | null>(null)
+  const [termsAcceptedEvent, setTermsAcceptedEvent] = useState(false)
   const ticketPriceCents =
     typeof oneTimePriceCents === "number" && Number.isInteger(oneTimePriceCents) ? oneTimePriceCents : null
 
   const handlePurchase = async () => {
     setError(null)
+
+    if (!termsAcceptedEvent) {
+      setError(PAYMENT_TERMS_ACCEPTANCE_ERROR)
+      return
+    }
+
     setStep("processing")
 
     try {
-      const result = await prepareEventRedirectPayment(eventId)
+      const result = await prepareEventRedirectPayment(eventId, termsAcceptedEvent)
 
       if (!result.success || !result.actionUrl || !result.signed || !result.order) {
         setError(result.error || "No se pudo preparar el pago")
@@ -163,16 +173,37 @@ export function PublicEventDetailClient({
           </div>
         </div>
       ) : (
-        <Button onClick={handlePurchase} disabled={step === "processing"} size="lg" className="w-full">
-          {step === "processing" ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Preparando pago
-            </>
-          ) : (
-            "Comprar entrada"
-          )}
-        </Button>
+        <div className="space-y-3">
+          <div className="flex items-start space-x-3 rounded-md border border-gray-200 p-3">
+            <Checkbox
+              id="event-terms"
+              checked={termsAcceptedEvent}
+              onCheckedChange={(checked) => setTermsAcceptedEvent(checked === true)}
+            />
+            <Label htmlFor="event-terms" className="text-sm leading-tight cursor-pointer">
+              He leido y estoy de acuerdo con los{" "}
+              <Link href="/terms-and-conditions" className="text-primary underline underline-offset-2">
+                Terminos y Condiciones
+              </Link>{" "}
+              de la web.
+            </Label>
+          </div>
+          <Button
+            onClick={handlePurchase}
+            disabled={step === "processing" || !termsAcceptedEvent}
+            size="lg"
+            className="w-full"
+          >
+            {step === "processing" ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Preparando pago
+              </>
+            ) : (
+              "Comprar entrada"
+            )}
+          </Button>
+        </div>
       )}
     </div>
   )

@@ -198,7 +198,43 @@ export default function TermsAndConditionsPage() {
         </div>
 
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">8. Propiedad intelectual</h2>
+          <h2 className="text-2xl font-semibold mb-4">8. Productos de tienda, envio, devolucion y desistimiento</h2>
+          <p>
+            La PeÃ±a puede ofrecer productos fisicos a traves de su tienda online. Las condiciones concretas de cada producto,
+            precio, impuestos aplicables y gastos de envio se muestran antes de confirmar el pedido.
+          </p>
+
+          <h3 className="text-xl font-medium mt-4 mb-2">8.1 Politica de envio</h3>
+          <ul className="list-disc pl-6 my-4 space-y-2">
+            <li>Los gastos de envio se informan durante el proceso de compra antes de redirigir al pago seguro.</li>
+            <li>El plazo de preparacion y entrega dependera de la disponibilidad del producto y del destino indicado por el comprador.</li>
+            <li>El comprador debe facilitar datos de envio completos y correctos. La PeÃ±a no sera responsable de retrasos derivados de datos incorrectos o incompletos.</li>
+            <li>Si un producto no estuviera disponible tras el pago, se contactara con el comprador para ofrecer una solucion, sustitucion o reembolso.</li>
+          </ul>
+
+          <h3 className="text-xl font-medium mt-4 mb-2">8.2 Politica de devolucion</h3>
+          <ul className="list-disc pl-6 my-4 space-y-2">
+            <li>El comprador puede solicitar la devolucion de productos fisicos en un plazo de 14 dias naturales desde la recepcion.</li>
+            <li>El producto debe devolverse sin usar, en buen estado y, cuando sea posible, con su embalaje original.</li>
+            <li>Para iniciar una devolucion, el comprador debe contactar con <a href="mailto:info@lorenzosanz.com" className="text-primary hover:underline">info@lorenzosanz.com</a> indicando el numero de pedido y el motivo.</li>
+            <li>Una vez recibido y verificado el producto, se tramitara el reembolso por el mismo medio de pago utilizado, salvo acuerdo distinto.</li>
+          </ul>
+
+          <h3 className="text-xl font-medium mt-4 mb-2">8.3 Derecho de desistimiento</h3>
+          <p>
+            Conforme a la normativa espaÃ±ola de consumidores y usuarios, el comprador dispone de 14 dias naturales para desistir
+            de la compra de productos fisicos, sin necesidad de justificar su decision, salvo en los supuestos legalmente exceptuados.
+          </p>
+          <ul className="list-disc pl-6 my-4 space-y-2">
+            <li>El plazo se cuenta desde la recepcion del producto por el comprador o por un tercero indicado por este.</li>
+            <li>El comprador asumira los costes directos de devolucion salvo que la devolucion se deba a un error de la PeÃ±a o a un producto defectuoso.</li>
+            <li>Quedan excluidos del desistimiento los productos personalizados, usados, deteriorados por causa imputable al comprador o aquellos que la ley excluya expresamente.</li>
+            <li>El reembolso podra retenerse hasta recibir los productos o hasta que el comprador acredite su devolucion.</li>
+          </ul>
+        </div>
+
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold mb-4">9. Propiedad intelectual</h2>
           <p>
             Somos los propietarios o licenciatarios de todos los derechos de propiedad intelectual en nuestro sitio y en el material publicado en él. Esas obras están 
             protegidas por leyes y tratados de derechos de autor en todo el mundo. Todos los derechos están reservados.
@@ -228,7 +264,7 @@ export default function TermsAndConditionsPage() {
         </div>
 
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">9. Limitación de nuestra responsabilidad</h2>
+          <h2 className="text-2xl font-semibold mb-4">10. Limitación de nuestra responsabilidad</h2>
           <p>
             Nada en estos términos de uso excluye o limita nuestra responsabilidad por muerte o lesiones personales derivadas de nuestra negligencia, o nuestro fraude o 
             tergiversación fraudulenta, o cualquier otra responsabilidad que no pueda ser excluida o limitada por la ley española.
@@ -272,7 +308,7 @@ export default function TermsAndConditionsPage() {
         </div>
 
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">10. Subida de contenido a nuestro sitio</h2>
+          <h2 className="text-2xl font-semibold mb-4">11. Subida de contenido a nuestro sitio</h2>
           <p>
             Siempre que utilice una función que le permita subir contenido a nuestro sitio, o ponerse en contacto con otros usuarios de nuestro sitio, debe cumplir con los 
             estándares de contenido establecidos a continuación.
@@ -301,7 +337,7 @@ export default function TermsAndConditionsPage() {
         </div>
 
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">11. Estándares de contenido</h2>
+          <h2 className="text-2xl font-semibold mb-4">12. Estándares de contenido</h2>
           <p>
             Estos estándares de contenido se aplican a cualquier y todo el material que contribuya a nuestro sitio (contribuciones), y a cualquier espacio interactivo asociado.
           </p>
@@ -335,7 +371,7 @@ export default function TermsAndConditionsPage() {
         </div>
 
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">12. Suspensión y terminación</h2>
+          <h2 className="text-2xl font-semibold mb-4">13. Suspensión y terminación</h2>
           <p>
             Determinaremos, a nuestra discreción, si ha habido una violación de estos términos de uso a través de su uso de nuestro sitio. Cuando ocurra una violación 
             de estos términos de uso, podemos tomar las acciones que consideremos apropiadas.
@@ -359,7 +395,7 @@ export default function TermsAndConditionsPage() {
         </div>
 
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">13. Ley aplicable y jurisdicción</h2>
+          <h2 className="text-2xl font-semibold mb-4">14. Ley aplicable y jurisdicción</h2>
           <p>
             Estos términos de uso, su tema y su formación, se rigen por la legislación española.
           </p>
@@ -372,7 +408,7 @@ export default function TermsAndConditionsPage() {
         </div>
 
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">14. Marcas comerciales</h2>
+          <h2 className="text-2xl font-semibold mb-4">15. Marcas comerciales</h2>
           <p>
             &quot;Real Madrid&quot; y el escudo del Real Madrid son marcas registradas del Real Madrid Club de Fútbol. La Peña Lorenzo Sanz no está afiliada oficialmente con el 
             Real Madrid C.F. a menos que se indique explícitamente lo contrario.
@@ -383,7 +419,7 @@ export default function TermsAndConditionsPage() {
         </div>
 
         <div>
-          <h2 className="text-2xl font-semibold mb-4">15. Contacto</h2>
+          <h2 className="text-2xl font-semibold mb-4">16. Contacto</h2>
           <p>
             Para contactar con nosotros, por favor envíe un correo electrónico a <a href="mailto:info@lorenzosanz.com" className="text-primary hover:underline">info@lorenzosanz.com</a>.
           </p>

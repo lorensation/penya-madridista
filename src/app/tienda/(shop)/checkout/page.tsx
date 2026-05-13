@@ -9,10 +9,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Checkbox } from "@/components/ui/checkbox"
 import { RedsysRedirectAutoSubmitForm } from "@/components/payments/redsys-redirect-form"
 import { prepareShopRedirectPayment } from "@/app/actions/payment"
 import { useCartStore, initializeStore } from "@/stores/cart"
 import { formatShopPrice } from "@/lib/utils"
+import { PAYMENT_TERMS_ACCEPTANCE_ERROR } from "@/lib/legal/terms"
 import type { RedsysSignedRequest } from "@/lib/redsys"
 
 type CheckoutStep = "shipping" | "processing" | "redirecting"
@@ -28,6 +30,7 @@ export default function CheckoutPage() {
 
   const [redirectActionUrl, setRedirectActionUrl] = useState<string | null>(null)
   const [redirectSigned, setRedirectSigned] = useState<RedsysSignedRequest | null>(null)
+  const [termsAcceptedCheckout, setTermsAcceptedCheckout] = useState(false)
 
   const [formState, setFormState] = useState({
     fullName: "",
@@ -66,6 +69,11 @@ export default function CheckoutPage() {
       return
     }
 
+    if (!termsAcceptedCheckout) {
+      setError(PAYMENT_TERMS_ACCEPTANCE_ERROR)
+      return
+    }
+
     try {
       setStep("processing")
 
@@ -79,7 +87,7 @@ export default function CheckoutPage() {
       const result = await prepareShopRedirectPayment(cartItems, {
         ...formState,
         shippingCents: FIXED_SHIPPING_CENTS,
-      })
+      }, termsAcceptedCheckout)
 
       if (!result.success || !result.actionUrl || !result.signed || !result.order) {
         setError(result.error || "Error al preparar el pago")
@@ -182,7 +190,21 @@ export default function CheckoutPage() {
                   <Label htmlFor="phone">Telefono *</Label>
                   <Input id="phone" name="phone" type="tel" value={formState.phone} onChange={handleChange} required />
                 </div>
-                <Button type="submit" className="w-full mt-2" size="lg">
+                <div className="flex items-start space-x-3 rounded-md border border-gray-200 p-3">
+                  <Checkbox
+                    id="checkout-terms"
+                    checked={termsAcceptedCheckout}
+                    onCheckedChange={(checked) => setTermsAcceptedCheckout(checked === true)}
+                  />
+                  <Label htmlFor="checkout-terms" className="text-sm leading-tight cursor-pointer">
+                    He leido y estoy de acuerdo con los{" "}
+                    <Link href="/terms-and-conditions" className="text-primary underline underline-offset-2">
+                      Terminos y Condiciones
+                    </Link>{" "}
+                    de la web.
+                  </Label>
+                </div>
+                <Button type="submit" className="w-full mt-2" size="lg" disabled={!termsAcceptedCheckout}>
                   Ir al pago seguro
                 </Button>
               </div>
