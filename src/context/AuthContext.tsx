@@ -4,12 +4,13 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { Session, User, AuthError } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
+import { getTermsAcceptanceError } from "@/lib/legal/terms"
 
 type AuthContextType = {
   user: User | null
   session: Session | null
   isLoading: boolean
-  signUp: (email: string, password: string, name: string) => Promise<{ error: AuthError | null }>
+  signUp: (email: string, password: string, name: string, termsAccepted: boolean) => Promise<{ error: AuthError | null }>
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>
   signOut: () => Promise<{ error: AuthError | null }>
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>
@@ -50,12 +51,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     session,
     isLoading,
-    signUp: async (email: string, password: string, name: string) => {
+    signUp: async (email: string, password: string, name: string, termsAccepted: boolean) => {
+      const termsError = getTermsAcceptanceError(termsAccepted)
+      if (termsError) {
+        return { error: new Error(termsError) as AuthError }
+      }
+
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { full_name: name },
+          data: { full_name: name, termsAccepted: true },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       })

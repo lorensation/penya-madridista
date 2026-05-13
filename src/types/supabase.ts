@@ -1311,6 +1311,7 @@ export type Database = {
           marketing_emails: boolean
           name: string | null
           profile_completed_at: string | null
+          terms_accepted: boolean
           updated_at: string | null
         }
         Insert: {
@@ -1323,6 +1324,7 @@ export type Database = {
           marketing_emails?: boolean
           name?: string | null
           profile_completed_at?: string | null
+          terms_accepted?: boolean
           updated_at?: string | null
         }
         Update: {
@@ -1335,6 +1337,7 @@ export type Database = {
           marketing_emails?: boolean
           name?: string | null
           profile_completed_at?: string | null
+          terms_accepted?: boolean
           updated_at?: string | null
         }
         Relationships: []

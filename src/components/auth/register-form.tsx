@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
@@ -22,6 +23,7 @@ import { useToast } from "@/components/ui/use-toast-hook"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import { Checkbox } from "@/components/ui/checkbox"
 import { addUserToNewsletter } from "@/app/actions/newsletter"
+import { TERMS_ACCEPTANCE_ERROR } from "@/lib/legal/terms"
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -37,6 +39,9 @@ const formSchema = z.object({
     message: "La fecha de nacimiento es obligatoria.",
   }),
   subscribeToNewsletter: z.boolean().default(true),
+  termsAccepted: z.boolean().refine((value) => value === true, {
+    message: TERMS_ACCEPTANCE_ERROR,
+  }),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -55,6 +60,7 @@ export function RegisterForm() {
       password: "",
       fecha_nacimiento: "",
       subscribeToNewsletter: true,
+      termsAccepted: false,
     },
   })
 
@@ -77,7 +83,8 @@ export function RegisterForm() {
           data: {
             name: values.name,
             fecha_nacimiento: values.fecha_nacimiento,
-            subscribeToNewsletter: values.subscribeToNewsletter
+            subscribeToNewsletter: values.subscribeToNewsletter,
+            termsAccepted: values.termsAccepted,
           },
         },
       })
@@ -97,6 +104,7 @@ export function RegisterForm() {
             is_member: false,
             email_notifications: values.subscribeToNewsletter,
             marketing_emails: values.subscribeToNewsletter,
+            terms_accepted: values.termsAccepted,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });
@@ -247,6 +255,31 @@ export function RegisterForm() {
                 <FormDescription>
                   Recibirás noticias, eventos y actualizaciones sobre nuestra peña.
                 </FormDescription>
+              </div>
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="termsAccepted"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border border-gray-200 p-3">
+              <FormControl>
+                <Checkbox
+                  id="register-terms"
+                  checked={field.value}
+                  onCheckedChange={(checked) => field.onChange(checked === true)}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel htmlFor="register-terms">
+                  He leido y acepto los{" "}
+                  <Link href="/terms-and-conditions" className="text-primary underline underline-offset-2">
+                    Terminos y Condiciones
+                  </Link>{" "}
+                  de la web.
+                </FormLabel>
+                <FormMessage />
               </div>
             </FormItem>
           )}

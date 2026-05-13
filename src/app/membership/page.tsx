@@ -8,6 +8,8 @@ import { CheckCircle, CreditCard, Award, Gift, Loader2, AlertCircle, BadgeCheck,
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import { supabase } from "@/lib/supabase"
 import { hasMembershipAccess } from "@/lib/membership-access"
 import type { PaymentInterval, PlanType, RedsysSignedRequest } from "@/lib/redsys"
@@ -95,6 +97,7 @@ export default function MembershipPage() {
 
   const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null)
   const [selectedPaymentOption, setSelectedPaymentOption] = useState<PaymentInterval | null>(null)
+  const [termsAcceptedSubscription, setTermsAcceptedSubscription] = useState(false)
 
   const [step, setStep] = useState<MembershipStep>("select")
   const [redirectActionUrl, setRedirectActionUrl] = useState<string | null>(null)
@@ -224,7 +227,11 @@ export default function MembershipPage() {
     setStep("processing")
 
     try {
-      const result = await prepareMembershipRedirectPayment(selectedPlan, selectedPaymentOption)
+      const result = await prepareMembershipRedirectPayment(
+        selectedPlan,
+        selectedPaymentOption,
+        termsAcceptedSubscription,
+      )
 
       if (!result.success || !result.actionUrl || !result.signed || !result.order) {
         setError(result.error || "No se pudo preparar el pago")
@@ -459,10 +466,24 @@ export default function MembershipPage() {
           )}
 
           <div className="mt-8 text-center">
+            <div className="mx-auto mb-4 flex max-w-xl items-start space-x-3 rounded-md border border-gray-200 bg-white p-3 text-left">
+              <Checkbox
+                id="membership-terms"
+                checked={termsAcceptedSubscription}
+                onCheckedChange={(checked) => setTermsAcceptedSubscription(checked === true)}
+              />
+              <Label htmlFor="membership-terms" className="text-sm leading-tight cursor-pointer">
+                He leido y estoy de acuerdo con los{" "}
+                <Link href="/terms-and-conditions" className="text-primary underline underline-offset-2">
+                  Terminos y Condiciones
+                </Link>{" "}
+                de la web.
+              </Label>
+            </div>
             <Button
               size="lg"
               onClick={handleSubscribe}
-              disabled={!selectedPlan || !selectedPaymentOption}
+              disabled={!selectedPlan || !selectedPaymentOption || !termsAcceptedSubscription}
               className="px-8 py-6 text-lg"
             >
               {!user ? "Iniciar sesion para suscribirse" : "Continuar con el pago anual"}
