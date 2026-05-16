@@ -82,6 +82,26 @@ export interface RedsysNotificationEventInsert {
   raw: Json | null
 }
 
+interface RedsysNotificationAuditInput {
+  event: RedsysNotificationEventName | string
+  reason: RedsysNotificationReason | string
+  contentType?: string | null
+  signatureVersion?: string | null
+  hasMerchantParameters?: boolean | null
+  hasSignature?: boolean | null
+  responseParams?: Record<string, unknown> | null
+  transactionId?: string | null
+  memberId?: string | null
+  context?: string | null
+  statusBefore?: string | null
+  statusAfter?: string | null
+  expectedAmount?: number | null
+  expectedMerchantCode?: string | null
+  expectedTerminal?: string | null
+  errorMessage?: string | null
+  raw?: Json | null
+}
+
 interface BestEffortAdminClient {
   from(table: "redsys_notification_events" | string): {
     insert(payload: unknown): unknown
@@ -94,6 +114,88 @@ function nullableString(value: number | string | null | undefined): string | nul
   }
 
   return String(value)
+}
+
+function maybeString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null
+}
+
+function sanitizeCardNumber(value: string): string {
+  const trimmed = value.trim()
+  if (/[*xX]/.test(trimmed)) {
+    return trimmed
+  }
+
+  const digits = trimmed.replace(/\D/g, "")
+  if (digits.length <= 4) {
+    return digits
+  }
+
+  return `${"*".repeat(Math.max(0, digits.length - 4))}${digits.slice(-4)}`
+}
+
+function buildSafeRedsysRaw(
+  responseParams: Record<string, unknown> | null | undefined,
+  fallbackRaw: Json | null | undefined,
+): Json | null {
+  if (fallbackRaw !== undefined) {
+    return fallbackRaw
+  }
+
+  if (!responseParams) {
+    return null
+  }
+
+  const safeParams: Record<string, Json> = {}
+  for (const [key, value] of Object.entries(responseParams).sort(([left], [right]) => left.localeCompare(right))) {
+    if (value === null || value === undefined) {
+      continue
+    }
+
+    if (key === "Ds_CardNumber" && typeof value === "string") {
+      safeParams[key] = sanitizeCardNumber(value)
+      continue
+    }
+
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      safeParams[key] = value
+    }
+  }
+
+  return { redsys_params: safeParams }
+}
+
+export function buildRedsysNotificationEventInput(
+  input: RedsysNotificationAuditInput,
+): RedsysNotificationEventInput {
+  const responseParams = input.responseParams ?? null
+
+  return {
+    event: input.event,
+    reason: input.reason,
+    redsys_order: maybeString(responseParams?.Ds_Order),
+    transaction_id: input.transactionId ?? null,
+    member_id: input.memberId ?? null,
+    context: input.context ?? null,
+    status_before: input.statusBefore ?? null,
+    status_after: input.statusAfter ?? null,
+    ds_response: maybeString(responseParams?.Ds_Response),
+    authorization_code: maybeString(responseParams?.Ds_AuthorisationCode),
+    amount: maybeString(responseParams?.Ds_Amount),
+    content_type: input.contentType ?? null,
+    signature_version: input.signatureVersion ?? null,
+    transaction_type: maybeString(responseParams?.Ds_TransactionType),
+    expected_amount: input.expectedAmount ?? null,
+    received_amount: maybeString(responseParams?.Ds_Amount),
+    expected_merchant_code: input.expectedMerchantCode ?? null,
+    received_merchant_code: maybeString(responseParams?.Ds_MerchantCode),
+    expected_terminal: input.expectedTerminal ?? null,
+    received_terminal: maybeString(responseParams?.Ds_Terminal),
+    has_merchant_parameters: input.hasMerchantParameters ?? null,
+    has_signature: input.hasSignature ?? null,
+    error_message: input.errorMessage ?? null,
+    raw: buildSafeRedsysRaw(responseParams, input.raw),
+  }
 }
 
 export function buildRedsysNotificationEventInsert(

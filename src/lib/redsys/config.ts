@@ -175,28 +175,61 @@ export function getSecretKey(): string {
   return key
 }
 
-function resolveBaseUrl(): string {
-  const fallback = "https://www.lorenzosanz.com"
-  const configured = process.env.NEXT_PUBLIC_BASE_URL?.trim()
+function isLocalUrl(url: URL): boolean {
+  return ["localhost", "127.0.0.1", "::1"].includes(url.hostname)
+}
 
-  if (!configured) {
-    return fallback
+function normalizePublicUrl(candidate: string | undefined, options?: { allowLocal?: boolean }): string | null {
+  if (!candidate?.trim()) {
+    return null
   }
 
   try {
-    const url = new URL(configured)
-    const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(url.hostname)
-    const isNonProduction = process.env.NODE_ENV !== "production"
+    const url = new URL(candidate.trim())
+    const isLocalHost = isLocalUrl(url)
+    const allowLocal = options?.allowLocal ?? false
 
-    // Local Next dev usually runs on HTTP. Avoid generating HTTPS localhost return URLs.
-    if (isLocalHost && isNonProduction && url.protocol === "https:") {
+    if (isLocalHost && !allowLocal) {
+      return null
+    }
+
+    if (isLocalHost && allowLocal && url.protocol === "https:") {
       url.protocol = "http:"
     }
 
     return url.origin
   } catch {
-    return fallback
+    return null
   }
+}
+
+function normalizeVercelUrl(candidate: string | undefined): string | null {
+  if (!candidate?.trim()) {
+    return null
+  }
+
+  const value = candidate.trim()
+  return normalizePublicUrl(value.includes("://") ? value : `https://${value}`)
+}
+
+function resolveBaseUrl(): string {
+  const fallback = "https://www.lorenzosanz.com"
+  const allowLocal = process.env.NODE_ENV !== "production"
+  const candidates = [
+    normalizePublicUrl(process.env.NEXT_PUBLIC_SITE_URL, { allowLocal }),
+    normalizePublicUrl(process.env.NEXT_PUBLIC_BASE_URL, { allowLocal }),
+    normalizeVercelUrl(process.env.VERCEL_PROJECT_PRODUCTION_URL),
+    normalizeVercelUrl(process.env.VERCEL_BRANCH_URL),
+    normalizeVercelUrl(process.env.VERCEL_URL),
+  ]
+
+  for (const candidate of candidates) {
+    if (candidate) {
+      return candidate
+    }
+  }
+
+  return fallback
 }
 
 export function getNotificationUrl(): string {

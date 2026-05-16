@@ -44,7 +44,13 @@ import {
 } from "@/components/ui/popover"
 import { formatShopPrice, cn } from "@/lib/utils"
 import { formatCentsToEuroInput, parseEuroPriceInputToCents } from "@/lib/events"
-import { createEventCampaign, sendCampaign, sendTestCampaign, getEventCampaignStatus } from "@/app/actions/admin-email-campaigns"
+import {
+  createEventCampaign,
+  getEventCampaignStatus,
+  sendCampaign,
+  sendEventInvitationToAttendees,
+  sendTestCampaign,
+} from "@/app/actions/admin-email-campaigns"
 
 // Add route segment config to mark this route as dynamic
 export const dynamic = 'force-dynamic'
@@ -60,6 +66,7 @@ interface Event {
   capacity: number | null
   available: number | null
   image_url: string | null
+  invite_image_url: string | null
   is_hidden: boolean
   one_time_price_cents: number | null
   created_at: string | null
@@ -76,6 +83,7 @@ const emptyEvent: Omit<Event, "id" | "created_at" | "updated_at"> = {
   capacity: 0,
   available: 0,
   image_url: null,
+  invite_image_url: null,
   is_hidden: false,
   one_time_price_cents: null,
 }
@@ -98,6 +106,7 @@ export default function AdminEventsPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null)
   const [imageUploading, setImageUploading] = useState(false)
+  const [inviteImageUploading, setInviteImageUploading] = useState(false)
   const [visibilityUpdatingId, setVisibilityUpdatingId] = useState<string | null>(null)
   const [priceInput, setPriceInput] = useState("")
   const [priceInputError, setPriceInputError] = useState<string | null>(null)
@@ -110,6 +119,7 @@ export default function AdminEventsPage() {
   const [emailTestAddress, setEmailTestAddress] = useState("")
   const [emailSending, setEmailSending] = useState(false)
   const [emailResult, setEmailResult] = useState<{ sent: number; failed: number; skipped: number } | null>(null)
+  const [attendeeEmailResult, setAttendeeEmailResult] = useState<{ sent: number; failed: number; skipped: number } | null>(null)
   const [emailAlreadySent, setEmailAlreadySent] = useState(false)
   const [emailConfirmResend, setEmailConfirmResend] = useState(false)
 
@@ -245,6 +255,7 @@ export default function AdminEventsPage() {
       capacity: event.capacity || 0,
       available: event.available || 0,
       image_url: event.image_url,
+      invite_image_url: event.invite_image_url,
       is_hidden: event.is_hidden,
       one_time_price_cents: event.one_time_price_cents,
     })
@@ -316,47 +327,68 @@ export default function AdminEventsPage() {
     }
   }
 
-  // Handle image upload
+  async function uploadEventImage(file: File, folder: "events" | "events/invites") {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${Math.random().toString(36).substring(2, 15)}-${Date.now()}.${fileExt}`
+    const filePath = `${folder}/${fileName}`
+
+    const { error: uploadError } = await supabase
+      .storage
+      .from('images')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true
+      })
+
+    if (uploadError) {
+      throw new Error(`Error uploading image: ${uploadError.message}`)
+    }
+
+    const { data } = supabase
+      .storage
+      .from('images')
+      .getPublicUrl(filePath)
+
+    return data.publicUrl
+  }
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     
     try {
       setImageUploading(true)
-      
-      // Create a unique filename
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${Math.random().toString(36).substring(2, 15)}-${Date.now()}.${fileExt}`
-      const filePath = `events/${fileName}`
-      
-      // Upload the file to Supabase Storage
-      const { error: uploadError } = await supabase
-        .storage
-        .from('images')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true
-        })
-      
-      if (uploadError) {
-        throw new Error(`Error uploading image: ${uploadError.message}`)
-      }
-      
-      // Get the public URL
-      const { data } = supabase
-        .storage
-        .from('images')
-        .getPublicUrl(filePath)
+      const publicUrl = await uploadEventImage(file, "events")
       
       setFormData((prev) => ({
         ...prev,
-        image_url: data.publicUrl
+        image_url: publicUrl
       }))
     } catch (error) {
       console.error("Error uploading image:", error)
       setError("Se produjo un error al subir la imagen.")
     } finally {
       setImageUploading(false)
+    }
+  }
+
+  const handleInviteImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      setInviteImageUploading(true)
+      const publicUrl = await uploadEventImage(file, "events/invites")
+
+      setFormData((prev) => ({
+        ...prev,
+        invite_image_url: publicUrl,
+      }))
+    } catch (error) {
+      console.error("Error uploading invite image:", error)
+      setError("Se produjo un error al subir la invitacion.")
+    } finally {
+      setInviteImageUploading(false)
     }
   }
 
@@ -443,6 +475,7 @@ export default function AdminEventsPage() {
     setEmailPreviewText("")
     setEmailTestAddress("")
     setEmailResult(null)
+    setAttendeeEmailResult(null)
     setEmailConfirmResend(false)
 
     // Check if a campaign was already sent for this event
@@ -501,6 +534,26 @@ export default function AdminEventsPage() {
     } catch (err) {
       console.error("Error sending event email:", err)
       setError("Error al enviar la notificación por email")
+    } finally {
+      setEmailSending(false)
+    }
+  }
+
+  const handleSendAttendeeInvitations = async () => {
+    if (!emailEventId) return
+
+    setEmailSending(true)
+    setAttendeeEmailResult(null)
+    try {
+      const result = await sendEventInvitationToAttendees({ eventId: emailEventId })
+      if (result.success) {
+        setAttendeeEmailResult({ sent: result.sent, failed: result.failed, skipped: result.skipped })
+      } else {
+        setError(result.error || "Error al enviar invitaciones a asistentes")
+      }
+    } catch (err) {
+      console.error("Error sending attendee invitations:", err)
+      setError("Error al enviar invitaciones a asistentes")
     } finally {
       setEmailSending(false)
     }
@@ -894,6 +947,50 @@ export default function AdminEventsPage() {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <Label>Imagen de Invitacion</Label>
+              <div className="flex items-center space-x-4">
+                <div className="border rounded-md overflow-hidden h-24 w-24 flex-shrink-0 bg-gray-50 relative">
+                  {formData.invite_image_url ? (
+                    <Image
+                      src={formData.invite_image_url}
+                      alt="Vista previa de la invitacion"
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full w-full text-gray-400">
+                      <ImagePlus size={24} />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <Label htmlFor="invite-image" className="cursor-pointer">
+                    <div className="flex items-center justify-center w-full border-2 border-dashed border-gray-300 rounded-md h-10 px-3 py-2 hover:bg-gray-50 transition-colors">
+                      {inviteImageUploading ? (
+                        <span className="text-sm text-gray-500">Subiendo...</span>
+                      ) : (
+                        <span className="text-sm text-gray-500">
+                          {formData.invite_image_url ? "Cambiar invitacion" : "Subir invitacion"}
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      id="invite-image"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleInviteImageUpload}
+                      className="hidden"
+                      disabled={inviteImageUploading}
+                    />
+                  </Label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Se guarda en images/events/invites/ y se usa en emails a asistentes.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <DialogFooter>
               <Button
                 type="button"
@@ -959,7 +1056,7 @@ export default function AdminEventsPage() {
       </Dialog>
 
       {/* Email Notification Dialog */}
-      <Dialog open={emailDialogOpen} onOpenChange={(open) => { setEmailDialogOpen(open); if (!open) { setEmailResult(null); setEmailConfirmResend(false); } }}>
+      <Dialog open={emailDialogOpen} onOpenChange={(open) => { setEmailDialogOpen(open); if (!open) { setEmailResult(null); setAttendeeEmailResult(null); setEmailConfirmResend(false); } }}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -990,6 +1087,15 @@ export default function AdminEventsPage() {
               </Alert>
             )}
 
+            {attendeeEmailResult && (
+              <Alert>
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-700">
+                  Invitaciones a asistentes enviadas: {attendeeEmailResult.sent} | Fallidas: {attendeeEmailResult.failed} | Omitidas: {attendeeEmailResult.skipped}
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="previewText">Texto de vista previa (opcional)</Label>
               <Input
@@ -1003,6 +1109,27 @@ export default function AdminEventsPage() {
             <p className="text-sm text-gray-500">
               Solo se enviará a contactos activos de <code>newsletter_subscribers</code>.
             </p>
+
+            <div className="rounded-md border p-3 space-y-2">
+              <p className="text-sm text-gray-600">
+                Envia una confirmacion solo a asistentes pagados guardados en <code>event_assists</code>.
+              </p>
+              <Button
+                variant="outline"
+                onClick={handleSendAttendeeInvitations}
+                disabled={emailSending}
+                className="w-full"
+              >
+                {emailSending ? (
+                  <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    Enviar invitacion a asistentes
+                  </>
+                )}
+              </Button>
+            </div>
 
             <div className="border-t pt-4 space-y-2">
               <Label htmlFor="testEmail">Enviar prueba a:</Label>

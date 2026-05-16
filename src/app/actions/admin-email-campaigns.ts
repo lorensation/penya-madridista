@@ -2,10 +2,16 @@
 
 import { revalidatePath } from "next/cache"
 import { sendEmail } from "@/lib/email"
+import {
+  buildEventAttendeeDeliveryRows,
+  resolveEventInvitationImageUrl,
+  type EventAssistRecipientRow,
+} from "@/lib/email/event-invitations"
 import { generatePreferencesToken } from "@/lib/email/preferences-token"
 import { getAcquisitionCampaignTemplate } from "@/lib/email/templates/acquisition-campaign"
 import {
   getListUnsubscribeHeaders as getEventUnsubscribeHeaders,
+  renderEventAttendeeInvitationEmail,
   renderEventNotificationEmail,
 } from "@/lib/email/templates/event-notification"
 import {
@@ -93,6 +99,10 @@ function pushUniqueRecipient(
   })
 }
 
+function normalizeOptionalIdList(ids?: string[] | null): string[] {
+  return Array.from(new Set((ids ?? []).map((id) => id.trim()).filter(Boolean)))
+}
+
 export async function createEventCampaign(
   eventId: string,
   subjectOverride?: string,
@@ -144,6 +154,195 @@ export async function createEventCampaign(
   } catch (error) {
     console.error("createEventCampaign error:", error)
     return { success: false, error: error instanceof Error ? error.message : "Error desconocido" }
+  }
+}
+
+export async function sendEventInvitationToAttendees(input: {
+  eventId: string
+  attendeeIds?: string[]
+  imageUrlOverride?: string | null
+}): Promise<SendResult> {
+  try {
+    const adminUserId = await requireAdmin()
+    const supabase = createAdminSupabaseClient()
+    const selectedAttendeeIds = normalizeOptionalIdList(input.attendeeIds)
+
+    const { data: event, error: eventError } = await supabase
+      .from("events")
+      .select("id, title, date, time, location, description, image_url, invite_image_url")
+      .eq("id", input.eventId)
+      .single()
+
+    if (eventError || !event) {
+      return { success: false, sent: 0, failed: 0, skipped: 0, error: "Evento no encontrado" }
+    }
+
+    let attendeeQuery = supabase
+      .from("event_assists")
+      .select("id, email, user_id, name, apellido1, apellido2")
+      .eq("event_id", input.eventId)
+      .eq("payment_status", "authorized")
+
+    if (selectedAttendeeIds.length > 0) {
+      attendeeQuery = attendeeQuery.in("id", selectedAttendeeIds)
+    }
+
+    const { data: attendees, error: attendeeError } = await attendeeQuery
+
+    if (attendeeError) {
+      console.error("[admin-email-campaigns] Failed loading event attendees", {
+        eventId: input.eventId,
+        error: attendeeError,
+      })
+      return { success: false, sent: 0, failed: 0, skipped: 0, error: "No se pudieron cargar los asistentes" }
+    }
+
+    const validAttendees = ((attendees ?? []) as EventAssistRecipientRow[]).filter((attendee) =>
+      isValidEmail(normalizeEmail(attendee.email)),
+    )
+
+    if (validAttendees.length === 0) {
+      return { success: false, sent: 0, failed: 0, skipped: 0, error: "No hay asistentes con email valido" }
+    }
+
+    const invitationImageUrl = resolveEventInvitationImageUrl(event, input.imageUrlOverride)
+    const subject = `Confirmacion de asistencia: ${event.title}`
+    const previewText = `Confirmacion e invitacion para ${event.title}`
+    const sampleHtml = renderEventAttendeeInvitationEmail({
+      eventTitle: event.title,
+      eventDate: formatDateES(event.date),
+      eventTime: event.time,
+      eventLocation: event.location,
+      eventDescription: event.description,
+      attendeeName: validAttendees[0]?.name || "asistente",
+      attendeeEmail: normalizeEmail(validAttendees[0]?.email || ""),
+      invitationImageUrl,
+    })
+
+    const { data: campaign, error: campaignError } = await supabase
+      .from("email_campaigns")
+      .insert({
+        kind: "event_attendee_invitation",
+        status: "sending",
+        subject,
+        preview_text: previewText,
+        html_body: sampleHtml,
+        event_id: input.eventId,
+        segment: "event_assists",
+        recipient_count: validAttendees.length,
+        created_by: adminUserId,
+        updated_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single()
+
+    if (campaignError || !campaign) {
+      console.error("[admin-email-campaigns] Failed creating event attendee invitation campaign", {
+        eventId: input.eventId,
+        error: campaignError,
+      })
+      return { success: false, sent: 0, failed: 0, skipped: 0, error: "Error al crear la campana" }
+    }
+
+    const deliveryRows = buildEventAttendeeDeliveryRows(campaign.id, validAttendees)
+    if (deliveryRows.length > 0) {
+      const { error: deliveryInsertError } = await supabase.from("email_deliveries").insert(deliveryRows)
+      if (deliveryInsertError) {
+        console.error("[admin-email-campaigns] Failed creating event invitation deliveries", {
+          campaignId: campaign.id,
+          error: deliveryInsertError,
+        })
+      }
+    }
+
+    let sentCount = 0
+    let failedCount = 0
+
+    for (const attendee of validAttendees) {
+      const recipientEmail = normalizeEmail(attendee.email)
+      const attendeeName = attendee.name?.trim() || recipientEmail
+      const html = renderEventAttendeeInvitationEmail({
+        eventTitle: event.title,
+        eventDate: formatDateES(event.date),
+        eventTime: event.time,
+        eventLocation: event.location,
+        eventDescription: event.description,
+        attendeeName,
+        attendeeEmail: recipientEmail,
+        invitationImageUrl,
+      })
+
+      try {
+        const result = await sendEmail({
+          to: recipientEmail,
+          subject,
+          html,
+        })
+
+        if (result.success) {
+          sentCount++
+          await supabase
+            .from("email_deliveries")
+            .update({
+              status: "sent",
+              provider_message_id: result.messageId || null,
+              sent_at: new Date().toISOString(),
+            })
+            .eq("campaign_id", campaign.id)
+            .eq("recipient_email", recipientEmail)
+        } else {
+          failedCount++
+          await supabase
+            .from("email_deliveries")
+            .update({
+              status: "failed",
+              error_message: String(result.error || "Unknown error"),
+            })
+            .eq("campaign_id", campaign.id)
+            .eq("recipient_email", recipientEmail)
+        }
+      } catch (error) {
+        failedCount++
+        await supabase
+          .from("email_deliveries")
+          .update({
+            status: "failed",
+            error_message: error instanceof Error ? error.message : "Unknown error",
+          })
+          .eq("campaign_id", campaign.id)
+          .eq("recipient_email", recipientEmail)
+      }
+    }
+
+    await supabase
+      .from("email_campaigns")
+      .update({
+        status: failedCount === validAttendees.length ? "failed" : "sent",
+        sent_count: sentCount,
+        failed_count: failedCount,
+        sent_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", campaign.id)
+
+    revalidatePath("/admin/events")
+    revalidatePath(`/admin/events/${input.eventId}`)
+
+    return {
+      success: true,
+      sent: sentCount,
+      failed: failedCount,
+      skipped: validAttendees.length - deliveryRows.length,
+    }
+  } catch (error) {
+    console.error("sendEventInvitationToAttendees error:", error)
+    return {
+      success: false,
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+      error: error instanceof Error ? error.message : "Error desconocido",
+    }
   }
 }
 
@@ -533,6 +732,7 @@ export async function getEventCampaignStatus(eventId: string): Promise<{
       .from("email_campaigns")
       .select("id, status, sent_at")
       .eq("event_id", eventId)
+      .eq("kind", "event")
       .eq("status", "sent")
       .maybeSingle()
 

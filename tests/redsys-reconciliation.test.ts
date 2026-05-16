@@ -3,8 +3,10 @@ import assert from "node:assert/strict"
 import {
   buildRedsysReconciliationCandidates,
   buildDetailedReconciliation,
+  buildRedsysExportSummary,
   classifyRedsysOperations,
   decodeRedsysCsvBuffer,
+  filterRedsysRowsByExcludedMonths,
   findMissingWorkbookOperations,
   parseRedsysOperationsCsv,
 } from "../scripts/redsys-reconcile-csv"
@@ -220,4 +222,23 @@ test("finds successful CSV operations missing from an existing workbook without 
     missing.map((row) => row.order),
     ["2604MISSING"],
   )
+})
+
+test("filters excluded months and summarizes event/payment reconciliation inputs", () => {
+  const rows = parseRedsysOperationsCsv(`Fecha;Hora;Tipo operacion;Cod. pedido;Resultado operacion y codigo;Importe;Moneda;Importe Euros;Tipo de pago;Tipo pago original;N. tarjeta;Titular;
+30/04/2026;11:07:31;Autorizacion;2604APRIL;Autorizada 739293;60.00;EUR;60.00;Challenge Visa;;459985******5091;;
+09/05/2026;14:34:28;Autorizacion;2605M3c8rDwS;Autorizada 674084;60.00;EUR;60.00;Apple Pay;;476173******0041;;
+14/05/2026;12:12:35;Autorizacion;2605E4evewLc;Autorizada 327020;10.00;EUR;10.00;Frictionless MasterCard;;545608******3043;;
+`)
+
+  const filtered = filterRedsysRowsByExcludedMonths(rows, ["2026-04"])
+  const summary = buildRedsysExportSummary(filtered)
+
+  assert.deepEqual(
+    filtered.map((row) => row.order),
+    ["2605M3c8rDwS", "2605E4evewLc"],
+  )
+  assert.equal(summary.successfulAuthorizations, 2)
+  assert.equal(summary.eventPaymentSuccesses, 1)
+  assert.equal(summary.membershipPaymentSuccesses, 1)
 })

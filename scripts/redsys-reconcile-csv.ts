@@ -307,6 +307,47 @@ export function classifyRedsysOperations(rows: RedsysCsvRow[]) {
   }
 }
 
+function rowMonthKey(row: Pick<RedsysCsvRow, "date">): string | null {
+  const [day, month, year] = row.date.split("/")
+  if (!day || !month || !year) {
+    return null
+  }
+
+  return `${year}-${month.padStart(2, "0")}`
+}
+
+export function filterRedsysRowsByExcludedMonths(
+  rows: RedsysCsvRow[],
+  excludedMonths: string[],
+): RedsysCsvRow[] {
+  const excluded = new Set(excludedMonths.map((month) => month.trim()).filter(Boolean))
+
+  if (excluded.size === 0) {
+    return rows
+  }
+
+  return rows.filter((row) => {
+    const month = rowMonthKey(row)
+    return !month || !excluded.has(month)
+  })
+}
+
+export function buildRedsysExportSummary(rows: RedsysCsvRow[]) {
+  const classified = classifyRedsysOperations(rows)
+  const successfulAuthorizations = classified.successfulAuthorizations
+
+  return {
+    totalRows: rows.length,
+    successfulAuthorizations: successfulAuthorizations.length,
+    successfulDevolutions: classified.successfulDevolutions.length,
+    deniedOrFailedOperations: classified.deniedOrFailedOperations.length,
+    cancelledOperations: classified.cancelledOperations.length,
+    otherOperations: classified.otherOperations.length,
+    eventPaymentSuccesses: successfulAuthorizations.filter((row) => (row.amountEurosCents || row.amountCents) === 1000).length,
+    membershipPaymentSuccesses: successfulAuthorizations.filter((row) => (row.amountEurosCents || row.amountCents) !== 1000).length,
+  }
+}
+
 function hasPlanMetadata(metadata: unknown): boolean {
   return Boolean(
     metadata &&
