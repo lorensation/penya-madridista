@@ -14,7 +14,10 @@ import {
 import type { RedsysResponseParams } from "@/lib/redsys"
 import type { Json } from "@/types/supabase"
 import { finalizeMembershipPayment } from "@/lib/membership/onboarding"
-import { recordRedsysNotificationEvent } from "@/lib/redsys/notification-events"
+import {
+  buildRedsysNotificationEventInput,
+  recordRedsysNotificationEvent,
+} from "@/lib/redsys/notification-events"
 import { upsertEventAssistForAuthorizedPayment } from "@/lib/event-assists"
 
 function getAdminClient() {
@@ -110,6 +113,7 @@ interface NotificationLogFields {
   has_merchant_parameters?: boolean
   has_signature?: boolean
   error_message?: string | null
+  raw?: Json | null
 }
 
 function logNotificationLastFour(options: {
@@ -175,6 +179,62 @@ function logNotification(fields: NotificationLogFields) {
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+function buildMissingFieldsRaw(options: {
+  contentType: string
+  signatureVersion?: string | null
+  hasMerchantParameters: boolean
+  hasSignature: boolean
+}): Json {
+  return {
+    content_type: options.contentType,
+    signature_version: options.signatureVersion ?? null,
+    has_merchant_parameters: options.hasMerchantParameters,
+    has_signature: options.hasSignature,
+  }
+}
+
+function enrichNotificationFields(
+  fields: NotificationLogFields,
+  responseParams: RedsysResponseParams | null,
+): NotificationLogFields {
+  if (!responseParams) {
+    return fields
+  }
+
+  const base = buildRedsysNotificationEventInput({
+    event: fields.event,
+    reason: fields.reason,
+    contentType: fields.content_type,
+    signatureVersion: fields.signature_version,
+    hasMerchantParameters: fields.has_merchant_parameters,
+    hasSignature: fields.has_signature,
+    responseParams: responseParams as unknown as Record<string, unknown>,
+    transactionId: fields.transaction_id,
+    memberId: fields.member_id,
+    context: fields.context,
+    statusBefore: fields.status_before,
+    statusAfter: fields.status_after,
+    expectedAmount: fields.expected_amount,
+    expectedMerchantCode: fields.expected_merchant_code,
+    expectedTerminal: fields.expected_terminal,
+    errorMessage: fields.error_message,
+    raw: fields.raw,
+  })
+
+  return {
+    ...fields,
+    redsys_order: fields.redsys_order ?? base.redsys_order,
+    ds_response: fields.ds_response ?? base.ds_response,
+    authorization_code: fields.authorization_code ?? base.authorization_code,
+    amount: fields.amount ?? base.amount,
+    transaction_type: fields.transaction_type ?? base.transaction_type,
+    received_amount: fields.received_amount ?? base.received_amount,
+    received_merchant_code: fields.received_merchant_code ?? base.received_merchant_code,
+    received_terminal: fields.received_terminal ?? base.received_terminal,
+    raw: fields.raw ?? base.raw,
+  }
 }
 
 function getStringField(record: Record<string, unknown>, key: string): string | undefined {
@@ -414,8 +474,9 @@ export async function POST(request: NextRequest) {
   let admin: AdminClient | null = null
 
   const recordAndLog = async (fields: NotificationLogFields) => {
-    logNotification(fields)
-    await recordRedsysNotificationEvent(admin, fields)
+    const enrichedFields = enrichNotificationFields(fields, decodedForLogs)
+    logNotification(enrichedFields)
+    await recordRedsysNotificationEvent(admin, enrichedFields)
   }
 
   try {
@@ -442,16 +503,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await recordAndLog({
-      event: "redsys.notification.received",
-      reason: "success",
-      content_type: contentType,
-      signature_version: dsSignatureVersion ?? null,
-      has_merchant_parameters: Boolean(dsMerchantParameters),
-      has_signature: Boolean(dsSignature),
-    })
-
     if (!dsMerchantParameters || !dsSignature || !dsSignatureVersion) {
+      await recordAndLog({
+        event: "redsys.notification.received",
+        reason: "success",
+        content_type: contentType,
+        signature_version: dsSignatureVersion ?? null,
+        has_merchant_parameters: Boolean(dsMerchantParameters),
+        has_signature: Boolean(dsSignature),
+        raw: buildMissingFieldsRaw({
+          contentType,
+          signatureVersion: dsSignatureVersion ?? null,
+          hasMerchantParameters: Boolean(dsMerchantParameters),
+          hasSignature: Boolean(dsSignature),
+        }),
+      })
+
       await recordAndLog({
         event: "redsys.notification.failed",
         reason: "missing_fields",
@@ -459,6 +526,12 @@ export async function POST(request: NextRequest) {
         signature_version: dsSignatureVersion ?? null,
         has_merchant_parameters: Boolean(dsMerchantParameters),
         has_signature: Boolean(dsSignature),
+        raw: buildMissingFieldsRaw({
+          contentType,
+          signatureVersion: dsSignatureVersion ?? null,
+          hasMerchantParameters: Boolean(dsMerchantParameters),
+          hasSignature: Boolean(dsSignature),
+        }),
       })
       return NextResponse.json({ ok: true }, { status: 200 })
     }
@@ -466,6 +539,15 @@ export async function POST(request: NextRequest) {
     const normalizedParams = normalizeRedsysBase64(dsMerchantParameters)
     const normalizedSignature = normalizeRedsysBase64(dsSignature)
     decodedForLogs = tryDecodeMerchantParams(normalizedParams)
+
+    await recordAndLog({
+      event: "redsys.notification.received",
+      reason: "success",
+      content_type: contentType,
+      signature_version: dsSignatureVersion ?? null,
+      has_merchant_parameters: true,
+      has_signature: true,
+    })
 
     if (dsSignatureVersion !== SIGNATURE_VERSION) {
       await recordAndLog({
@@ -578,6 +660,35 @@ export async function POST(request: NextRequest) {
             signature_version: dsSignatureVersion,
             transaction_type: responseParams.Ds_TransactionType ?? null,
             error_message: getErrorMessage(fulfillmentError),
+          })
+        }
+      }
+
+      if (transaction.context === "membership" && transaction.status === "authorized") {
+        const finalized = await finalizeMembershipPayment({
+          order,
+          expectedMemberId: transaction.member_id,
+          admin,
+        })
+
+        if (!finalized.success) {
+          await recordAndLog({
+            event: "redsys.notification.failed",
+            reason: "fulfillment_failed",
+            redsys_order: order,
+            transaction_id: transaction.id,
+            member_id: transaction.member_id,
+            context: transaction.context,
+            status_before: transaction.status,
+            status_after: finalized.status ?? transaction.status,
+            ds_response: responseParams.Ds_Response ?? null,
+            authorization_code: responseParams.Ds_AuthorisationCode ?? null,
+            amount: transaction.amount_cents,
+            created_at: transaction.created_at,
+            content_type: contentType,
+            signature_version: dsSignatureVersion,
+            transaction_type: responseParams.Ds_TransactionType ?? null,
+            error_message: finalized.error ?? null,
           })
         }
       }

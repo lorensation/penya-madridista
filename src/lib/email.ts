@@ -39,6 +39,10 @@ export function createTransporter() {
   return getTransporter()
 }
 
+export function buildDefaultEmailFrom(emailFrom = process.env.EMAIL_FROM || "noreply@lorenzosanz.com") {
+  return `Pena Lorenzo Sanz <${emailFrom}>`
+}
+
 // ── Retry helper ─────────────────────────────────────────────────────────────
 
 const MAX_RETRIES = 3
@@ -79,7 +83,7 @@ export async function sendEmail({
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       const info = await transporter.sendMail({
-        from: `Peña Lorenzo Sanz <${process.env.EMAIL_FROM || "noreply@lorenzosanz.com"}>`,
+        from: buildDefaultEmailFrom(),
         to,
         subject,
         text,
