@@ -61,12 +61,34 @@ interface FinalizeMembershipPaymentOptions {
   admin?: AdminClient
 }
 
+export interface TrustedRedsysAuthorizationInput {
+  order: string
+  amountCents: number
+  authorizationCode: string
+  lastFour?: string | null
+  authorizedAt?: string | null
+}
+
 export interface CompleteMembershipOnboardingResult {
   success: boolean
   activated?: boolean
   profileWasJustCompleted?: boolean
   checkoutData?: MembershipCheckoutSnapshot
   error?: string
+}
+
+export function buildTrustedRedsysAuthorizationParams(
+  input: TrustedRedsysAuthorizationInput,
+): RedsysResponseParams {
+  const lastFour = input.lastFour?.trim()
+
+  return {
+    Ds_Order: input.order,
+    Ds_Amount: String(input.amountCents),
+    Ds_Response: "0000",
+    Ds_AuthorisationCode: input.authorizationCode,
+    Ds_CardNumber: lastFour ? `************${lastFour}` : undefined,
+  }
 }
 
 interface ProcessIncompletePaidMembershipsOptions {
@@ -602,6 +624,27 @@ export async function finalizeMembershipPayment(
       error: error instanceof Error ? error.message : "UNEXPECTED_ERROR",
     }
   }
+}
+
+export async function repairMembershipPaymentFromTrustedAuthorization(input: {
+  order: string
+  amountCents: number
+  authorizationCode: string
+  lastFour?: string | null
+  expectedMemberId?: string | null
+  admin?: AdminClient
+}): Promise<FinalizeMembershipPaymentResult> {
+  return finalizeMembershipPayment({
+    order: input.order,
+    expectedMemberId: input.expectedMemberId,
+    responseParams: buildTrustedRedsysAuthorizationParams({
+      order: input.order,
+      amountCents: input.amountCents,
+      authorizationCode: input.authorizationCode,
+      lastFour: input.lastFour,
+    }),
+    admin: input.admin,
+  })
 }
 
 export async function completeMembershipOnboarding(

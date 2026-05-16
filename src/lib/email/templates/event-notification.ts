@@ -15,6 +15,18 @@ export interface EventNotificationTemplateData {
   preferencesToken?: string
 }
 
+export interface EventAttendeeInvitationTemplateData {
+  eventTitle: string
+  eventDate: string
+  eventTime?: string | null
+  eventLocation?: string | null
+  eventDescription?: string | null
+  attendeeName: string
+  attendeeEmail: string
+  invitationImageUrl?: string | null
+  preferencesToken?: string
+}
+
 export function renderEventNotificationEmail(data: EventNotificationTemplateData): string {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://lorenzosanz.com"
 
@@ -75,6 +87,56 @@ export function renderEventNotificationEmail(data: EventNotificationTemplateData
     body,
     previewText: `La Peña Lorenzo Sanz te invita a ${data.eventTitle}`,
     includeUnsubscribe: true,
+    preferencesToken: data.preferencesToken,
+  })
+}
+
+export function renderEventAttendeeInvitationEmail(data: EventAttendeeInvitationTemplateData): string {
+  const imageHtml = data.invitationImageUrl
+    ? `<div style="text-align:center;margin-bottom:20px;">
+        <img src="${data.invitationImageUrl}" alt="${data.eventTitle}" style="max-width:100%;height:auto;border-radius:8px;" />
+      </div>`
+    : ""
+
+  const timeHtml = data.eventTime
+    ? `<p style="margin:4px 0;"><strong>Hora:</strong> ${data.eventTime} h</p>`
+    : ""
+
+  const locationHtml = data.eventLocation
+    ? `<p style="margin:4px 0;"><strong>Lugar:</strong> ${data.eventLocation}</p>`
+    : ""
+
+  const descriptionHtml = data.eventDescription
+    ? `<p style="margin-top:16px;">${data.eventDescription}</p>`
+    : ""
+
+  const body = `
+    <h1>Confirmacion de asistencia</h1>
+    <p>Hola ${data.attendeeName},</p>
+    <p>
+      Hemos registrado tu asistencia para <strong>${data.eventTitle}</strong>.
+      Guarda este correo como confirmacion de tu entrada.
+    </p>
+
+    ${imageHtml}
+
+    <div style="background-color:#f8f9fa;padding:20px;border-radius:8px;margin:20px 0;">
+      <h2 style="margin-top:0;">${data.eventTitle}</h2>
+      <p style="margin:4px 0;"><strong>Fecha:</strong> ${data.eventDate}</p>
+      ${timeHtml}
+      ${locationHtml}
+      ${descriptionHtml}
+      <p style="margin:16px 0 0;"><strong>Asistente:</strong> ${data.attendeeName} &lt;${data.attendeeEmail}&gt;</p>
+    </div>
+
+    <p>Te esperamos.</p>
+    <p>El equipo de la Pena Lorenzo Sanz</p>
+  `
+
+  return renderEmailLayout({
+    body,
+    previewText: `Confirmacion para ${data.eventTitle}`,
+    includeUnsubscribe: false,
     preferencesToken: data.preferencesToken,
   })
 }
