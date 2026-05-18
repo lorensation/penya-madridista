@@ -12,31 +12,22 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { supabase } from "@/lib/supabase"
 import { hasMembershipAccess } from "@/lib/membership-access"
-import type { PaymentInterval, PlanType, RedsysSignedRequest } from "@/lib/redsys"
+import type { PlanType, RedsysSignedRequest } from "@/lib/redsys"
 import { prepareMembershipRedirectPayment } from "@/app/actions/payment"
 import { RedsysRedirectAutoSubmitForm } from "@/components/payments/redsys-redirect-form"
-
-type MembershipPaymentOption = {
-  id: PaymentInterval
-  name: string
-  price: string
-  period: string
-  discount?: string
-}
 
 const membershipPlans: Array<{
   id: PlanType
   name: string
-  paymentOptions: MembershipPaymentOption[]
+  price: string
+  period: string
   features: string[]
-  popular?: boolean
 }> = [
   {
     id: "under25" as PlanType,
     name: "Suscripción Joven (Menores de 25)",
-    paymentOptions: [
-      { id: "annual" as PaymentInterval, name: "Anual", price: "30 €", period: "/año" },
-    ],
+    price: "30 €",
+    period: "/año",
     features: [
       "Acceso a eventos exclusivos organizados por la peña",
       "Descuentos en viajes organizados para ver partidos",
@@ -48,9 +39,8 @@ const membershipPlans: Array<{
   {
     id: "over25" as PlanType,
     name: "Suscripción Adulto (Mayores de 25)",
-    paymentOptions: [
-      { id: "annual" as PaymentInterval, name: "Anual", price: "60 €", period: "/año" },
-    ],
+    price: "60 €",
+    period: "/año",
     features: [
       "Acceso a eventos exclusivos organizados por la peña",
       "Descuentos en viajes organizados para ver partidos",
@@ -58,7 +48,6 @@ const membershipPlans: Array<{
       "Acceso al contenido exclusivo en nuestra web",
       "Carnet oficial de socio de la Peña Lorenzo Sanz",
     ],
-    popular: true,
   },
   // Family plan hidden from UI — kept in backend for potential future use
   // {
@@ -95,8 +84,7 @@ export default function MembershipPage() {
   const [needsDob, setNeedsDob] = useState(false)
   const [fallbackDob, setFallbackDob] = useState("")
 
-  const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null)
-  const [selectedPaymentOption, setSelectedPaymentOption] = useState<PaymentInterval | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState<PlanType>("over25")
   const [termsAcceptedSubscription, setTermsAcceptedSubscription] = useState(false)
 
   const [step, setStep] = useState<MembershipStep>("select")
@@ -126,6 +114,7 @@ export default function MembershipPage() {
             age--
           }
           setUserAge(age)
+          setSelectedPlan(age < 25 ? "under25" : "over25")
         } else {
           // Existing user without DOB in metadata — will need fallback
           setNeedsDob(true)
@@ -190,7 +179,9 @@ export default function MembershipPage() {
     if (!fallbackDob || !user) return
     const age = computeAge(fallbackDob)
     setUserAge(age)
+    setSelectedPlan(age < 25 ? "under25" : "over25")
     setNeedsDob(false)
+    setError(null)
 
     // Persist to user metadata so they don't have to enter it again
     try {
@@ -207,14 +198,12 @@ export default function MembershipPage() {
       setError("La suscripción Joven está disponible solo para menores de 25 años. Por favor, selecciona la suscripción Adulto.")
       return
     }
-    const plan = membershipPlans.find((item) => item.id === planId)
     setSelectedPlan(planId)
-    setSelectedPaymentOption(plan?.paymentOptions[0]?.id ?? null)
     setError(null)
   }
 
   const handleSubscribe = async () => {
-    if (!selectedPlan || !selectedPaymentOption) {
+    if (!selectedPlan) {
       return
     }
 
@@ -229,7 +218,7 @@ export default function MembershipPage() {
     try {
       const result = await prepareMembershipRedirectPayment(
         selectedPlan,
-        selectedPaymentOption,
+        "annual",
         termsAcceptedSubscription,
       )
 
@@ -335,7 +324,7 @@ export default function MembershipPage() {
     )
   }
 
-  const selectedPlanData = membershipPlans.find((plan) => plan.id === selectedPlan)
+  const isSelectedPlanUnavailable = selectedPlan === "under25" && userAge !== null && userAge >= 25
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 md:py-24">
@@ -391,18 +380,13 @@ export default function MembershipPage() {
                 type="button"
                 disabled={isUnder25Disabled}
                 className={`bg-white rounded-lg shadow-md overflow-hidden text-left transition-all flex flex-col h-full ${
-                  plan.popular ? "border-2 border-secondary" : ""
-                } ${selectedPlan === plan.id ? "ring-2 ring-primary" : ""} ${
+                  selectedPlan === plan.id ? "ring-2 ring-primary" : ""
+                } ${
                   isUnder25Disabled ? "opacity-50 cursor-not-allowed" : ""
                 }`}
                 onClick={() => handleSelectPlan(plan.id)}
               >
                 <div className="bg-primary text-white p-6 text-center relative">
-                  {plan.popular && (
-                    <div className="absolute top-0 right-0 bg-accent text-primary text-xs font-bold px-3 py-1 transform translate-y-2 rotate-45">
-                      POPULAR
-                    </div>
-                  )}
                   <h2 className="text-xl font-bold">{plan.name}</h2>
                 </div>
                 <div className="p-6 flex-grow flex flex-col">
@@ -416,8 +400,8 @@ export default function MembershipPage() {
                         <div className="text-xs text-gray-600 mt-1">Solo disponible en cuota anual</div>
                       </div>
                       <div className="text-right">
-                        <span className="font-bold">{plan.paymentOptions[0]?.price}</span>
-                        <div className="text-xs text-gray-600">{plan.paymentOptions[0]?.period}</div>
+                        <span className="font-bold">{plan.price}</span>
+                        <div className="text-xs text-gray-600">{plan.period}</div>
                       </div>
                     </div>
                   </div>
@@ -434,36 +418,6 @@ export default function MembershipPage() {
               )
             })}
           </div>
-
-          {selectedPlanData && (
-            <div className="mt-8 bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-xl font-bold text-primary mb-2">Pago de la suscripción</h3>
-              <p className="text-sm text-gray-600 mb-4">Las suscripciones Joven y Adulto se contratan exclusivamente con pago anual.</p>
-              <div className="grid grid-cols-1 gap-4">
-                {selectedPlanData.paymentOptions.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    className={`border rounded-lg p-4 text-left transition-all ${
-                      selectedPaymentOption === option.id ? "border-primary ring-2 ring-primary" : "border-gray-200"
-                    }`}
-                    onClick={() => setSelectedPaymentOption(option.id)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">{option.name}</span>
-                      <div className="text-right">
-                        <div className="text-xl font-bold">
-                          {option.price}
-                          <span className="text-sm font-normal text-gray-500">{option.period}</span>
-                        </div>
-                        {option.discount && <div className="text-xs text-green-600 font-medium">{option.discount}</div>}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div className="mt-8 text-center">
             <div className="mx-auto mb-4 flex max-w-xl items-start space-x-3 rounded-md border border-gray-200 bg-white p-3 text-left">
@@ -483,7 +437,7 @@ export default function MembershipPage() {
             <Button
               size="lg"
               onClick={handleSubscribe}
-              disabled={!selectedPlan || !selectedPaymentOption || !termsAcceptedSubscription}
+              disabled={!selectedPlan || isSelectedPlanUnavailable || !termsAcceptedSubscription}
               className="px-8 py-6 text-lg"
             >
               {!user ? "Iniciar sesion para suscribirse" : "Continuar con el pago anual"}

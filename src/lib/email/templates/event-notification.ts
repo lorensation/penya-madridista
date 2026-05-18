@@ -130,7 +130,7 @@ export function renderEventAttendeeInvitationEmail(data: EventAttendeeInvitation
     </div>
 
     <p>Te esperamos.</p>
-    <p>El equipo de la Pena Lorenzo Sanz</p>
+    <p>El equipo de la Peña Lorenzo Sanz</p>
   `
 
   return renderEmailLayout({
