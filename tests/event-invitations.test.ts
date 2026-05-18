@@ -1,5 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
+import fs from "node:fs"
 import {
   buildEventAttendeeDeliveryRows,
   resolveEventInvitationImageUrl,
@@ -8,6 +9,17 @@ import { renderEventAttendeeInvitationEmail } from "../src/lib/email/templates/e
 
 const inviteUrl =
   "https://dlijdwtlrmutbcdyeugq.supabase.co/storage/v1/object/public/images/events/invites/invitacion-evento20mayo.jpeg"
+
+test("migration allows attendee invitation campaign kind", () => {
+  const sql = fs.readFileSync(
+    "docs/sql/2026-05-16-email-campaigns-attendee-invitations.sql",
+    "utf8",
+  )
+
+  assert.match(sql, /drop constraint if exists email_campaigns_kind_check/)
+  assert.match(sql, /add constraint email_campaigns_kind_check/)
+  assert.match(sql, /kind in \('event', 'marketing', 'event_attendee_invitation'\)/)
+})
 
 test("renders attendee invitation emails with attendee name and invitation image", () => {
   const html = renderEventAttendeeInvitationEmail({
