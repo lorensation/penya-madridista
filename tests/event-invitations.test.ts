@@ -21,6 +21,18 @@ test("migration allows attendee invitation campaign kind", () => {
   assert.match(sql, /kind in \('event', 'marketing', 'event_attendee_invitation'\)/)
 })
 
+test("migration allows event assist invitation delivery rows", () => {
+  const sql = fs.readFileSync(
+    "docs/sql/2026-05-19-email-deliveries-event-assist-source.sql",
+    "utf8",
+  )
+
+  assert.match(sql, /drop constraint if exists email_deliveries_recipient_source_check/)
+  assert.match(sql, /recipient_source in \('users', 'newsletter_subscribers', 'event_assists'\)/)
+  assert.match(sql, /drop constraint if exists email_deliveries_status_check/)
+  assert.match(sql, /status in \('pending', 'sent', 'failed', 'skipped_unsubscribed', 'skipped'\)/)
+})
+
 test("renders attendee invitation emails with attendee name and invitation image", () => {
   const html = renderEventAttendeeInvitationEmail({
     eventTitle: "Celebracion Efemerides",

@@ -46,11 +46,13 @@ import { formatShopPrice, cn } from "@/lib/utils"
 import { formatCentsToEuroInput, parseEuroPriceInputToCents } from "@/lib/events"
 import {
   createEventCampaign,
+  getAdminEventAttendees,
   getEventCampaignStatus,
   sendCampaign,
   sendEventInvitationToAttendees,
   sendEventInvitationToSingleAttendee,
   sendTestCampaign,
+  type AdminEventAttendeeRow,
 } from "@/app/actions/admin-email-campaigns"
 
 // Add route segment config to mark this route as dynamic
@@ -72,22 +74,6 @@ interface Event {
   one_time_price_cents: number | null
   created_at: string | null
   updated_at: string | null
-}
-
-interface EventAttendee {
-  id: string
-  event_id: string
-  name: string
-  apellido1: string | null
-  apellido2: string | null
-  email: string
-  payment_status: string
-  amount_cents: number | null
-  payment_authorized_at: string | null
-  created_at: string
-  invitation_email_status: string | null
-  invitation_email_sent_at: string | null
-  invitation_email_error: string | null
 }
 
 interface AttendeeSendState {
@@ -114,7 +100,7 @@ const emptyEvent: Omit<Event, "id" | "created_at" | "updated_at"> = {
 export default function AdminEventsPage() {
   const router = useRouter()
   const [events, setEvents] = useState<Event[]>([])
-  const [eventAttendeesByEventId, setEventAttendeesByEventId] = useState<Record<string, EventAttendee[]>>({})
+  const [eventAttendeesByEventId, setEventAttendeesByEventId] = useState<Record<string, AdminEventAttendeeRow[]>>({})
   const [attendeeSendState, setAttendeeSendState] = useState<Record<string, AttendeeSendState>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -211,17 +197,13 @@ export default function AdminEventsPage() {
         const eventIds = fetchedEvents.map((event) => event.id)
 
         if (eventIds.length > 0) {
-          const { data: attendees, error: attendeesError } = await supabase
-            .from("event_assists")
-            .select("id, event_id, name, apellido1, apellido2, email, payment_status, amount_cents, payment_authorized_at, created_at, invitation_email_status, invitation_email_sent_at, invitation_email_error")
-            .in("event_id", eventIds)
-            .order("created_at", { ascending: true })
+          const attendeeResult = await getAdminEventAttendees(eventIds)
 
-          if (attendeesError) {
-            console.error("Error fetching event attendees:", attendeesError)
+          if (!attendeeResult.success) {
+            console.error("Error fetching event attendees:", attendeeResult.error)
             setEventAttendeesByEventId({})
           } else {
-            const grouped = ((attendees ?? []) as EventAttendee[]).reduce<Record<string, EventAttendee[]>>(
+            const grouped = attendeeResult.attendees.reduce<Record<string, AdminEventAttendeeRow[]>>(
               (acc, attendee) => {
                 if (!acc[attendee.event_id]) {
                   acc[attendee.event_id] = []
@@ -673,7 +655,7 @@ export default function AdminEventsPage() {
     })
   }
 
-  const getAttendeeDisplayName = (attendee: EventAttendee) => {
+  const getAttendeeDisplayName = (attendee: AdminEventAttendeeRow) => {
     return [attendee.name, attendee.apellido1, attendee.apellido2]
       .map((part) => part?.trim())
       .filter(Boolean)

@@ -38,6 +38,22 @@ export interface SendResult {
   error?: string
 }
 
+export interface AdminEventAttendeeRow {
+  id: string
+  event_id: string
+  name: string
+  apellido1: string | null
+  apellido2: string | null
+  email: string
+  payment_status: string
+  amount_cents: number | null
+  payment_authorized_at: string | null
+  created_at: string
+  invitation_email_status: string | null
+  invitation_email_sent_at: string | null
+  invitation_email_error: string | null
+}
+
 interface RecipientRow {
   email: string
   user_id: string | null
@@ -416,6 +432,45 @@ export async function sendEventInvitationToSingleAttendee(input: {
       sent: 0,
       failed: 1,
       skipped: 0,
+      error: error instanceof Error ? error.message : "Error desconocido",
+    }
+  }
+}
+
+export async function getAdminEventAttendees(eventIds: string[]): Promise<{
+  success: boolean
+  attendees: AdminEventAttendeeRow[]
+  error?: string
+}> {
+  try {
+    await requireAdmin()
+    const normalizedEventIds = normalizeOptionalIdList(eventIds)
+
+    if (normalizedEventIds.length === 0) {
+      return { success: true, attendees: [] }
+    }
+
+    const supabase = createAdminSupabaseClient()
+    const { data, error } = await supabase
+      .from("event_assists")
+      .select("id, event_id, name, apellido1, apellido2, email, payment_status, amount_cents, payment_authorized_at, created_at, invitation_email_status, invitation_email_sent_at, invitation_email_error")
+      .in("event_id", normalizedEventIds)
+      .order("created_at", { ascending: true })
+
+    if (error) {
+      console.error("[admin-email-campaigns] Failed loading admin event attendees", {
+        eventIds: normalizedEventIds,
+        error,
+      })
+      return { success: false, attendees: [], error: "No se pudieron cargar los participantes" }
+    }
+
+    return { success: true, attendees: (data ?? []) as AdminEventAttendeeRow[] }
+  } catch (error) {
+    console.error("getAdminEventAttendees error:", error)
+    return {
+      success: false,
+      attendees: [],
       error: error instanceof Error ? error.message : "Error desconocido",
     }
   }
