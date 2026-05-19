@@ -28,6 +28,21 @@ test("parses authorized Redsys CSV rows", () => {
   assert.equal(rows[1].authorized, false)
 })
 
+test("parses comma-delimited Redsys event exports", () => {
+  const rows = parseRedsysOperationsCsv(`Fecha,Hora,N.º terminal,Tipo operación,Cód. pedido,Resultado operación y código,Importe,Moneda,Importe Euros,Cierre de sesión,Tipo de pago,Tipo pago original,N.º tarjeta
+18/05/2026,12:01:25,1,Autorización,2605Eyc68lmB,Autorizada 098692,20,EUR,20,73/0,Frictionless MasterCard,,535120******6014
+18/05/2026,9:07:38,1,Autorización,2605EiKlOvUZ,Sin Finalizar 9998,20,EUR,20,,,,
+`)
+
+  assert.equal(rows.length, 2)
+  assert.equal(rows[0].order, "2605Eyc68lmB")
+  assert.equal(rows[0].authorized, true)
+  assert.equal(rows[0].authorizationCode, "098692")
+  assert.equal(rows[0].amountCents, 2000)
+  assert.equal(rows[0].lastFour, "6014")
+  assert.equal(rows[1].authorized, false)
+})
+
 test("decodes Windows-1252 Redsys exports with accented Spanish headers", () => {
   const cp1252Csv = Buffer.from(
     "Fecha;Hora;Tipo operaci\xf3n;C\xf3d. pedido;Resultado operaci\xf3n y c\xf3digo;Importe;Moneda;Importe Euros;Tipo de pago;Tipo pago original;N.\xba tarjeta;Titular;\n" +

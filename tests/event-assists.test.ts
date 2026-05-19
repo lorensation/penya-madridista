@@ -197,3 +197,106 @@ test("upserts authorized event assists by payment transaction id", async () => {
     authorizedTransaction.id,
   )
 })
+
+test("preserves confirmed attendee data and only refreshes payment fields", async () => {
+  const updates: Array<{ payload: Record<string, unknown>; column: string; value: string }> = []
+  const upserts: unknown[] = []
+  const admin = {
+    from(table: string) {
+      if (table === "miembros") {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  maybeSingle() {
+                    return Promise.resolve({
+                      data: {
+                        email: "profile@example.com",
+                        name: "Profile Name",
+                        apellido1: "Profile",
+                        apellido2: "Ignored",
+                        telefono: "600000000",
+                      },
+                      error: null,
+                    })
+                  },
+                }
+              },
+            }
+          },
+        }
+      }
+
+      if (table === "users") {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  maybeSingle() {
+                    return Promise.resolve({
+                      data: {
+                        email: "user@example.com",
+                        name: "User Name",
+                      },
+                      error: null,
+                    })
+                  },
+                }
+              },
+            }
+          },
+        }
+      }
+
+      assert.equal(table, "event_assists")
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                maybeSingle() {
+                  return Promise.resolve({
+                    data: {
+                      data_confirmed_at: "2026-05-18T12:00:00.000Z",
+                    },
+                    error: null,
+                  })
+                },
+              }
+            },
+          }
+        },
+        update(payload: Record<string, unknown>) {
+          return {
+            eq(column: string, value: string) {
+              updates.push({ payload, column, value })
+              return Promise.resolve({ error: null })
+            },
+          }
+        },
+        upsert(payload: unknown) {
+          upserts.push(payload)
+          return Promise.resolve({ error: null })
+        },
+      }
+    },
+  }
+
+  await upsertEventAssistForAuthorizedPayment(admin, authorizedTransaction)
+
+  assert.equal(upserts.length, 0)
+  assert.equal(updates.length, 1)
+  assert.equal(updates[0].column, "payment_transaction_id")
+  assert.equal(updates[0].value, authorizedTransaction.id)
+  assert.deepEqual(Object.keys(updates[0].payload).sort(), [
+    "amount_cents",
+    "currency",
+    "ds_authorization_code",
+    "last_four",
+    "payment_authorized_at",
+    "payment_status",
+    "updated_at",
+  ])
+})

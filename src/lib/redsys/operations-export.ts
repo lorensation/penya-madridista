@@ -86,7 +86,13 @@ function normalizeHeader(value: string): string {
     .toLowerCase()
 }
 
-function parseDelimitedLine(line: string): string[] {
+function inferDelimiter(line: string): ";" | "," {
+  const semicolonCount = (line.match(/;/g) ?? []).length
+  const commaCount = (line.match(/,/g) ?? []).length
+  return commaCount > semicolonCount ? "," : ";"
+}
+
+function parseDelimitedLine(line: string, delimiter: ";" | "," = ";"): string[] {
   const values: string[] = []
   let current = ""
   let inQuotes = false
@@ -100,7 +106,7 @@ function parseDelimitedLine(line: string): string[] {
       index += 1
     } else if (char === '"') {
       inQuotes = !inQuotes
-    } else if (char === ";" && !inQuotes) {
+    } else if (char === delimiter && !inQuotes) {
       values.push(current.trim())
       current = ""
     } else {
@@ -146,10 +152,11 @@ export function parseRedsysExportCsv(csv: string): RedsysAuthorizedOperation[] {
     return []
   }
 
-  const headers = parseDelimitedLine(headerLine).map(normalizeHeader)
+  const delimiter = inferDelimiter(headerLine)
+  const headers = parseDelimitedLine(headerLine, delimiter).map(normalizeHeader)
 
   return dataLines.flatMap((line) => {
-    const columns = parseDelimitedLine(line)
+    const columns = parseDelimitedLine(line, delimiter)
     const row = Object.fromEntries(headers.map((header, index) => [header, columns[index] ?? ""]))
     const rawResult = getColumn(row, "Resultado operación y código")
     const resultMatch = rawResult.match(/^Autorizada\s+(.+)$/i)

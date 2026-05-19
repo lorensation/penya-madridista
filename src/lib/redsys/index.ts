@@ -44,6 +44,8 @@ export {
   getEndpoints,
   getMerchantCode,
   getTerminal,
+  normalizeRedsysTerminal,
+  redsysTerminalsMatch,
   getSecretKey,
   getNotificationUrl,
   getRealizarPagoUrl,
