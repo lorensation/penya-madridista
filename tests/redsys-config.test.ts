@@ -1,6 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { getBaseUrl, getNotificationUrl } from "../src/lib/redsys/config"
+import {
+  getBaseUrl,
+  getNotificationUrl,
+  normalizeRedsysTerminal,
+  redsysTerminalsMatch,
+} from "../src/lib/redsys/config"
 
 function withEnv(env: Record<string, string | undefined>, fn: () => void) {
   const previous = new Map<string, string | undefined>()
@@ -58,4 +63,12 @@ test("falls back to Vercel deployment URL when configured public URLs are local 
       assert.equal(getBaseUrl(), "https://penya-madridista.vercel.app")
     },
   )
+})
+
+test("normalizes Redsys terminal identifiers before comparing notification callbacks", () => {
+  assert.equal(normalizeRedsysTerminal("001"), "1")
+  assert.equal(normalizeRedsysTerminal("1"), "1")
+  assert.equal(redsysTerminalsMatch("1", "001"), true)
+  assert.equal(redsysTerminalsMatch("001", "1"), true)
+  assert.equal(redsysTerminalsMatch("1", "2"), false)
 })

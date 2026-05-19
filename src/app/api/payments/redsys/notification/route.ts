@@ -8,6 +8,7 @@ import {
   isAuthorizationSuccess,
   getCardLastFourExtraction,
   normalizeRedsysBase64,
+  redsysTerminalsMatch,
   SIGNATURE_VERSION,
   verifySignature,
 } from "@/lib/redsys"
@@ -756,11 +757,14 @@ export async function POST(request: NextRequest) {
 
     const expectedMerchantCode = getMerchantCode()
     const expectedTerminal = getTerminal()
+    const merchantMismatch = Boolean(
+      responseParams.Ds_MerchantCode && responseParams.Ds_MerchantCode !== expectedMerchantCode,
+    )
+    const terminalMismatch = Boolean(
+      responseParams.Ds_Terminal && !redsysTerminalsMatch(expectedTerminal, responseParams.Ds_Terminal),
+    )
 
-    if (
-      (responseParams.Ds_MerchantCode && responseParams.Ds_MerchantCode !== expectedMerchantCode) ||
-      (responseParams.Ds_Terminal && responseParams.Ds_Terminal !== expectedTerminal)
-    ) {
+    if (merchantMismatch || terminalMismatch) {
       await admin
         .from("payment_transactions")
         .update({
@@ -774,7 +778,7 @@ export async function POST(request: NextRequest) {
       await recordAndLog({
         event: "redsys.notification.failed",
         reason:
-          responseParams.Ds_MerchantCode && responseParams.Ds_MerchantCode !== expectedMerchantCode
+          merchantMismatch
             ? "merchant_mismatch"
             : "terminal_mismatch",
         redsys_order: order,

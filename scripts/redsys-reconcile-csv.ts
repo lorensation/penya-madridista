@@ -173,7 +173,13 @@ function normalizeAuthorizationCode(value: string | null | undefined): string {
   return /^\d+$/.test(trimmed) ? trimmed.padStart(6, "0") : trimmed
 }
 
-function parseDelimitedLine(line: string): string[] {
+function inferDelimiter(line: string): ";" | "," {
+  const semicolonCount = (line.match(/;/g) ?? []).length
+  const commaCount = (line.match(/,/g) ?? []).length
+  return commaCount > semicolonCount ? "," : ";"
+}
+
+function parseDelimitedLine(line: string, delimiter: ";" | "," = ";"): string[] {
   const values: string[] = []
   let current = ""
   let inQuotes = false
@@ -187,7 +193,7 @@ function parseDelimitedLine(line: string): string[] {
       index += 1
     } else if (char === '"') {
       inQuotes = !inQuotes
-    } else if (char === ";" && !inQuotes) {
+    } else if (char === delimiter && !inQuotes) {
       values.push(current.trim())
       current = ""
     } else {
@@ -254,10 +260,11 @@ export function parseRedsysOperationsCsv(csv: string): RedsysCsvRow[] {
   const [headerLine, ...dataLines] = lines
   if (!headerLine) return []
 
-  const headers = parseDelimitedLine(headerLine).map(normalizeHeader)
+  const delimiter = inferDelimiter(headerLine)
+  const headers = parseDelimitedLine(headerLine, delimiter).map(normalizeHeader)
 
   return dataLines.map((line) => {
-    const columns = parseDelimitedLine(line)
+    const columns = parseDelimitedLine(line, delimiter)
     const row = Object.fromEntries(headers.map((header, index) => [header, columns[index] ?? ""]))
     const operationType = getColumn(row, ["Tipo operación", "Tipo operacion"])
     const rawResult = getColumn(row, ["Resultado operación y código", "Resultado operacion y codigo"])

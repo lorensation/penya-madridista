@@ -28,6 +28,19 @@ test("parses only authorized Redsys rows and splits result code", () => {
   assert.equal(rows[2].type, "Devolución")
 })
 
+test("parses comma-delimited Redsys event exports", () => {
+  const rows = parseRedsysExportCsv(`Fecha,Hora,N.º terminal,Tipo operación,Cód. pedido,Resultado operación y código,Importe,Moneda,Importe Euros,Cierre de sesión,Tipo de pago,Tipo pago original,N.º tarjeta
+18/05/2026,12:01:25,1,Autorización,2605Eyc68lmB,Autorizada 098692,20,EUR,20,73/0,Frictionless MasterCard,,535120******6014
+18/05/2026,9:07:38,1,Autorización,2605EiKlOvUZ,Sin Finalizar 9998,20,EUR,20,,,,
+`)
+
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].order, "2605Eyc68lmB")
+  assert.equal(rows[0].operationCode, "098692")
+  assert.equal(rows[0].amountEuros, 20)
+  assert.equal(rows[0].cardNumber, "535120******6014")
+})
+
 test("parses real accented Spanish Redsys headers", () => {
   const rows = parseRedsysExportCsv(csv)
 

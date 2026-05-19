@@ -169,6 +169,26 @@ export function getTerminal(): string {
   return process.env.REDSYS_TERMINAL || "1"
 }
 
+export function normalizeRedsysTerminal(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
+  if (!trimmed) {
+    return null
+  }
+
+  const numeric = Number.parseInt(trimmed, 10)
+  return Number.isFinite(numeric) ? String(numeric) : trimmed
+}
+
+export function redsysTerminalsMatch(
+  expected: string | null | undefined,
+  received: string | null | undefined,
+): boolean {
+  const normalizedExpected = normalizeRedsysTerminal(expected)
+  const normalizedReceived = normalizeRedsysTerminal(received)
+
+  return Boolean(normalizedExpected && normalizedReceived && normalizedExpected === normalizedReceived)
+}
+
 export function getSecretKey(): string {
   const key = process.env.REDSYS_SECRET_KEY
   if (!key) throw new Error("Missing env: REDSYS_SECRET_KEY")
