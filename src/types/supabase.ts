@@ -193,6 +193,11 @@ export type Database = {
           email: string
           event_id: string
           id: string
+          invitation_email_error: string | null
+          invitation_email_last_attempt_at: string | null
+          invitation_email_message_id: string | null
+          invitation_email_sent_at: string | null
+          invitation_email_status: string | null
           last_four: string | null
           name: string
           payment_authorized_at: string | null
@@ -214,6 +219,11 @@ export type Database = {
           email: string
           event_id: string
           id?: string
+          invitation_email_error?: string | null
+          invitation_email_last_attempt_at?: string | null
+          invitation_email_message_id?: string | null
+          invitation_email_sent_at?: string | null
+          invitation_email_status?: string | null
           last_four?: string | null
           name: string
           payment_authorized_at?: string | null
@@ -235,6 +245,11 @@ export type Database = {
           email?: string
           event_id?: string
           id?: string
+          invitation_email_error?: string | null
+          invitation_email_last_attempt_at?: string | null
+          invitation_email_message_id?: string | null
+          invitation_email_sent_at?: string | null
+          invitation_email_status?: string | null
           last_four?: string | null
           name?: string
           payment_authorized_at?: string | null

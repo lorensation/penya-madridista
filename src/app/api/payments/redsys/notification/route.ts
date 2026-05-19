@@ -20,6 +20,10 @@ import {
   recordRedsysNotificationEvent,
 } from "@/lib/redsys/notification-events"
 import { upsertEventAssistForAuthorizedPayment } from "@/lib/event-assists"
+import {
+  sendEventAttendeeInvitationForPaymentTransaction,
+  type EventAttendeeInvitationAdminClient,
+} from "@/lib/email/event-attendee-invitations"
 
 function getAdminClient() {
   return createClient(
@@ -395,6 +399,26 @@ async function handleAuthorizedShopPayment(admin: AdminClient, transaction: Paym
     .eq("id", transaction.id)
 }
 
+async function handleAuthorizedEventPayment(admin: AdminClient, transaction: PaymentTransactionRow) {
+  await upsertEventAssistForAuthorizedPayment(admin, transaction)
+
+  const invitationResult = await sendEventAttendeeInvitationForPaymentTransaction({
+    admin: admin as unknown as EventAttendeeInvitationAdminClient,
+    paymentTransactionId: transaction.id,
+    mode: "automatic",
+  })
+
+  if (!invitationResult.success && !invitationResult.skipped) {
+    console.error("[redsys.notification] Event attendee invitation email failed", {
+      transactionId: transaction.id,
+      redsysOrder: transaction.redsys_order,
+      eventId: transaction.event_id,
+      reason: invitationResult.reason,
+      error: invitationResult.error,
+    })
+  }
+}
+
 async function handleAuthorizedCardUpdate(
   admin: AdminClient,
   transaction: PaymentTransactionRow,
@@ -642,7 +666,7 @@ export async function POST(request: NextRequest) {
     if (transaction.status !== "pending") {
       if (transaction.context === "event" && transaction.status === "authorized") {
         try {
-          await upsertEventAssistForAuthorizedPayment(admin, transaction as PaymentTransactionRow)
+          await handleAuthorizedEventPayment(admin, transaction as PaymentTransactionRow)
         } catch (fulfillmentError) {
           await recordAndLog({
             event: "redsys.notification.failed",
@@ -966,7 +990,7 @@ export async function POST(request: NextRequest) {
       if (claimed.data.context === "shop") {
         await handleAuthorizedShopPayment(admin, claimed.data as PaymentTransactionRow)
       } else if (claimed.data.context === "event") {
-        await upsertEventAssistForAuthorizedPayment(admin, claimed.data as PaymentTransactionRow)
+        await handleAuthorizedEventPayment(admin, claimed.data as PaymentTransactionRow)
       } else if (claimed.data.context === "membership") {
         const metadata = parseMetadataRecord(claimed.data.metadata)
         const metadataType = typeof metadata.type === "string" ? metadata.type : null

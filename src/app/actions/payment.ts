@@ -26,6 +26,10 @@ import {
   buildAuthorizedEventReturnUpdate,
   upsertEventAssistForAuthorizedPayment,
 } from "@/lib/event-assists"
+import {
+  sendEventAttendeeInvitationForPaymentTransaction,
+  type EventAttendeeInvitationAdminClient,
+} from "@/lib/email/event-attendee-invitations"
 import type {
   ExecutePaymentResult,
   PaymentContext,
@@ -272,6 +276,40 @@ function normalizePaymentStatus(status: string | null | undefined): ResolveEvent
   return "not_found"
 }
 
+async function sendEventInvitationAfterRedirect(
+  admin: ReturnType<typeof getAdminClient>,
+  transaction: {
+    id: string
+    redsys_order: string
+    event_id: string | null
+  },
+) {
+  try {
+    const result = await sendEventAttendeeInvitationForPaymentTransaction({
+      admin: admin as unknown as EventAttendeeInvitationAdminClient,
+      paymentTransactionId: transaction.id,
+      mode: "automatic",
+    })
+
+    if (!result.success && !result.skipped) {
+      console.error("[payment] Event attendee invitation email failed from redirect", {
+        transactionId: transaction.id,
+        redsysOrder: transaction.redsys_order,
+        eventId: transaction.event_id,
+        reason: result.reason,
+        error: result.error,
+      })
+    }
+  } catch (error) {
+    console.error("[payment] Event attendee invitation email failed unexpectedly from redirect", {
+      transactionId: transaction.id,
+      redsysOrder: transaction.redsys_order,
+      eventId: transaction.event_id,
+      error,
+    })
+  }
+}
+
 export async function resolveEventRedirectPayment(
   input: ResolveEventRedirectPaymentInput,
 ): Promise<ResolveEventRedirectPaymentResult> {
@@ -312,6 +350,7 @@ export async function resolveEventRedirectPayment(
 
     if (transaction.status === "authorized") {
       await upsertEventAssistForAuthorizedPayment(admin, transaction)
+      await sendEventInvitationAfterRedirect(admin, transaction)
       return { success: true, status: "authorized" }
     }
 
@@ -370,6 +409,7 @@ export async function resolveEventRedirectPayment(
 
       if (latestTransaction?.status === "authorized") {
         await upsertEventAssistForAuthorizedPayment(admin, latestTransaction)
+        await sendEventInvitationAfterRedirect(admin, latestTransaction)
         return { success: true, status: "authorized" }
       }
 
@@ -380,6 +420,7 @@ export async function resolveEventRedirectPayment(
     }
 
     await upsertEventAssistForAuthorizedPayment(admin, updatedTransaction)
+    await sendEventInvitationAfterRedirect(admin, updatedTransaction)
     revalidatePath(`/blog/events/${parsed.data.eventId}/redsys/ok`)
 
     return { success: true, status: "authorized" }

@@ -49,6 +49,7 @@ import {
   getEventCampaignStatus,
   sendCampaign,
   sendEventInvitationToAttendees,
+  sendEventInvitationToSingleAttendee,
   sendTestCampaign,
 } from "@/app/actions/admin-email-campaigns"
 
@@ -73,6 +74,28 @@ interface Event {
   updated_at: string | null
 }
 
+interface EventAttendee {
+  id: string
+  event_id: string
+  name: string
+  apellido1: string | null
+  apellido2: string | null
+  email: string
+  payment_status: string
+  amount_cents: number | null
+  payment_authorized_at: string | null
+  created_at: string
+  invitation_email_status: string | null
+  invitation_email_sent_at: string | null
+  invitation_email_error: string | null
+}
+
+interface AttendeeSendState {
+  loading?: boolean
+  success?: string
+  error?: string
+}
+
 // Empty event for new creation
 const emptyEvent: Omit<Event, "id" | "created_at" | "updated_at"> = {
   title: "",
@@ -91,6 +114,8 @@ const emptyEvent: Omit<Event, "id" | "created_at" | "updated_at"> = {
 export default function AdminEventsPage() {
   const router = useRouter()
   const [events, setEvents] = useState<Event[]>([])
+  const [eventAttendeesByEventId, setEventAttendeesByEventId] = useState<Record<string, EventAttendee[]>>({})
+  const [attendeeSendState, setAttendeeSendState] = useState<Record<string, AttendeeSendState>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [authChecking, setAuthChecking] = useState(true)
@@ -181,7 +206,37 @@ export default function AdminEventsPage() {
         console.error("Error fetching events:", error)
         setError("No se pudieron cargar los eventos. Por favor, inténtalo de nuevo más tarde.")
       } else {
-        setEvents(data || [])
+        const fetchedEvents = data || []
+        setEvents(fetchedEvents)
+        const eventIds = fetchedEvents.map((event) => event.id)
+
+        if (eventIds.length > 0) {
+          const { data: attendees, error: attendeesError } = await supabase
+            .from("event_assists")
+            .select("id, event_id, name, apellido1, apellido2, email, payment_status, amount_cents, payment_authorized_at, created_at, invitation_email_status, invitation_email_sent_at, invitation_email_error")
+            .in("event_id", eventIds)
+            .order("created_at", { ascending: true })
+
+          if (attendeesError) {
+            console.error("Error fetching event attendees:", attendeesError)
+            setEventAttendeesByEventId({})
+          } else {
+            const grouped = ((attendees ?? []) as EventAttendee[]).reduce<Record<string, EventAttendee[]>>(
+              (acc, attendee) => {
+                if (!acc[attendee.event_id]) {
+                  acc[attendee.event_id] = []
+                }
+                acc[attendee.event_id].push(attendee)
+                return acc
+              },
+              {},
+            )
+            setEventAttendeesByEventId(grouped)
+          }
+        } else {
+          setEventAttendeesByEventId({})
+        }
+
         setError(null)
       }
     } catch (error) {
@@ -559,12 +614,89 @@ export default function AdminEventsPage() {
     }
   }
 
+  const handleSendSingleAttendeeInvitation = async (eventId: string, attendeeId: string) => {
+    setAttendeeSendState((prev) => ({
+      ...prev,
+      [attendeeId]: { loading: true },
+    }))
+
+    try {
+      const result = await sendEventInvitationToSingleAttendee({ eventId, attendeeId })
+      if (!result.success) {
+        setAttendeeSendState((prev) => ({
+          ...prev,
+          [attendeeId]: {
+            loading: false,
+            error: result.error || "No se pudo enviar la invitacion",
+          },
+        }))
+        return
+      }
+
+      await fetchEvents()
+      setAttendeeSendState((prev) => ({
+        ...prev,
+        [attendeeId]: {
+          loading: false,
+          success: result.skipped > 0 ? "Envio omitido" : "Invitacion enviada",
+        },
+      }))
+    } catch (err) {
+      console.error("Error sending single attendee invitation:", err)
+      setAttendeeSendState((prev) => ({
+        ...prev,
+        [attendeeId]: {
+          loading: false,
+          error: "Error al enviar la invitacion",
+        },
+      }))
+    }
+  }
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("es-ES", {
       day: "numeric",
       month: "long",
       year: "numeric"
     })
+  }
+
+  const formatDateTime = (dateString: string | null) => {
+    if (!dateString) return "No disponible"
+
+    return new Date(dateString).toLocaleString("es-ES", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  const getAttendeeDisplayName = (attendee: EventAttendee) => {
+    return [attendee.name, attendee.apellido1, attendee.apellido2]
+      .map((part) => part?.trim())
+      .filter(Boolean)
+      .join(" ") || attendee.email
+  }
+
+  const getInvitationStatusLabel = (status: string | null) => {
+    switch (status) {
+      case "sent":
+        return "Enviado"
+      case "sending":
+        return "Enviando"
+      case "failed":
+        return "Fallido"
+      case "skipped":
+        return "Omitido"
+      case "pending":
+      case null:
+      case undefined:
+        return "Pendiente"
+      default:
+        return status
+    }
   }
 
   // Show loading state while checking authentication
@@ -727,6 +859,94 @@ export default function AdminEventsPage() {
                     </span>
                   </div>
                 )}
+                <div className="border-t pt-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Participantes</span>
+                    </div>
+                    <Badge variant="outline">
+                      {(eventAttendeesByEventId[event.id] ?? []).length}
+                    </Badge>
+                  </div>
+
+                  {(eventAttendeesByEventId[event.id] ?? []).length === 0 ? (
+                    <p className="text-sm text-gray-500">Sin participantes registrados.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {(eventAttendeesByEventId[event.id] ?? []).map((attendee) => {
+                        const rowState = attendeeSendState[attendee.id] ?? {}
+                        const invitationSent = Boolean(attendee.invitation_email_sent_at)
+
+                        return (
+                          <div key={attendee.id} className="rounded-md border p-3">
+                            <div className="flex flex-col gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium">{getAttendeeDisplayName(attendee)}</p>
+                                <p className="truncate text-xs text-gray-500">{attendee.email}</p>
+                              </div>
+
+                              <div className="grid grid-cols-1 gap-2 text-xs text-gray-600 sm:grid-cols-2">
+                                <div>
+                                  <span className="font-medium text-gray-700">Pago: </span>
+                                  {attendee.payment_status}
+                                </div>
+                                <div>
+                                  <span className="font-medium text-gray-700">Precio: </span>
+                                  {typeof attendee.amount_cents === "number"
+                                    ? formatShopPrice(attendee.amount_cents)
+                                    : "No disponible"}
+                                </div>
+                                <div>
+                                  <span className="font-medium text-gray-700">Compra: </span>
+                                  {formatDateTime(attendee.payment_authorized_at ?? attendee.created_at)}
+                                </div>
+                                <div>
+                                  <span className="font-medium text-gray-700">Email: </span>
+                                  {getInvitationStatusLabel(attendee.invitation_email_status)}
+                                </div>
+                                <div className="sm:col-span-2">
+                                  <span className="font-medium text-gray-700">Ultimo envio: </span>
+                                  {formatDateTime(attendee.invitation_email_sent_at)}
+                                </div>
+                                {attendee.invitation_email_error && (
+                                  <div className="text-red-600 sm:col-span-2">
+                                    {attendee.invitation_email_error}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleSendSingleAttendeeInvitation(event.id, attendee.id)}
+                                  disabled={Boolean(rowState.loading)}
+                                  className="w-full sm:w-auto"
+                                >
+                                  {rowState.loading ? (
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                                  ) : (
+                                    <>
+                                      <Send className="mr-2 h-4 w-4" />
+                                      {invitationSent ? "Reenviar invitacion" : "Enviar invitacion"}
+                                    </>
+                                  )}
+                                </Button>
+                                {rowState.success && (
+                                  <span className="text-xs text-green-700">{rowState.success}</span>
+                                )}
+                                {rowState.error && (
+                                  <span className="text-xs text-red-600">{rowState.error}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
               </CardContent>
               <CardFooter className="pt-0 mt-auto grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Button

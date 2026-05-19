@@ -7,6 +7,10 @@ import {
   resolveEventInvitationImageUrl,
   type EventAssistRecipientRow,
 } from "@/lib/email/event-invitations"
+import {
+  sendEventAttendeeInvitation,
+  type EventAttendeeInvitationAdminClient,
+} from "@/lib/email/event-attendee-invitations"
 import { generatePreferencesToken } from "@/lib/email/preferences-token"
 import { getAcquisitionCampaignTemplate } from "@/lib/email/templates/acquisition-campaign"
 import {
@@ -257,29 +261,20 @@ export async function sendEventInvitationToAttendees(input: {
 
     let sentCount = 0
     let failedCount = 0
+    let skippedCount = 0
 
     for (const attendee of validAttendees) {
       const recipientEmail = normalizeEmail(attendee.email)
-      const attendeeName = attendee.name?.trim() || recipientEmail
-      const html = renderEventAttendeeInvitationEmail({
-        eventTitle: event.title,
-        eventDate: formatDateES(event.date),
-        eventTime: event.time,
-        eventLocation: event.location,
-        eventDescription: event.description,
-        attendeeName,
-        attendeeEmail: recipientEmail,
-        invitationImageUrl,
-      })
 
       try {
-        const result = await sendEmail({
-          to: recipientEmail,
-          subject,
-          html,
+        const result = await sendEventAttendeeInvitation({
+          admin: supabase as unknown as EventAttendeeInvitationAdminClient,
+          attendeeId: attendee.id,
+          mode: "manual",
+          imageUrlOverride: input.imageUrlOverride,
         })
 
-        if (result.success) {
+        if (result.success && !result.skipped) {
           sentCount++
           await supabase
             .from("email_deliveries")
@@ -287,6 +282,16 @@ export async function sendEventInvitationToAttendees(input: {
               status: "sent",
               provider_message_id: result.messageId || null,
               sent_at: new Date().toISOString(),
+            })
+            .eq("campaign_id", campaign.id)
+            .eq("recipient_email", recipientEmail)
+        } else if (result.skipped) {
+          skippedCount++
+          await supabase
+            .from("email_deliveries")
+            .update({
+              status: "skipped",
+              error_message: result.reason || null,
             })
             .eq("campaign_id", campaign.id)
             .eq("recipient_email", recipientEmail)
@@ -332,7 +337,7 @@ export async function sendEventInvitationToAttendees(input: {
       success: true,
       sent: sentCount,
       failed: failedCount,
-      skipped: validAttendees.length - deliveryRows.length,
+      skipped: skippedCount + validAttendees.length - deliveryRows.length,
     }
   } catch (error) {
     console.error("sendEventInvitationToAttendees error:", error)
@@ -340,6 +345,76 @@ export async function sendEventInvitationToAttendees(input: {
       success: false,
       sent: 0,
       failed: 0,
+      skipped: 0,
+      error: error instanceof Error ? error.message : "Error desconocido",
+    }
+  }
+}
+
+export async function sendEventInvitationToSingleAttendee(input: {
+  eventId: string
+  attendeeId: string
+}): Promise<SendResult> {
+  try {
+    await requireAdmin()
+    const supabase = createAdminSupabaseClient()
+
+    const { data: attendee, error: attendeeError } = await supabase
+      .from("event_assists")
+      .select("id, event_id")
+      .eq("id", input.attendeeId)
+      .eq("event_id", input.eventId)
+      .maybeSingle()
+
+    if (attendeeError) {
+      console.error("[admin-email-campaigns] Failed loading attendee for manual invitation resend", {
+        eventId: input.eventId,
+        attendeeId: input.attendeeId,
+        error: attendeeError,
+      })
+      return { success: false, sent: 0, failed: 1, skipped: 0, error: "No se pudo cargar el asistente" }
+    }
+
+    if (!attendee) {
+      return { success: false, sent: 0, failed: 1, skipped: 0, error: "Asistente no encontrado" }
+    }
+
+    const result = await sendEventAttendeeInvitation({
+      admin: supabase as unknown as EventAttendeeInvitationAdminClient,
+      attendeeId: input.attendeeId,
+      mode: "manual",
+    })
+
+    revalidatePath("/admin/events")
+    revalidatePath(`/admin/events/${input.eventId}`)
+
+    if (result.success && !result.skipped) {
+      return { success: true, sent: 1, failed: 0, skipped: 0 }
+    }
+
+    if (result.skipped) {
+      return {
+        success: true,
+        sent: 0,
+        failed: 0,
+        skipped: 1,
+        error: result.reason,
+      }
+    }
+
+    return {
+      success: false,
+      sent: 0,
+      failed: 1,
+      skipped: 0,
+      error: result.error || "No se pudo enviar la invitacion",
+    }
+  } catch (error) {
+    console.error("sendEventInvitationToSingleAttendee error:", error)
+    return {
+      success: false,
+      sent: 0,
+      failed: 1,
       skipped: 0,
       error: error instanceof Error ? error.message : "Error desconocido",
     }
